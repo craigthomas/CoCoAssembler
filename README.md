@@ -38,19 +38,30 @@ LICENSE for more information.
 Simply copy the source files to a directory of your choice. In addition to
 the source, you will need the following required software packages:
 
-* [Python 3](http://www.python.org)
-* [pygame](http://http://www.pygame.org)
+* [Python 2.7+ or 3](http://www.python.org)
 
 I strongly recommend creating a virtual environment using the
 [virtualenv](http://pypi.python.org/pypi/virtualenv) builder as well as the
 [virtualenvwrapper](https://bitbucket.org/dhellmann/virtualenvwrapper) tools.
-With these tools, you can easily create a virtual sandbox to install pygame
-and run the emulator in, without touching your master Python enviornment.
 
 
 ## Usage
 
-Under construction.
+The assembler is used to transform assembly language statements into 6809E
+machine code. A source file of assembly language statments is broken up into a
+number of columns:
+
+    LABEL    OPERATION    OPERAND    COMMENT
+
+Where each column contains the following:
+
+* `LABEL` - a label to be applied to the operation or declaraion. A label may be 
+composed of any alphanumeric characters, and can be any length. For example,
+`START_ROUTINE` or `PRINT_21`.
+* `OPERATION` - the operation to execute. For example, `ADDA`, `STX`, `LDY`.
+* `OPERAND` - the data to apply to the operation. For example, `#$40`, `[$1234]`.
+* `COMMENT` - a textual comment to be applied to the operation, can be any length
+and is terminated by a newline character. For example, `Print out a string`.
 
 
 ## Further Documentation
