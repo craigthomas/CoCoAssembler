@@ -8,6 +8,7 @@ A Color Computer 3 assembler - see the README.md file for details.
 
 import argparse
 import re
+import sys
 
 # C O N S T A N T S ###########################################################
 
@@ -23,6 +24,9 @@ LABEL = "label"
 OP = "op"
 OPERAND = "operand"
 COMMENT = "comment"
+MODE = "mode"
+OPCODE = "opcode"
+DATA = "data"
 
 # Illegal addressing mode
 ILLEGAL_MODE = 0x00
@@ -56,6 +60,11 @@ OPERAND_COUNTS = {
 # Pattern to parse a single line
 ASM_LINE_REGEX = re.compile("(?P<label>\w*)\s+(?P<op>\w*)\s+"
     "(?P<operand>[\w#\$,\+-]*)\s+(?P<comment>.*)")
+
+# G L O B A L S ###############################################################
+
+# Stores each of the symbols and their values
+symbol_table = dict()
 
 # F U N C T I O N S ###########################################################
 
@@ -96,6 +105,9 @@ def parse_line(line):
         op - the operation (for example, ADCA, LDA)
         operand - the operand of the operation (for example, $4000)
         comment - the comment applied to the line
+
+    If the line does not match the column format specified, return an empty
+    dictionary.
     
     @param line: the line of code to parse
     @type line: str
@@ -110,10 +122,11 @@ def parse_line(line):
         result[OP] = data.group(OP)
         result[OPERAND] = data.group(OPERAND)
         result[COMMENT] = data.group(COMMENT)
+    print(result)
     return result 
 
 
-def get_addressing_mode(operand):
+def translate_addressing_mode(statement):
     '''
     Based upon the operand, determine what the addressing mode should be.
 
@@ -123,16 +136,134 @@ def get_addressing_mode(operand):
     @return: the addressing mode associated with the operand
     @rtype: [ Inherent | Immediate | Direct | Indexed | Extended ]
     '''
+    operand = statement[OPERAND]
     if operand == "":
-        return INHERENT
+        return INH
     if operand.startswith("#"):
-        return IMMEDIATE
+        return IMM
     if "," in operand:
-        return INDEXED
+        return IND
     if operand.startswith("<"):
-        return DIRECT
+        return DIR
     if operand.startswith(">"):
-        return EXTENDED
+        return EXT
+    return EXT
+
+
+def translate_opcode(statement):
+    '''
+    Translate the opcode mnemonic into a machine language opcode. The
+    translation examines the mode of the statement to figure out the
+    correct opcode. Will exit with an error on an invalid opcode
+    mnemonic, or if there is a problem translating the operand.
+
+    @param statement: the assembly statement containing the operand to
+        translate
+    @type statement: dict
+
+    @return: the machine language opcode translation of the mnemonic
+    @rtype: int
+    '''
+    operation = statement[OP]
+    mode = statement[MODE]
+
+    if operation not in OPERATIONS:
+        print("{}  {}  {}  {}".format(statement[LABEL], statement[OP],
+           statement[OPERAND], statement[COMMENT]))
+        print("Error: invalid mnemonic '{}'".format(statement[OP]))
+        sys.exit(1)
+    
+    if mode not in OPERATIONS[operation]:
+        print("{}  {}  {}  {}".format(statement[LABEL], statement[OP],
+           statement[OPERAND], statement[COMMENT]))
+        print("Error: syntax error in operand '{}'".format(statement[OPERAND]))
+        sys.exit(1)
+
+    return OPERATIONS[operation][mode]
+
+
+def is_pseudo_op(statement):
+    '''
+    Returns true if the assembly language statement is actually a pseudo op.
+
+    @param statement: the assembly statement containing the operand to
+        translate
+    @type statement: dict
+
+    @return: True if the statement is a pseudo op, False otherwise
+    @rtype: boolean
+    '''
+    if statement[OP] in PSEUDO_OPERATIONS:
+        return True
+    return False
+
+
+def get_hex_value(operand):
+    ''' 
+    Returns the hex value of the operand, and the number of bytes used to
+    represent the hex value. If the operand contains a symbol reference,
+    attempts to look up that symbol in the symbol_table.
+
+    @param operand: the operand to decode
+    @type operand: str
+
+    @return: a tuple containing the hex value of the statement, and the
+        number of bytes taken to store the statement
+    @rtype: ( int, int )
+    '''
+    value = operand
+    num_bytes = 0
+    hex_value = 0x0
+
+    if operand.startswith("$"):
+        value = operand.replace("$", "")
+        hex_value = int(value, 16) 
+        if len(value) == 1 or len(value) == 2:
+            num_bytes = 1
+        if len(value) == 3 or len(value) == 4:
+            num_bytes = 2
+        return (hex_value, num_bytes)
+
+
+def translate_operand(statement):
+    '''
+    Translate the operand into a hex value, and record the number of bytes
+    taken to represent the operand. Result of the function is a tuple with
+    the operand value (in hex), and the number of bytes for the operand.
+
+    @param statement: the assembly statement containing the operand to
+        translate
+    @type statement: dict
+
+    @return: a tuple containing the hex value of the statement, and the
+        number of bytes taken to store the statement
+    @rtype: ( int, int )
+    '''
+    mode = statement[MODE]
+    operand = statement[OPERAND]
+
+    if mode == INH:
+        return (0, 0) 
+
+    if mode == IMM:
+        operand = operand.replace("#", "")
+        return get_hex_value(operand)
+
+    if mode == EXT:
+        operand = operand.replace(">", "")
+        return get_hex_value(operand)
+        
+
+def translate(statement):
+    '''
+    '''
+    if is_pseudo_op(statement):
+        pass
+    else:
+        statement[MODE] = translate_addressing_mode(statement)
+        statement[OPCODE] = translate_opcode(statement)
+        statement[DATA] = translate_operand(statement)
+    print('{}'.format(statement))
 
 
 def main(args):
@@ -142,7 +273,10 @@ def main(args):
     lines = read_file(args.filename)
     for line in lines:
         result = parse_line(line)
-        print(result)
+        if result:
+            translate(result)
+            
+
 
 # M A I N #####################################################################
 
