@@ -56,12 +56,15 @@ number of columns:
 Where each column contains the following:
 
 * `LABEL` - a label to be applied to the operation or declaraion. A label may be 
-composed of any alphanumeric characters, and can be any length. For example,
-`START_ROUTINE` or `PRINT_21`.
-* `OPERATION` - the operation to execute. For example, `ADDA`, `STX`, `LDY`.
-* `OPERAND` - the data to apply to the operation. For example, `#$40`, `[$1234]`.
+composed of any alphanumeric characters, and can be any length.
+* `OPERATION` - the operation to execute. 
+* `OPERAND` - the data to apply to the operation. 
 * `COMMENT` - a textual comment to be applied to the operation, can be any length
-and is terminated by a newline character. For example, `Print out a string`.
+and is terminated by a newline character. 
+
+A full example would be:
+
+    PRINT_STR   LDA    #$40   Load starting address
 
 
 ## Further Documentation
