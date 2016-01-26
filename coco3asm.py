@@ -37,6 +37,19 @@ OPERATIONS = {
     "ABX":  {INH: 0x3A, IMM: IVLD, DIR: IVLD, IND: IVLD, EXT: IVLD},
     "ADCA": {INH: 0x00, IMM: 0x89, DIR: 0x99, IND: 0xA9, EXT: 0xB9},
     "ADCB": {INH: 0x00, IMM: 0xC9, DIR: 0xD9, IND: 0xE9, EXT: 0xF9},
+    "ADDA": {INH: IVLD, IMM: 0x8B, DIR: 0x9B, IND: 0xAB, EXT: 0xBB},
+    "ADDB": {INH: IVLD, IMM: 0xCB, DIR: 0xDB, IND: 0xEB, EXT: 0xFB},
+    "ADDD": {INH: IVLD, IMM: 0xC3, DIR: 0xD3, IND: 0xE3, EXT: 0xF3},
+    "ANDA": {INH: IVLD, IMM: 0x84, DIR: 0x94, IND: 0xA4, EXT: 0xB4},
+    "ANDB": {INH: IVLD, IMM: 0xC4, DIR: 0xD4, IND: 0xE4, EXT: 0xF4},
+    "ANDCC":{INH: IVLD, IMM: 0x1C, DIR: IVLD, IND: IVLD, EXT: IVLD},
+    "ASLA": {INH: 0x48, IMM: IVLD, DIR: IVLD, IND: IVLD, EXT: IVLD},
+    "ASLB": {INH: 0x58, IMM: IVLD, DIR: IVLD, IND: IVLD, EXT: IVLD},
+    "ASL":  {INH: IVLD, IMM: IVLD, DIR: 0x08, IND: 0x68, EXT: 0x78},
+    "ASRA": {INH: 0x47, IMM: IVLD, DIR: IVLD, IND: IVLD, EXT: IVLD},
+    "ASRB": {INH: 0x57, IMM: IVLD, DIR: IVLD, IND: IVLD, EXT: IVLD},
+    "ASR":  {INH: IVLD, IMM: IVLD, DIR: 0x07, IND: 0x67, EXT: 0x77},
+    "LDB":  {INH: IVLD, IMM: 0xC6, DIR: 0xD6, IND: 0xE6, EXT: 0xF6}
 }
 
 # Pseudo operations
@@ -51,16 +64,16 @@ FCC = "FCC"
 INCLUDE = "INCLUDE"
 PSEUDO_OPERATIONS = [END, ORG, EQU, SET, RMB, FCB, FDB, FCC, INCLUDE]
 
-# Opcode operand requirements based on addressing modes
+# Op code operand requirements based on addressing modes
 OPERAND_COUNTS = {
-    "ABX": {INH: 0, IMM: 0, DIR: 0, IND: 0, EXT: 0},
+    "ABX":  {INH: 0, IMM: 0, DIR: 0, IND: 0, EXT: 0},
     "ADCA": {INH: 0, IMM: 1, DIR: 1, IND: 1, EXT: 2},
     "ADCB": {INH: 0, IMM: 1, DIR: 1, IND: 1, EXT: 2},
 }
 
 # Pattern to parse a single line
-ASM_LINE_REGEX = re.compile("(?P<" + LABEL + ">\w*)\s+(?P<" + OP + ">\w*)\s+"
-    "(?P<" + OPERANDS + ">[\w#\$,\+-]*)\s+(?P<" + COMMENT + ">.*)")
+ASM_LINE_REGEX = re.compile(
+    "(?P<{0}>\\w*)\\s+(?P<{1}>\\w*)\\s+(?P<{2}>[\\w#\\$,\\+-]*)\\s+# (?P<{3}>.*)".format(LABEL, OP, OPERANDS, COMMENT))
 
 # G L O B A L S ###############################################################
 
@@ -101,15 +114,27 @@ class Statement:
         self.comments = ""
         self.size = 0
         self.address = 0
+        self.data = 0
         self.op = ""
         self.operands = ""
         self.comment = ""
         self.mode = ""
 
     def __str__(self):
-        return "$-- {} {} {} {}  # {}".format(
-                # self.address[2:].upper().rjust(4, '0'),
-                hex(self.op_code).rjust(4, '0'),
+        if self.data != 0:
+            return "{:04X} {:4X} {:4X} {} {} {}  # {}".format(
+                    self.address,
+                    self.op_code,
+                    self.data,
+                    self.label.rjust(15, ' '),
+                    self.op.rjust(5, ' '),
+                    self.operands.rjust(15, ' '),
+                    self.comment.ljust(40, ' '))
+
+        return "{:04X} {:4X} {} {} {} {}  # {}".format(
+                self.address,
+                self.op_code,
+                "".rjust(4, ' '),
                 self.label.rjust(15, ' '),
                 self.op.rjust(5, ' '),
                 self.operands.rjust(15, ' '),
@@ -141,6 +166,7 @@ class Statement:
 
         self.set_addressing_mode()
         self.set_op_code()
+        self.set_data()
 
     def get_operation(self):
         """
@@ -176,9 +202,41 @@ class Statement:
         """
         self.op_code = self.get_operation()[self.mode]
         if self.op_code == IVLD:
-            error = "Invalid addressing mode {} for operation {}".format(
+            error = "Invalid addressing mode ({}) for operation {}".format(
                         self.mode, self.op)
             raise TranslationError(error)
+
+    def set_data(self):
+        """
+        Sets the data component of the statement. Translates the operands
+        into useful data bytes.
+        """
+        self.data, self.size = self.get_hex_value()
+
+    def get_hex_value(self):
+        """
+        Returns the hex value of the operand, and the number of bytes used to
+        represent the hex value. If the operand contains a symbol reference,
+        attempts to look up that symbol in the symbol_table.
+        @param operand: the operand to decode
+        @type operand: str
+        @return: a tuple containing the hex value of the statement, and the
+            number of bytes taken to store the statement
+        @rtype: ( int, int )
+        """
+        operand = self.operands
+        if operand.startswith("#"):
+            operand = operand.replace("#", "")
+
+        if operand.startswith("$"):
+            value = operand.replace("$", "")
+            hex_value = int(value, 16)
+            num_bytes = 1
+            if len(value) == 3 or len(value) == 4:
+                num_bytes = 2
+            return hex_value, num_bytes
+
+        return 0, 0
 
     def is_empty(self):
         """
@@ -195,6 +253,7 @@ class Statement:
         return self.label
 
 # F U N C T I O N S ###########################################################
+
 
 def parse_arguments():
     """
@@ -241,7 +300,6 @@ def main(args):
     global symbol_table
     symbol_table = dict()
     statements = []
-    address = 0x200
 
     # Pass 1: parse all of the statements in the file, but do not attempt
     # to resolve any of the labels or locations
