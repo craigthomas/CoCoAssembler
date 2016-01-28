@@ -48,10 +48,10 @@ I strongly recommend creating a virtual environment using the
 ## Usage
 
 The assembler is used to transform assembly language statements into 6809E
-machine code. A source file of assembly language statments is broken up into a
+machine code. A source file of assembly language statements is broken up into a
 number of columns:
 
-    LABEL    OPERATION    OPERAND    COMMENT
+    LABEL    OPERATION    OPERAND    # COMMENT
 
 Where each column contains the following:
 
@@ -64,8 +64,42 @@ and is terminated by a newline character.
 
 A full example would be:
 
-    PRINT_STR   LDA    #$40   Load starting address
+    BUFFER  EQU     $6100           # START OF BUFFER
+    BUFFEND EQU     $7FFF           # END OF BUFFER
+    START   LDY     #$0FF00         # LOAD INPUT PIA ADDRESS
+            LDX     #BUFFER         # LOAD BUFFER PNTR ADDRESS
+    INP000  LDB     #10             # SELECT RIGHT,X
+            JSR     $A9A2           # SELECT SUBROUTINE
 
+To run the assembler:
+
+    python coco3asm.py input_file -o output_file
+
+This will assemble the instructions found in file `input_file` and will generate the
+associated CoCo machine instructions in binary format in `output_file`. Additional
+options include printing the symbol table:
+
+    python coco3asm.py test.asm -s
+
+Which will have the following output:
+
+   -- Symbol Table --
+   BUFFER          $6100
+   START           $6000
+   INP000          $6007
+   BUFFEND         $7FFF
+
+Print out the assembled version of the input:
+
+    python chip8asm/chip8asm.py test.asm -p
+
+Which will have the following output:
+
+    -- Assembled Statements --
+    6000 108E FF00  START   LDY         #$0FF00  # LOAD INPUT PIA ADDRESS
+    6004   8E 6100          LDX         #BUFFER  # LOAD BUFFER PNTR ADDRESS
+    6007   C6   0A INP000   LDB             #10  # SELECT RIGHT,X
+    6009   BD A9A2          JSR           $A9A2  # SELECT SUBROUTINE
 
 ## Further Documentation
 
