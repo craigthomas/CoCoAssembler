@@ -71,8 +71,11 @@ class Operand(object):
             return
 
         if self.get_hex_value() != "":
-            self.operand_type = OperandType.EXTENDED
+            operand_hex_value = hex_value(self.operand)
+            self.operand_type = OperandType.DIRECT if len(operand_hex_value) < 3 else OperandType.EXTENDED
             return
+
+        self.operand_type = OperandType.SYMBOL
 
     def get_string_value(self):
         return str(self.operand)
@@ -99,5 +102,16 @@ class Operand(object):
 
     def get_hex_value(self):
         return HEX_REGEX.match(self.operand) or ""
+
+    def get_extended(self):
+        match = HEX_REGEX.match(self.operand) or ""
+        if match:
+            return match.group("value") if match else ""
+
+    def is_extended(self):
+        return self.get_operand_type() == OperandType.EXTENDED
+
+    def is_symbol(self):
+        return self.get_operand_type() == OperandType.SYMBOL
 
 # E N D   O F   F I L E #######################################################

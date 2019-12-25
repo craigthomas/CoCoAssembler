@@ -69,15 +69,16 @@ class Statement(object):
         if self.get_post_byte():
             op_code_string += self.get_post_byte()
         if self.get_additional():
-            op_code_string += self.get_additional()
+            op_code_string += " " + self.get_additional()
 
-        return "${} {} {} {} {}  ; {}".format(
+        return "${} {} {} {} {}  ; {} {}".format(
             self.get_address()[2:].upper().rjust(4, '0'),
             op_code_string.ljust(15, ' '),
             self.get_label().rjust(10, ' '),
             self.get_mnemonic().rjust(5, ' '),
             self.operand.get_string_value().rjust(15, ' '),
-            self.get_comment().ljust(40, ' ')
+            self.get_comment().ljust(40, ' '),
+            self.operand.operand_type
         )
 
     def get_address(self):
@@ -227,13 +228,25 @@ class Statement(object):
         if immediate_operand and not self.instruction.mode.supports_immediate():
             raise TranslationError("Instruction [{}] does not support immediate addressing".format(self.mnemonic), self)
 
-        if immediate_operand and self.instruction.mode.supports_indexed():
+        if immediate_operand and self.instruction.mode.supports_immediate():
             self.op_code = self.instruction.mode.imm
             self.additional = immediate_operand.get_hex_value()
             return
 
     def translate_extended(self, symbol_table):
-        pass
+        if self.operand.is_symbol():
+            symbol = self.operand.get_string_value()
+            if symbol not in symbol_table:
+                raise TranslationError("Unknown symbol [{}]".format(symbol), self)
+            self.operand = Operand(symbol_table[symbol].get_address())
+
+        if self.operand.is_extended() and not self.instruction.mode.supports_extended():
+            raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic), self)
+
+        if self.operand.get_extended() and self.instruction.mode.supports_extended():
+            self.op_code = self.instruction.mode.ext
+            self.additional = self.operand.get_extended()
+            return
 
     def translate(self, symbol_table):
         """
