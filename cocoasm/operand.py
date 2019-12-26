@@ -14,6 +14,11 @@ from cocoasm.helpers import hex_value, decimal_value
 
 # C O N S T A N T S ###########################################################
 
+# Patten to recognize an expression
+EXPR_REGEX = re.compile(
+    r"^(?P<symbol0>[\d\w]+)(?P<operation>[\+\-\/\*])(?P<symbol1>[\d\w]+)"
+)
+
 # Pattern to recognize an immediate value
 IMM_REGEX = re.compile(
     r"^#(?P<value>.*)"
@@ -58,6 +63,14 @@ class Operand(object):
         self.determine_operand_type()
 
     def determine_operand_type(self):
+        if self.get_expression() != "":
+            self.operand_type = OperandType.EXPRESSION
+            return
+
+        if self.is_indexed():
+            self.operand_type = OperandType.INDIRECT
+            return
+
         if self.operand == "":
             self.operand_type = OperandType.INHERENT
             return
@@ -89,6 +102,18 @@ class Operand(object):
     def is_immediate(self):
         return self.get_operand_type() == OperandType.IMMEDIATE
 
+    def is_indexed(self):
+        return "," in self.operand
+
+    def is_extended(self):
+        return self.get_operand_type() == OperandType.EXTENDED
+
+    def is_symbol(self):
+        return self.get_operand_type() == OperandType.SYMBOL
+
+    def is_direct(self):
+        return self.get_operand_type == OperandType.DIRECT
+
     def get_immediate(self):
         """
         Returns true if the operand is immediate data.
@@ -105,13 +130,11 @@ class Operand(object):
 
     def get_extended(self):
         match = HEX_REGEX.match(self.operand) or ""
-        if match:
-            return match.group("value") if match else ""
+        return match.group("value") if match else ""
 
-    def is_extended(self):
-        return self.get_operand_type() == OperandType.EXTENDED
+    def get_expression(self):
+        match = EXPR_REGEX.match(self.operand) or ""
+        return [match.group("symbol0"), match.group("operation"), match.group("symbol1")] if match else ""
 
-    def is_symbol(self):
-        return self.get_operand_type() == OperandType.SYMBOL
 
 # E N D   O F   F I L E #######################################################

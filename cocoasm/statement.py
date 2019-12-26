@@ -243,6 +243,14 @@ class Statement(object):
         if self.operand.is_extended() and not self.instruction.mode.supports_extended():
             raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic), self)
 
+        if self.operand.is_direct() and not self.instruction.mode.supports_direct():
+            raise TranslationError("Instruction [{}] does not support direct addressing".format(self.mnemonic), self)
+
+        if self.operand.is_direct() and self.instruction.mode.supports_direct():
+            self.op_code = self.instruction.mode.dir
+            self.additional = self.operand.get_extended()
+            return
+
         if self.operand.get_extended() and self.instruction.mode.supports_extended():
             self.op_code = self.instruction.mode.ext
             self.additional = self.operand.get_extended()
@@ -256,6 +264,10 @@ class Statement(object):
         """
         if self.is_pseudo_op():
             self.additional = self.instruction.translate_pseudo(self.get_label(), self.operand, symbol_table)
+            return
+
+        if self.instruction.translate_non_pseudo(self.operand):
+            self.post_byte = self.instruction.translate_non_pseudo(self.operand)
             return
 
         if self.instruction.is_branch_operation():

@@ -127,6 +127,28 @@ class Instruction(NamedTuple):
         if self.mnemonic == "EQU":
             symbol_table[label].set_address(operand.get_string_value())
 
+    def translate_non_pseudo(self, operand):
+        """
+        Translates special non-pseudo operations.
+
+        :param operand: the operand to process
+        """
+        if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
+            registers = operand.get_string_value().split(",")
+            postbyte = 0x00
+            for register in registers:
+                postbyte |= 0x06 if register == "D" else 0x00
+                postbyte |= 0x01 if register == "CC" else 0x00
+                postbyte |= 0x02 if register == "A" else 0x00
+                postbyte |= 0x04 if register == "B" else 0x00
+                postbyte |= 0x08 if register == "DP" else 0x00
+                postbyte |= 0x10 if register == "X" else 0x00
+                postbyte |= 0x20 if register == "Y" else 0x00
+                postbyte |= 0x40 if register == "U" else 0x00
+                postbyte |= 0x80 if register == "PC" else 0x00
+            return postbyte
+
+        return None
 
 INSTRUCTIONS = [
     Instruction(mnemonic="ABX", mode=Mode(inh=0x3A)),
