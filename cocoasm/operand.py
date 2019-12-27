@@ -111,6 +111,9 @@ class Operand(object):
     def is_extended(self):
         return self.get_operand_type() == OperandType.EXTENDED
 
+    def is_extended_indirect(self):
+        return self.get_operand_type() == OperandType.EXTENDED
+
     def is_symbol(self):
         return self.get_operand_type() == OperandType.SYMBOL
 
@@ -123,10 +126,12 @@ class Operand(object):
 
         :return: True if the operand is immediate
         """
-        return IMM_REGEX.match(self.operand) or ""
+        match = IMM_REGEX.match(self.operand) or ""
+        return match.group("value") if match else ""
 
     def get_extended_indirect(self):
-        return EXTENDED_INDIRECT_REGEX.match(self.operand) or ""
+        match = EXTENDED_INDIRECT_REGEX.match(self.operand) or ""
+        return match.group("value") if match else ""
 
     def get_hex_value(self):
         return HEX_REGEX.match(self.operand) or ""

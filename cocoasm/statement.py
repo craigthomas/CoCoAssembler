@@ -148,14 +148,6 @@ class Statement(object):
     def is_comment_only(self):
         return self.comment_only
 
-    def is_valid_mnemonic(self):
-        """
-        Returns true if the assembly language statement is a valid mnemonic.
-
-        :return: True if the statement is a valid mnemonic, False otherwise
-        """
-        return self.match_operation() is not None
-
     def get_include_filename(self):
         """
         Returns the name of the file to include in the current stream of
@@ -169,6 +161,8 @@ class Statement(object):
     def parse_line(self, line):
         """
         Parse a line of assembly language text.
+
+        :param line: the line of text to parse
         """
         if BLANK_LINE_REGEX.search(line):
             return
@@ -192,63 +186,9 @@ class Statement(object):
         raise ParseError("Could not parse line [{}]".format(line), self)
 
     def match_mnemonic(self):
-        if not self.is_valid_mnemonic():
-            raise TranslationError("Invalid mnemonic [{}]".format(self.mnemonic), self)
         self.instruction = copy(self.match_operation())
-
-    def translate_extended_indirect(self, symbol_table):
-        indexed_operand = None
-        data = self.operand.get_extended_indirect()
-        if data:
-            indexed_operand = Operand(data.group("value")) or None
-
-        if indexed_operand and not self.instruction.mode.supports_indexed():
-            raise TranslationError("Instruction [{}] does not support indexed addressing".format(self.mnemonic), self)
-
-        if indexed_operand and self.instruction.mode.supports_indexed():
-            self.op_code = self.instruction.mode.ind
-            self.additional = indexed_operand.get_hex_value()
-            self.post_byte = 0x9F
-            return
-
-    def translate_immediate(self, symbol_table):
-        immediate_operand = None
-        data = self.operand.get_immediate()
-        if data:
-            immediate_operand = Operand(data.group("value")) or None
-
-        if immediate_operand and not self.instruction.mode.supports_immediate():
-            raise TranslationError("Instruction [{}] does not support immediate addressing".format(self.mnemonic), self)
-
-        if immediate_operand and self.instruction.mode.supports_immediate():
-            self.op_code = self.instruction.mode.imm
-            self.additional = immediate_operand.get_hex_value()
-            return
-
-    def translate_extended(self, symbol_table):
-        operand = self.operand
-
-        if operand.is_symbol():
-            symbol = operand.get_string_value()
-            if symbol not in symbol_table:
-                raise TranslationError("Unknown symbol [{}]".format(symbol), self)
-            operand = Operand(symbol_table[symbol].get_address())
-
-        if operand.is_extended() and not self.instruction.mode.supports_extended():
-            raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic), self)
-
-        if operand.is_direct() and not self.instruction.mode.supports_direct():
-            raise TranslationError("Instruction [{}] does not support direct addressing".format(self.mnemonic), self)
-
-        if operand.is_direct() and self.instruction.mode.supports_direct():
-            self.op_code = self.instruction.mode.dir
-            self.additional = operand.get_string_value()
-            return
-
-        if operand.get_extended() and self.instruction.mode.supports_extended():
-            self.op_code = self.instruction.mode.ext
-            self.additional = operand.get_string_value()
-            return
+        if not self.instruction:
+            raise TranslationError("Invalid mnemonic [{}]".format(self.mnemonic), self)
 
     def translate(self, symbol_table):
         """
@@ -264,19 +204,58 @@ class Statement(object):
             self.post_byte = self.instruction.translate_special(self.operand)
             return
 
+        operand = self.operand
+        if operand.is_symbol():
+            symbol = operand.get_string_value()
+            if symbol not in symbol_table:
+                raise TranslationError("Unknown symbol [{}]".format(symbol), self)
+            operand = Operand(symbol_table[symbol].get_address())
+            if not operand.get_string_value():
+                return
+
         if self.instruction.is_branch_operation():
             self.op_code = self.instruction.mode.rel
+            # TODO: translate the relative address to branch to
             return
 
-        if self.operand.is_inherent() and self.instruction.mode.supports_inherent():
-            self.op_code = self.instruction.mode.inh
-            return
+        if operand.is_inherent():
+            if self.instruction.mode.supports_inherent():
+                self.op_code = self.instruction.mode.inh
+            else:
+                raise TranslationError("Instruction [{}] requires an operand".format(self.mnemonic), self)
 
-        if self.operand.is_inherent() and not self.instruction.mode.supports_inherent():
-            raise TranslationError("Instruction [{}] requires an operand".format(self.mnemonic), self)
+        if operand.is_immediate():
+            if self.instruction.mode.supports_immediate():
+                self.op_code = self.instruction.mode.imm
+                self.additional = operand.get_immediate()
+            else:
+                raise TranslationError("Instruction [{}] does not support immediate addressing".format(self.mnemonic),
+                                       self)
 
-        self.translate_immediate(symbol_table)
-        self.translate_extended_indirect(symbol_table)
-        self.translate_extended(symbol_table)
+        if operand.is_extended_indirect():
+            if self.instruction.mode.supports_indexed():
+                self.op_code = self.instruction.mode.ind
+                self.additional = operand.get_extended_indirect()
+                # TODO: properly translate what the post-byte code should be
+                self.post_byte = 0x9F
+            else:
+                raise TranslationError("Instruction [{}] does not support indexed addressing".format(self.mnemonic),
+                                       self)
+
+        if operand.is_direct():
+            if self.instruction.mode.supports_direct():
+                self.op_code = self.instruction.mode.dir
+                self.additional = operand.get_string_value()
+            else:
+                raise TranslationError("Instruction [{}] does not support direct addressing".format(self.mnemonic),
+                                       self)
+
+        if operand.is_extended():
+            if self.instruction.mode.supports_extended():
+                self.op_code = self.instruction.mode.ext
+                self.additional = operand.get_string_value()
+            else:
+                raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic),
+                                       self)
 
 # E N D   O F   F I L E #######################################################
