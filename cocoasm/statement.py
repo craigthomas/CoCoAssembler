@@ -138,23 +138,15 @@ class Statement(object):
 
     def match_operation(self):
         """
-        Returns true if the assembly language statement is actually a pseudo op.
+        Returns the instruction with the specified mnemonic, or None if the
+        mnemonic does not exist.
 
-        :return: True if the statement is a pseudo op, False otherwise
+        :return: the instruction associated with the mnemonic
         """
         return next((op for op in INSTRUCTIONS if op.mnemonic == self.mnemonic), None)
 
     def is_comment_only(self):
         return self.comment_only
-
-    def is_pseudo_op(self):
-        """
-        Returns true if the assembly language statement is actually a pseudo op.
-
-        :return: True if the statement is a pseudo op, False otherwise
-        """
-        instruction = self.match_operation()
-        return instruction.pseudo if instruction else False
 
     def is_valid_mnemonic(self):
         """
@@ -234,26 +226,28 @@ class Statement(object):
             return
 
     def translate_extended(self, symbol_table):
-        if self.operand.is_symbol():
-            symbol = self.operand.get_string_value()
+        operand = self.operand
+
+        if operand.is_symbol():
+            symbol = operand.get_string_value()
             if symbol not in symbol_table:
                 raise TranslationError("Unknown symbol [{}]".format(symbol), self)
-            self.operand = Operand(symbol_table[symbol].get_address())
+            operand = Operand(symbol_table[symbol].get_address())
 
-        if self.operand.is_extended() and not self.instruction.mode.supports_extended():
+        if operand.is_extended() and not self.instruction.mode.supports_extended():
             raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic), self)
 
-        if self.operand.is_direct() and not self.instruction.mode.supports_direct():
+        if operand.is_direct() and not self.instruction.mode.supports_direct():
             raise TranslationError("Instruction [{}] does not support direct addressing".format(self.mnemonic), self)
 
-        if self.operand.is_direct() and self.instruction.mode.supports_direct():
+        if operand.is_direct() and self.instruction.mode.supports_direct():
             self.op_code = self.instruction.mode.dir
-            self.additional = self.operand.get_extended()
+            self.additional = operand.get_string_value()
             return
 
-        if self.operand.get_extended() and self.instruction.mode.supports_extended():
+        if operand.get_extended() and self.instruction.mode.supports_extended():
             self.op_code = self.instruction.mode.ext
-            self.additional = self.operand.get_extended()
+            self.additional = operand.get_string_value()
             return
 
     def translate(self, symbol_table):
@@ -262,12 +256,12 @@ class Statement(object):
 
         :param symbol_table: the dictionary of symbol table elements
         """
-        if self.is_pseudo_op():
+        if self.instruction.is_pseudo():
             self.additional = self.instruction.translate_pseudo(self.get_label(), self.operand, symbol_table)
             return
 
-        if self.instruction.translate_non_pseudo(self.operand):
-            self.post_byte = self.instruction.translate_non_pseudo(self.operand)
+        if self.instruction.is_special():
+            self.post_byte = self.instruction.translate_special(self.operand)
             return
 
         if self.instruction.is_branch_operation():

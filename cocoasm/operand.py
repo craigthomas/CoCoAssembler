@@ -62,6 +62,9 @@ class Operand(object):
         self.operand_type = OperandType.UNKNOWN
         self.determine_operand_type()
 
+    def __str__(self):
+        return "Operand [{}, {}]".format(self.operand, self.operand_type)
+
     def determine_operand_type(self):
         if self.get_expression() != "":
             self.operand_type = OperandType.EXPRESSION
@@ -112,7 +115,7 @@ class Operand(object):
         return self.get_operand_type() == OperandType.SYMBOL
 
     def is_direct(self):
-        return self.get_operand_type == OperandType.DIRECT
+        return self.get_operand_type() == OperandType.DIRECT
 
     def get_immediate(self):
         """

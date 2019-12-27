@@ -109,6 +109,12 @@ class Instruction(NamedTuple):
         """
         return self.mnemonic == "INCLUDE"
 
+    def is_pseudo(self):
+        return self.mnemonic in ["FCC", "FCB", "FDB", "EQU", "INCLUDE"]
+
+    def is_special(self):
+        return self.mnemonic in ["PULS", "PSHS"]
+
     def translate_pseudo(self, label, operand, symbol_table):
         """
         Translates a pseudo operation.
@@ -127,7 +133,7 @@ class Instruction(NamedTuple):
         if self.mnemonic == "EQU":
             symbol_table[label].set_address(operand.get_string_value())
 
-    def translate_non_pseudo(self, operand):
+    def translate_special(self, operand):
         """
         Translates special non-pseudo operations.
 

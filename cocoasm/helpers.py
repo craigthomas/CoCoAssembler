@@ -36,16 +36,16 @@ def value_with_base_to_hex(value, base):
         return ""
 
     if type(value) is int:
-        return "{:0<2X}".format(value)
+        return "{:0>2X}".format(value)
 
     data = HEX_REGEX.match(value)
     if data:
-        return "{:0<2X}".format(int(data.group("value"), 16))
+        return "{:0>2X}".format(int(data.group("value"), 16))
 
     data = INT_REGEX.match(value)
     if data:
-        return "{:0<2X}".format(int(data.group("value"), 10))
+        return "{:0>2X}".format(int(data.group("value"), 10))
 
-    return "{:0<2X}".format(int(value, base))
+    return "{:0>2X}".format(int(value, base))
 
 # E N D   O F   F I L E #######################################################
