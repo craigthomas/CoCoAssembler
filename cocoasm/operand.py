@@ -112,7 +112,7 @@ class Operand(object):
         return self.get_operand_type() == OperandType.EXTENDED
 
     def is_extended_indirect(self):
-        return self.get_operand_type() == OperandType.EXTENDED
+        return self.get_operand_type() == OperandType.EXTENDED_INDIRECT
 
     def is_symbol(self):
         return self.get_operand_type() == OperandType.SYMBOL

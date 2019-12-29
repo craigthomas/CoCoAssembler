@@ -114,6 +114,11 @@ class Program(object):
         for index, statement in enumerate(self.statements):
             statement.translate(self.symbol_table)
 
+        address = 0
+        for index, statement in enumerate(self.statements):
+            statement.set_address(address)
+            address += statement.get_size()
+
     def save_binary_file(self, filename):
         """
         Writes out the assembled statements to the specified file

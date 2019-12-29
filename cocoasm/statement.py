@@ -55,6 +55,7 @@ class Statement(object):
         self.comment = None
         self.size = 0
         self.address = None
+        self.set_address(0x0)
         self.mnemonic = None
         self.op_code = None
         self.post_byte = None
@@ -72,7 +73,7 @@ class Statement(object):
             op_code_string += " " + self.get_additional()
 
         return "${} {} {} {} {}  ; {} {}".format(
-            self.get_address()[2:].upper().rjust(4, '0'),
+            self.get_address(),
             op_code_string.ljust(15, ' '),
             self.get_label().rjust(10, ' '),
             self.get_mnemonic().rjust(5, ' '),
@@ -87,7 +88,7 @@ class Statement(object):
 
         :return: the address for this statement
         """
-        return self.address or ""
+        return self.address or "0000"
 
     def get_label(self):
         """
@@ -126,6 +127,9 @@ class Statement(object):
         :return: the comment for this statement
         """
         return self.comment or ""
+
+    def get_size(self):
+        return self.size
 
     def is_empty(self):
         """
@@ -189,6 +193,9 @@ class Statement(object):
         self.instruction = copy(self.match_operation())
         if not self.instruction:
             raise TranslationError("Invalid mnemonic [{}]".format(self.mnemonic), self)
+
+    def set_address(self, address):
+        self.address = hex_value(address, 4)
 
     def translate(self, symbol_table):
         """
@@ -257,5 +264,14 @@ class Statement(object):
             else:
                 raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic),
                                        self)
+
+        if self.op_code:
+            self.size += int((len(self.get_op_codes()) / 2))
+
+        if self.additional:
+            self.size += int((len(self.get_additional()) / 2))
+
+        if self.post_byte:
+            self.size += int((len(self.get_post_byte()) / 2))
 
 # E N D   O F   F I L E #######################################################
