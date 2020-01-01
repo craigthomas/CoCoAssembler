@@ -46,7 +46,7 @@ class OperandType(Enum):
     UNKNOWN = 0
     INHERENT = 1
     IMMEDIATE = 2
-    INDIRECT = 3
+    INDEXED = 3
     EXTENDED_INDIRECT = 4
     EXTENDED = 5
     DIRECT = 6
@@ -71,7 +71,7 @@ class Operand(object):
             return
 
         if self.is_indexed():
-            self.operand_type = OperandType.INDIRECT
+            self.operand_type = OperandType.INDEXED
             return
 
         if self.operand == "":
@@ -134,7 +134,8 @@ class Operand(object):
         return match.group("value") if match else ""
 
     def get_hex_value(self):
-        return HEX_REGEX.match(self.operand) or ""
+        match = HEX_REGEX.match(self.operand) or ""
+        return match.group("value") if match else ""
 
     def get_extended(self):
         match = HEX_REGEX.match(self.operand) or ""

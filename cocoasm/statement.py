@@ -239,6 +239,16 @@ class Statement(object):
                 raise TranslationError("Instruction [{}] does not support immediate addressing".format(self.mnemonic),
                                        self)
 
+        if operand.is_indexed():
+            if self.instruction.mode.supports_indexed():
+                self.op_code = self.instruction.mode.ind
+                # TODO: properly translate indexed values and post-byte codes
+                self.additional = 0x0
+                self.post_byte = 0x0
+            else:
+                raise TranslationError("Instruction [{}] does not support indexed addressing".format(self.mnemonic),
+                                       self)
+
         if operand.is_extended_indirect():
             if self.instruction.mode.supports_indexed():
                 self.op_code = self.instruction.mode.ind

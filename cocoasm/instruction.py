@@ -113,7 +113,7 @@ class Instruction(NamedTuple):
         return self.mnemonic in ["FCC", "FCB", "FDB", "EQU", "INCLUDE"]
 
     def is_special(self):
-        return self.mnemonic in ["PULS", "PSHS"]
+        return self.mnemonic in ["PULS", "PSHS", "EXG"]
 
     def translate_pseudo(self, label, operand, symbol_table):
         """
@@ -153,6 +153,9 @@ class Instruction(NamedTuple):
                 postbyte |= 0x40 if register == "U" else 0x00
                 postbyte |= 0x80 if register == "PC" else 0x00
             return postbyte
+
+        if self.mnemonic == "EXG":
+            return 0x00
 
         return None
 
