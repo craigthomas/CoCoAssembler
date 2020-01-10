@@ -208,7 +208,10 @@ class Statement(object):
             return
 
         if self.instruction.is_special():
-            self.post_byte = self.instruction.translate_special(self.operand)
+            try:
+                self.op_code, self.post_byte, self.additional = self.instruction.translate_special(self.operand)
+            except ValueError as error:
+                raise TranslationError(error.args[0], self)
             return
 
         operand = self.operand

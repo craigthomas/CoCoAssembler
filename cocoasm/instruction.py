@@ -139,25 +139,71 @@ class Instruction(NamedTuple):
 
         :param operand: the operand to process
         """
+        post_byte = 0x0
+        additional_byte = 0x0
+
         if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
             registers = operand.get_string_value().split(",")
-            postbyte = 0x00
             for register in registers:
-                postbyte |= 0x06 if register == "D" else 0x00
-                postbyte |= 0x01 if register == "CC" else 0x00
-                postbyte |= 0x02 if register == "A" else 0x00
-                postbyte |= 0x04 if register == "B" else 0x00
-                postbyte |= 0x08 if register == "DP" else 0x00
-                postbyte |= 0x10 if register == "X" else 0x00
-                postbyte |= 0x20 if register == "Y" else 0x00
-                postbyte |= 0x40 if register == "U" else 0x00
-                postbyte |= 0x80 if register == "PC" else 0x00
-            return postbyte
+                post_byte |= 0x06 if register == "D" else 0x00
+                post_byte |= 0x01 if register == "CC" else 0x00
+                post_byte |= 0x02 if register == "A" else 0x00
+                post_byte |= 0x04 if register == "B" else 0x00
+                post_byte |= 0x08 if register == "DP" else 0x00
+                post_byte |= 0x10 if register == "X" else 0x00
+                post_byte |= 0x20 if register == "Y" else 0x00
+                post_byte |= 0x40 if register == "U" else 0x00
+                post_byte |= 0x80 if register == "PC" else 0x00
+            return self.mode.imm, post_byte, additional_byte
 
         if self.mnemonic == "EXG":
-            return 0x00
+            registers = operand.get_string_value().split(",")
+            if len(registers) != 2:
+                raise ValueError("EXG takes exactly 2 registers")
+
+            post_byte |= 0x00 if registers[0] == "D" else 0x00
+            post_byte |= 0x00 if registers[1] == "D" else 0x00
+
+            post_byte |= 0x10 if registers[0] == "X" else 0x00
+            post_byte |= 0x01 if registers[1] == "X" else 0x00
+
+            post_byte |= 0x20 if registers[0] == "Y" else 0x00
+            post_byte |= 0x02 if registers[1] == "Y" else 0x00
+
+            post_byte |= 0x30 if registers[0] == "U" else 0x00
+            post_byte |= 0x03 if registers[1] == "U" else 0x00
+
+            post_byte |= 0x40 if registers[0] == "S" else 0x00
+            post_byte |= 0x04 if registers[1] == "S" else 0x00
+
+            post_byte |= 0x50 if registers[0] == "PC" else 0x00
+            post_byte |= 0x05 if registers[1] == "PC" else 0x00
+
+            post_byte |= 0x80 if registers[0] == "A" else 0x00
+            post_byte |= 0x08 if registers[1] == "A" else 0x00
+
+            post_byte |= 0x90 if registers[0] == "B" else 0x00
+            post_byte |= 0x09 if registers[1] == "B" else 0x00
+
+            post_byte |= 0xA0 if registers[0] == "CC" else 0x00
+            post_byte |= 0x0A if registers[1] == "CC" else 0x00
+
+            post_byte |= 0xB0 if registers[0] == "DP" else 0x00
+            post_byte |= 0x0B if registers[1] == "DP" else 0x00
+
+            if post_byte not in [0x01, 0x10, 0x02, 0x20, 0x03, 0x30, 0x04, 0x40,
+                                 0x05, 0x50, 0x12, 0x21, 0x13, 0x31, 0x14, 0x41,
+                                 0x15, 0x51, 0x23, 0x32, 0x24, 0x42, 0x25, 0x52,
+                                 0x34, 0x43, 0x35, 0x53, 0x45, 0x54, 0x89, 0x98,
+                                 0x8A, 0xA8, 0x8B, 0xB8, 0x9A, 0xA9, 0x9B, 0xB9,
+                                 0xAB, 0xBA, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
+                                 0x88, 0x99, 0xAA, 0xBB]:
+                raise ValueError("EXG of {} to {} not allowed".format(registers[0], registers[1]))
+
+            return self.mode.imm, post_byte, additional_byte
 
         return None
+
 
 INSTRUCTIONS = [
     Instruction(mnemonic="ABX", mode=Mode(inh=0x3A)),
