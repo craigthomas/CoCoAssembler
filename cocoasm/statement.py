@@ -25,7 +25,7 @@ COMMENT_LINE_REGEX = re.compile(r"^\s*;\s*(?P<comment>.*)$")
 
 # Pattern to parse a single line
 ASM_LINE_REGEX = re.compile(
-    r"^(?P<label>\w*)\s+(?P<mnemonic>\w*)\s+(?P<operands>[\w\[\]#$,+-\.\*]*)\s*[;]*(?P<comment>.*)$"
+    r"^(?P<label>[\w\@]*)\s+(?P<mnemonic>\w*)\s+(?P<operands>[\w\[\]#$,+-\.\*\@\"]*)\s*[;]*(?P<comment>.*)$"
 )
 
 # Pattern to recognize a direct value
@@ -70,7 +70,7 @@ class Statement(object):
         if self.get_post_byte():
             op_code_string += self.get_post_byte()
         if self.get_additional():
-            op_code_string += " " + self.get_additional()
+            op_code_string += self.get_additional()
 
         return "${} {} {} {} {}  ; {} {}".format(
             self.get_address(),

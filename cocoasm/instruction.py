@@ -16,6 +16,9 @@ IVLD = 0x01
 # Illegal addressing mode
 ILLEGAL_MODE = 0x00
 
+# Recognized register names
+REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
+
 
 # C L A S S E S ###############################################################
 
@@ -110,10 +113,10 @@ class Instruction(NamedTuple):
         return self.mnemonic == "INCLUDE"
 
     def is_pseudo(self):
-        return self.mnemonic in ["FCC", "FCB", "FDB", "EQU", "INCLUDE"]
+        return self.mnemonic in ["FCC", "FCB", "FDB", "EQU", "INCLUDE", "END"]
 
     def is_special(self):
-        return self.mnemonic in ["PULS", "PSHS", "EXG"]
+        return self.mnemonic in ["PULS", "PSHS", "EXG", "TFR"]
 
     def translate_pseudo(self, label, operand, symbol_table):
         """
@@ -145,6 +148,9 @@ class Instruction(NamedTuple):
         if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
             registers = operand.get_string_value().split(",")
             for register in registers:
+                if register not in REGISTERS:
+                    raise ValueError("unknown register {}".format(register))
+
                 post_byte |= 0x06 if register == "D" else 0x00
                 post_byte |= 0x01 if register == "CC" else 0x00
                 post_byte |= 0x02 if register == "A" else 0x00
@@ -156,10 +162,16 @@ class Instruction(NamedTuple):
                 post_byte |= 0x80 if register == "PC" else 0x00
             return self.mode.imm, post_byte, additional_byte
 
-        if self.mnemonic == "EXG":
+        if self.mnemonic == "EXG" or self.mnemonic == "TFR":
             registers = operand.get_string_value().split(",")
             if len(registers) != 2:
-                raise ValueError("EXG takes exactly 2 registers")
+                raise ValueError("{} requires exactly 2 registers".format(self.mnemonic))
+
+            if registers[0] not in REGISTERS:
+                raise ValueError("unknown register {}".format(registers[0]))
+
+            if registers[1] not in REGISTERS:
+                raise ValueError("unknown register {}".format(registers[1]))
 
             post_byte |= 0x00 if registers[0] == "D" else 0x00
             post_byte |= 0x00 if registers[1] == "D" else 0x00
@@ -198,7 +210,7 @@ class Instruction(NamedTuple):
                                  0x8A, 0xA8, 0x8B, 0xB8, 0x9A, 0xA9, 0x9B, 0xB9,
                                  0xAB, 0xBA, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
                                  0x88, 0x99, 0xAA, 0xBB]:
-                raise ValueError("EXG of {} to {} not allowed".format(registers[0], registers[1]))
+                raise ValueError("{} of {} to {} not allowed".format(self.mnemonic, registers[0], registers[1]))
 
             return self.mode.imm, post_byte, additional_byte
 
