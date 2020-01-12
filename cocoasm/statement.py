@@ -72,14 +72,13 @@ class Statement(object):
         if self.get_additional():
             op_code_string += self.get_additional()
 
-        return "${} {} {} {} {}  ; {} {}".format(
+        return "${} {} {} {} {}  ; {}".format(
             self.get_address(),
             op_code_string.ljust(15, ' '),
             self.get_label().rjust(10, ' '),
             self.get_mnemonic().rjust(5, ' '),
             self.operand.get_string_value().rjust(15, ' '),
-            self.get_comment().ljust(40, ' '),
-            self.operand.operand_type
+            self.get_comment().ljust(40, ' ')
         )
 
     def get_address(self):

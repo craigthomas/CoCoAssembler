@@ -128,10 +128,10 @@ class Instruction(NamedTuple):
         :return: returns the value of the pseudo operation
         """
         if self.mnemonic == "FCB":
-            return operand.get_hex_value()
+            return operand.get_string_value()
 
         if self.mnemonic == "FDB":
-            return operand.get_hex_value()
+            return operand.get_string_value()
 
         if self.mnemonic == "EQU":
             symbol_table[label].set_address(operand.get_string_value())
