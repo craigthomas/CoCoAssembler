@@ -53,13 +53,16 @@ class OperandType(Enum):
     RELATIVE = 7
     SYMBOL = 8
     EXPRESSION = 9
+    VALUE = 10
+    ADDRESS = 11
 
 
 class Operand(object):
-    def __init__(self, operand):
+    def __init__(self, operand, original_symbol=None):
         self.operand = operand or ""
         self.variables = []
         self.operand_type = OperandType.UNKNOWN
+        self.original_symbol = operand if original_symbol is None else original_symbol
         self.determine_operand_type()
 
     def __str__(self):
@@ -93,6 +96,9 @@ class Operand(object):
 
         self.operand_type = OperandType.SYMBOL
 
+    def get_original_symbol(self):
+        return self.original_symbol
+
     def get_string_value(self):
         return str(self.operand)
 
@@ -106,7 +112,7 @@ class Operand(object):
         return self.get_operand_type() == OperandType.IMMEDIATE
 
     def is_indexed(self):
-        return "," in self.operand
+        return "," in self.operand if type(self.operand) is str else False
 
     def is_extended(self):
         return self.get_operand_type() == OperandType.EXTENDED
@@ -119,6 +125,12 @@ class Operand(object):
 
     def is_direct(self):
         return self.get_operand_type() == OperandType.DIRECT
+
+    def is_value(self):
+        return self.get_operand_type() == OperandType.VALUE
+
+    def is_address(self):
+        return self.get_operand_type() == OperandType.ADDRESS
 
     def get_immediate(self):
         """
@@ -144,6 +156,20 @@ class Operand(object):
     def get_expression(self):
         match = EXPR_REGEX.match(self.operand) or ""
         return [match.group("symbol0"), match.group("operation"), match.group("symbol1")] if match else ""
+
+    def check_symbol(self, symbol_table):
+        if self.is_symbol():
+            symbol_string = self.get_string_value()
+            if symbol_string not in symbol_table:
+                raise ValueError("Unknown symbol [{}]".format(symbol_string))
+            symbol = symbol_table[symbol_string]
+            if symbol.is_value():
+                new_operand = Operand(symbol_table[symbol_string].get_value(), symbol_string)
+                self.operand_type = new_operand.get_operand_type()
+                self.operand = new_operand.get_string_value()
+            else:
+                self.operand_type = OperandType.ADDRESS
+                self.operand = symbol_table[symbol_string].get_address()
 
 
 # E N D   O F   F I L E #######################################################

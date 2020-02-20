@@ -111,12 +111,16 @@ class Program(object):
         self.statements = self.process_mnemonics(self.statements)
         for index, statement in enumerate(self.statements):
             self.save_symbol(index, statement)
+
+        for index, statement in enumerate(self.statements):
+            statement.translate_pseudo(self.symbol_table)
+
         for index, statement in enumerate(self.statements):
             statement.translate(self.symbol_table)
 
         address = 0
         for index, statement in enumerate(self.statements):
-            statement.set_address(address)
+            address = int(statement.set_address(address), 16)
             address += statement.get_size()
 
     def save_binary_file(self, filename):

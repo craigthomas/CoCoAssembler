@@ -8,6 +8,8 @@ A Color Computer Assembler - see the README.md file for details.
 
 from typing import NamedTuple, Callable
 
+from cocoasm.exceptions import TranslationError
+
 # C O N S T A N T S ###########################################################
 
 # Invalid operation
@@ -21,6 +23,23 @@ REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
 
 
 # C L A S S E S ###############################################################
+
+class InstructionBundle(object):
+    def __init__(self, op_code=None, address=None, post_byte=0x00, additional=0x00):
+        self.op_code = op_code
+        self.address = address
+        self.post_byte = post_byte
+        self.additional = additional
+        self.branch_index = 0
+
+    def __str__(self):
+        return "op_code: {}, address: {}, post_byte: {}, additional: {}".format(
+            self.op_code, self.address, self.post_byte, self.additional
+        )
+
+    def set_branch_index(self, index):
+        self.branch_index = index
+
 
 class Mode(NamedTuple):
     """
@@ -113,7 +132,7 @@ class Instruction(NamedTuple):
         return self.mnemonic == "INCLUDE"
 
     def is_pseudo(self):
-        return self.mnemonic in ["FCC", "FCB", "FDB", "EQU", "INCLUDE", "END"]
+        return self.mnemonic in ["FCC", "FCB", "FDB", "EQU", "INCLUDE", "END", "ORG"]
 
     def is_special(self):
         return self.mnemonic in ["PULS", "PSHS", "EXG", "TFR"]
@@ -128,22 +147,27 @@ class Instruction(NamedTuple):
         :return: returns the value of the pseudo operation
         """
         if self.mnemonic == "FCB":
-            return operand.get_string_value()
+            return InstructionBundle(additional=operand.get_string_value())
 
         if self.mnemonic == "FDB":
-            return operand.get_string_value()
+            return InstructionBundle(additional=operand.get_string_value())
 
         if self.mnemonic == "EQU":
-            symbol_table[label].set_address(operand.get_string_value())
+            symbol_table[label].set_value(operand.get_string_value())
+            return InstructionBundle()
 
-    def translate_special(self, operand):
+        if self.mnemonic == "ORG":
+            return InstructionBundle(address=operand.get_extended())
+
+    def translate_special(self, operand, statement):
         """
         Translates special non-pseudo operations.
 
         :param operand: the operand to process
+        :param statement: the statement that this operation came from
         """
-        post_byte = 0x0
-        additional_byte = 0x0
+        instruction_bundle = InstructionBundle()
+        instruction_bundle.op_code = statement.get_instruction().mode.imm
 
         if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
             registers = operand.get_string_value().split(",")
@@ -151,70 +175,70 @@ class Instruction(NamedTuple):
                 if register not in REGISTERS:
                     raise ValueError("unknown register {}".format(register))
 
-                post_byte |= 0x06 if register == "D" else 0x00
-                post_byte |= 0x01 if register == "CC" else 0x00
-                post_byte |= 0x02 if register == "A" else 0x00
-                post_byte |= 0x04 if register == "B" else 0x00
-                post_byte |= 0x08 if register == "DP" else 0x00
-                post_byte |= 0x10 if register == "X" else 0x00
-                post_byte |= 0x20 if register == "Y" else 0x00
-                post_byte |= 0x40 if register == "U" else 0x00
-                post_byte |= 0x80 if register == "PC" else 0x00
-            return self.mode.imm, post_byte, additional_byte
+                instruction_bundle.post_byte |= 0x06 if register == "D" else 0x00
+                instruction_bundle.post_byte |= 0x01 if register == "CC" else 0x00
+                instruction_bundle.post_byte |= 0x02 if register == "A" else 0x00
+                instruction_bundle.post_byte |= 0x04 if register == "B" else 0x00
+                instruction_bundle.post_byte |= 0x08 if register == "DP" else 0x00
+                instruction_bundle.post_byte |= 0x10 if register == "X" else 0x00
+                instruction_bundle.post_byte |= 0x20 if register == "Y" else 0x00
+                instruction_bundle.post_byte |= 0x40 if register == "U" else 0x00
+                instruction_bundle.post_byte |= 0x80 if register == "PC" else 0x00
+            return instruction_bundle
 
         if self.mnemonic == "EXG" or self.mnemonic == "TFR":
             registers = operand.get_string_value().split(",")
             if len(registers) != 2:
-                raise ValueError("{} requires exactly 2 registers".format(self.mnemonic))
+                raise TranslationError("{} requires exactly 2 registers".format(self.mnemonic), statement)
 
             if registers[0] not in REGISTERS:
-                raise ValueError("unknown register {}".format(registers[0]))
+                raise TranslationError("unknown register {}".format(registers[0]), statement)
 
             if registers[1] not in REGISTERS:
-                raise ValueError("unknown register {}".format(registers[1]))
+                raise TranslationError("unknown register {}".format(registers[1]), statement)
 
-            post_byte |= 0x00 if registers[0] == "D" else 0x00
-            post_byte |= 0x00 if registers[1] == "D" else 0x00
+            instruction_bundle.post_byte |= 0x00 if registers[0] == "D" else 0x00
+            instruction_bundle.post_byte |= 0x00 if registers[1] == "D" else 0x00
 
-            post_byte |= 0x10 if registers[0] == "X" else 0x00
-            post_byte |= 0x01 if registers[1] == "X" else 0x00
+            instruction_bundle.post_byte |= 0x10 if registers[0] == "X" else 0x00
+            instruction_bundle.post_byte |= 0x01 if registers[1] == "X" else 0x00
 
-            post_byte |= 0x20 if registers[0] == "Y" else 0x00
-            post_byte |= 0x02 if registers[1] == "Y" else 0x00
+            instruction_bundle.post_byte |= 0x20 if registers[0] == "Y" else 0x00
+            instruction_bundle.post_byte |= 0x02 if registers[1] == "Y" else 0x00
 
-            post_byte |= 0x30 if registers[0] == "U" else 0x00
-            post_byte |= 0x03 if registers[1] == "U" else 0x00
+            instruction_bundle.post_byte |= 0x30 if registers[0] == "U" else 0x00
+            instruction_bundle.post_byte |= 0x03 if registers[1] == "U" else 0x00
 
-            post_byte |= 0x40 if registers[0] == "S" else 0x00
-            post_byte |= 0x04 if registers[1] == "S" else 0x00
+            instruction_bundle.post_byte |= 0x40 if registers[0] == "S" else 0x00
+            instruction_bundle.post_byte |= 0x04 if registers[1] == "S" else 0x00
 
-            post_byte |= 0x50 if registers[0] == "PC" else 0x00
-            post_byte |= 0x05 if registers[1] == "PC" else 0x00
+            instruction_bundle.post_byte |= 0x50 if registers[0] == "PC" else 0x00
+            instruction_bundle.post_byte |= 0x05 if registers[1] == "PC" else 0x00
 
-            post_byte |= 0x80 if registers[0] == "A" else 0x00
-            post_byte |= 0x08 if registers[1] == "A" else 0x00
+            instruction_bundle.post_byte |= 0x80 if registers[0] == "A" else 0x00
+            instruction_bundle.post_byte |= 0x08 if registers[1] == "A" else 0x00
 
-            post_byte |= 0x90 if registers[0] == "B" else 0x00
-            post_byte |= 0x09 if registers[1] == "B" else 0x00
+            instruction_bundle.post_byte |= 0x90 if registers[0] == "B" else 0x00
+            instruction_bundle.post_byte |= 0x09 if registers[1] == "B" else 0x00
 
-            post_byte |= 0xA0 if registers[0] == "CC" else 0x00
-            post_byte |= 0x0A if registers[1] == "CC" else 0x00
+            instruction_bundle.post_byte |= 0xA0 if registers[0] == "CC" else 0x00
+            instruction_bundle.post_byte |= 0x0A if registers[1] == "CC" else 0x00
 
-            post_byte |= 0xB0 if registers[0] == "DP" else 0x00
-            post_byte |= 0x0B if registers[1] == "DP" else 0x00
+            instruction_bundle.post_byte |= 0xB0 if registers[0] == "DP" else 0x00
+            instruction_bundle.post_byte |= 0x0B if registers[1] == "DP" else 0x00
 
-            if post_byte not in [0x01, 0x10, 0x02, 0x20, 0x03, 0x30, 0x04, 0x40,
-                                 0x05, 0x50, 0x12, 0x21, 0x13, 0x31, 0x14, 0x41,
-                                 0x15, 0x51, 0x23, 0x32, 0x24, 0x42, 0x25, 0x52,
-                                 0x34, 0x43, 0x35, 0x53, 0x45, 0x54, 0x89, 0x98,
-                                 0x8A, 0xA8, 0x8B, 0xB8, 0x9A, 0xA9, 0x9B, 0xB9,
-                                 0xAB, 0xBA, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
-                                 0x88, 0x99, 0xAA, 0xBB]:
-                raise ValueError("{} of {} to {} not allowed".format(self.mnemonic, registers[0], registers[1]))
+            if instruction_bundle.post_byte not in [
+                    0x01, 0x10, 0x02, 0x20, 0x03, 0x30, 0x04, 0x40,
+                    0x05, 0x50, 0x12, 0x21, 0x13, 0x31, 0x14, 0x41,
+                    0x15, 0x51, 0x23, 0x32, 0x24, 0x42, 0x25, 0x52,
+                    0x34, 0x43, 0x35, 0x53, 0x45, 0x54, 0x89, 0x98,
+                    0x8A, 0xA8, 0x8B, 0xB8, 0x9A, 0xA9, 0x9B, 0xB9,
+                    0xAB, 0xBA, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
+                    0x88, 0x99, 0xAA, 0xBB]:
+                raise TranslationError("{} of {} to {} not allowed".format(self.mnemonic, registers[0], registers[1]),
+                                       statement)
 
-            return self.mode.imm, post_byte, additional_byte
-
-        return None
+        return instruction_bundle
 
 
 INSTRUCTIONS = [
