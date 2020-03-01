@@ -7,6 +7,7 @@ A Color Computer Assembler - see the README.md file for details.
 # I M P O R T S ###############################################################
 
 from typing import NamedTuple, Callable
+from codecs import encode
 
 from cocoasm.exceptions import TranslationError
 
@@ -158,6 +159,10 @@ class Instruction(NamedTuple):
 
         if self.mnemonic == "ORG":
             return InstructionBundle(address=operand.get_extended())
+
+        if self.mnemonic == "FCC":
+            hex_array = ["{:X}".format(ord(x)) for x in operand.get_string_value()[1:-1]]
+            return InstructionBundle(additional=hex_array)
 
     def translate_special(self, operand, statement):
         """

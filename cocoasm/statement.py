@@ -69,12 +69,12 @@ class Statement(object):
         if self.get_additional():
             op_code_string += self.get_additional()
 
-        return "${} {} {} {} {}  ; {}".format(
+        return "${} {:.10} {} {} {} ; {}".format(
             self.get_address(),
-            op_code_string.ljust(15, ' '),
+            op_code_string.ljust(10, ' '),
             self.get_label().rjust(10, ' '),
             self.get_mnemonic().rjust(5, ' '),
-            self.operand.get_original_symbol().rjust(15, ' '),
+            self.operand.get_original_symbol().rjust(30, ' '),
             self.get_comment().ljust(40, ' ')
         )
 
@@ -116,6 +116,8 @@ class Statement(object):
 
     def get_additional(self):
         if self.instruction_bundle:
+            if type(self.instruction_bundle.additional) is list:
+                return "".join(self.instruction_bundle.additional)
             return hex_value(self.instruction_bundle.additional) or None
         return None
 
@@ -130,7 +132,7 @@ class Statement(object):
 
         :return: the comment for this statement
         """
-        return self.comment or ""
+        return self.comment if self.comment else ""
 
     def get_size(self):
         return self.size
@@ -188,10 +190,20 @@ class Statement(object):
         data = ASM_LINE_REGEX.match(line)
         if data:
             self.label = data.group("label") or None
-            self.mnemonic = data.group("mnemonic") or None
+            self.mnemonic = data.group("mnemonic").upper() or None
             self.operand = Operand(data.group("operands"))
             self.comment = data.group("comment").strip() or None
             self.empty = False
+
+            # Check to see if we have a string definition
+            if self.mnemonic == "FCC":
+                original_operand = self.operand.get_string_value()
+                if self.comment:
+                    original_operand = "{} {}".format(self.operand.get_string_value(), self.comment)
+                starting_symbol = original_operand[0]
+                ending_location = original_operand.find(starting_symbol, 1)
+                self.operand = Operand(original_operand[0:ending_location+1])
+                self.comment = original_operand[ending_location+2:].strip() or None
             return
 
         raise ParseError("Could not parse line [{}]".format(line), self)
@@ -237,54 +249,55 @@ class Statement(object):
             return
 
         if self.operand.is_inherent():
-            if self.instruction.mode.supports_inherent():
-                self.instruction_bundle.op_code = self.instruction.mode.inh
-            else:
+            if not self.instruction.mode.supports_inherent():
                 raise TranslationError("Instruction [{}] requires an operand".format(self.mnemonic), self)
+            self.instruction_bundle.op_code = self.instruction.mode.inh
 
         if self.operand.is_immediate():
-            if self.instruction.mode.supports_immediate():
-                self.instruction_bundle.op_code = self.instruction.mode.imm
-                self.instruction_bundle.additional = self.operand.get_immediate()
-            else:
+            if not self.instruction.mode.supports_immediate():
                 raise TranslationError("Instruction [{}] does not support immediate addressing".format(self.mnemonic),
                                        self)
+            self.instruction_bundle.op_code = self.instruction.mode.imm
+            # Figure out the next portion of the operand
+            # operand = Operand(self.operand.get_immediate())
+            # operand.check_symbol(symbol_table)
+            # if operand.is_address():
+            #     self.instruction_bundle.additional = operand.get_string_value()
+            # else:
+            #     self.instruction_bundle.additional = operand.get_string_value()
 
         if self.operand.is_indexed():
-            if self.instruction.mode.supports_indexed():
-                self.instruction_bundle.op_code = self.instruction.mode.ind
-                # TODO: properly translate indexed values and post-byte codes
-                self.instruction_bundle.additional = 0x0
-                self.instruction_bundle.post_byte = 0x0
-            else:
+            if not self.instruction.mode.supports_indexed():
                 raise TranslationError("Instruction [{}] does not support indexed addressing".format(self.mnemonic),
                                        self)
+            self.instruction_bundle.op_code = self.instruction.mode.ind
+            # TODO: properly translate indexed values and post-byte codes
+            self.instruction_bundle.additional = 0x0
+            self.instruction_bundle.post_byte = 0x0
 
         if self.operand.is_extended_indirect():
-            if self.instruction.mode.supports_indexed():
-                self.instruction_bundle.op_code = self.instruction.mode.ind
-                self.instruction_bundle.additional = self.operand.get_extended_indirect()
-                # TODO: properly translate what the post-byte code should be
-                self.instruction_bundle.post_byte = 0x9F
-            else:
+            if not self.instruction.mode.supports_indexed():
                 raise TranslationError("Instruction [{}] does not support indexed addressing".format(self.mnemonic),
                                        self)
+            self.instruction_bundle.op_code = self.instruction.mode.ind
+            self.instruction_bundle.additional = self.operand.get_extended_indirect()
+            # TODO: properly translate what the post-byte code should be
+            self.instruction_bundle.post_byte = 0x9F
 
         if self.operand.is_direct():
-            if self.instruction.mode.supports_direct():
-                self.instruction_bundle.op_code = self.instruction.mode.dir
-                self.instruction_bundle.additional = self.operand.get_string_value()
-            else:
+            if not self.instruction.mode.supports_direct():
                 raise TranslationError("Instruction [{}] does not support direct addressing".format(self.mnemonic),
                                        self)
+            self.instruction_bundle.op_code = self.instruction.mode.dir
+            self.instruction_bundle.additional = self.operand.get_string_value()
 
         if self.operand.is_extended() or self.operand.is_address():
-            if self.instruction.mode.supports_extended():
-                self.instruction_bundle.op_code = self.instruction.mode.ext
-                self.instruction_bundle.additional = self.operand.get_string_value()
-            else:
+            if not self.instruction.mode.supports_extended():
                 raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic),
                                        self)
+            self.instruction_bundle.op_code = self.instruction.mode.ext
+            self.instruction_bundle.additional = self.operand.get_string_value()
+
         self.set_size()
 
     def set_size(self):
