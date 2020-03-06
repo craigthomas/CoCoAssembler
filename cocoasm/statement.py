@@ -1,5 +1,5 @@
 """
-Copyright (C) 2019 Craig Thomas
+Copyright (C) 2019-2020 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -74,7 +74,7 @@ class Statement(object):
             op_code_string.ljust(10, ' '),
             self.get_label().rjust(10, ' '),
             self.get_mnemonic().rjust(5, ' '),
-            self.operand.get_original_symbol().rjust(30, ' '),
+            self.operand.get_original_symbol().ljust(30, ' '),
             self.get_comment().ljust(40, ' ')
         )
 
@@ -241,7 +241,7 @@ class Statement(object):
 
         self.operand.check_symbol(symbol_table)
 
-        if self.instruction.is_branch_operation():
+        if self.instruction.is_short_branch or self.instruction.is_long_branch:
             self.instruction_bundle.op_code = self.instruction.mode.rel
             if self.operand.is_address():
                 self.instruction_bundle.additional = self.operand.get_string_value()
@@ -304,6 +304,14 @@ class Statement(object):
         if not self.instruction_bundle:
             return
 
+        if self.instruction.is_short_branch:
+            self.size += int((len(self.get_op_codes()) / 2)) + 1
+            return
+
+        if self.instruction.is_long_branch:
+            self.size += int((len(self.get_op_codes()) / 2)) + 2
+            return
+
         if self.instruction_bundle.op_code:
             self.size += int((len(self.get_op_codes()) / 2))
 
@@ -312,5 +320,32 @@ class Statement(object):
 
         if self.instruction_bundle.post_byte:
             self.size += int((len(self.get_post_byte()) / 2))
+
+    def fix_addresses(self, statements, this_index):
+        if self.instruction.is_short_branch:
+            branch_index = int(self.instruction_bundle.additional)
+            length = 0
+            if branch_index < this_index:
+                length = 1
+                for statement in statements[branch_index:this_index]:
+                    length += statement.get_size()
+                self.instruction_bundle.additional = "{:X}".format(0xFF - length)
+            else:
+                for statement in statements[this_index+1:branch_index]:
+                    length += statement.get_size()
+                self.instruction_bundle.additional = "{:X}".format(length)
+
+        if self.instruction.is_long_branch:
+            branch_index = int(self.instruction_bundle.additional)
+            length = 0
+            if branch_index < this_index:
+                length = 1
+                for statement in statements[branch_index:this_index]:
+                    length += statement.get_size()
+                self.instruction_bundle.additional = "{:4X}".format(0xFFFF - length)
+            else:
+                for statement in statements[this_index+1:branch_index]:
+                    length += statement.get_size()
+                self.instruction_bundle.additional = "{:4X}".format(length)
 
 # E N D   O F   F I L E #######################################################

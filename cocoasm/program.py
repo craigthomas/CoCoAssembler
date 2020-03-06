@@ -123,6 +123,9 @@ class Program(object):
             address = int(statement.set_address(address), 16)
             address += statement.get_size()
 
+        for index, statement in enumerate(self.statements):
+            statement.fix_addresses(self.statements, index)
+
     def save_binary_file(self, filename):
         """
         Writes out the assembled statements to the specified file
@@ -151,8 +154,8 @@ class Program(object):
         Prints out the assembled statements.
         """
         print("-- Assembled Statements --")
-        for statement in self.statements:
-            print(statement)
+        for index, statement in enumerate(self.statements):
+            print("{} {}".format(statement, index))
 
     @staticmethod
     def throw_error(error):

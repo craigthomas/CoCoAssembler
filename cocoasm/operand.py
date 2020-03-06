@@ -10,7 +10,7 @@ import re
 
 from enum import Enum
 
-from cocoasm.helpers import hex_value, decimal_value
+from cocoasm.helpers import hex_value
 
 # C O N S T A N T S ###########################################################
 

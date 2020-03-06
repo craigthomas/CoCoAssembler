@@ -113,15 +113,9 @@ class Instruction(NamedTuple):
     mnemonic: str = ""
     mode: Mode = Mode()
     pseudo: bool = False
-    is_branch: bool = False
+    is_short_branch: bool = False
+    is_long_branch: bool = False
     func: Callable[..., str] = None
-
-    def is_branch_operation(self):
-        """
-        Returns whether the instruction is a branch instruction.
-        :return: True if the instruction is a branch instruction, False otherwise
-        """
-        return self.is_branch
 
     def is_include(self):
         """
@@ -352,46 +346,46 @@ INSTRUCTIONS = [
     Instruction(mnemonic="SWI3", mode=Mode(inh=0x113F)),
 
     # Short branches
-    Instruction(mnemonic="BCC", mode=Mode(rel=0x24), is_branch=True),
-    Instruction(mnemonic="BCS", mode=Mode(rel=0x25), is_branch=True),
-    Instruction(mnemonic="BEQ", mode=Mode(rel=0x27), is_branch=True),
-    Instruction(mnemonic="BGE", mode=Mode(rel=0x2C), is_branch=True),
-    Instruction(mnemonic="BGT", mode=Mode(rel=0x2E), is_branch=True),
-    Instruction(mnemonic="BHI", mode=Mode(rel=0x22), is_branch=True),
-    Instruction(mnemonic="BHS", mode=Mode(rel=0x24), is_branch=True),
-    Instruction(mnemonic="BLE", mode=Mode(rel=0x2F), is_branch=True),
-    Instruction(mnemonic="BLO", mode=Mode(rel=0x25), is_branch=True),
-    Instruction(mnemonic="BLS", mode=Mode(rel=0x23), is_branch=True),
-    Instruction(mnemonic="BLT", mode=Mode(rel=0x2D), is_branch=True),
-    Instruction(mnemonic="BMI", mode=Mode(rel=0x2B), is_branch=True),
-    Instruction(mnemonic="BNE", mode=Mode(rel=0x26), is_branch=True),
-    Instruction(mnemonic="BPL", mode=Mode(rel=0x2A), is_branch=True),
-    Instruction(mnemonic="BRA", mode=Mode(rel=0x20), is_branch=True),
-    Instruction(mnemonic="BRN", mode=Mode(rel=0x21), is_branch=True),
-    Instruction(mnemonic="BSR", mode=Mode(rel=0x8D), is_branch=True),
-    Instruction(mnemonic="BVC", mode=Mode(rel=0x28), is_branch=True),
-    Instruction(mnemonic="BVS", mode=Mode(rel=0x29), is_branch=True),
+    Instruction(mnemonic="BCC", mode=Mode(rel=0x24), is_short_branch=True),
+    Instruction(mnemonic="BCS", mode=Mode(rel=0x25), is_short_branch=True),
+    Instruction(mnemonic="BEQ", mode=Mode(rel=0x27), is_short_branch=True),
+    Instruction(mnemonic="BGE", mode=Mode(rel=0x2C), is_short_branch=True),
+    Instruction(mnemonic="BGT", mode=Mode(rel=0x2E), is_short_branch=True),
+    Instruction(mnemonic="BHI", mode=Mode(rel=0x22), is_short_branch=True),
+    Instruction(mnemonic="BHS", mode=Mode(rel=0x24), is_short_branch=True),
+    Instruction(mnemonic="BLE", mode=Mode(rel=0x2F), is_short_branch=True),
+    Instruction(mnemonic="BLO", mode=Mode(rel=0x25), is_short_branch=True),
+    Instruction(mnemonic="BLS", mode=Mode(rel=0x23), is_short_branch=True),
+    Instruction(mnemonic="BLT", mode=Mode(rel=0x2D), is_short_branch=True),
+    Instruction(mnemonic="BMI", mode=Mode(rel=0x2B), is_short_branch=True),
+    Instruction(mnemonic="BNE", mode=Mode(rel=0x26), is_short_branch=True),
+    Instruction(mnemonic="BPL", mode=Mode(rel=0x2A), is_short_branch=True),
+    Instruction(mnemonic="BRA", mode=Mode(rel=0x20), is_short_branch=True),
+    Instruction(mnemonic="BRN", mode=Mode(rel=0x21), is_short_branch=True),
+    Instruction(mnemonic="BSR", mode=Mode(rel=0x8D), is_short_branch=True),
+    Instruction(mnemonic="BVC", mode=Mode(rel=0x28), is_short_branch=True),
+    Instruction(mnemonic="BVS", mode=Mode(rel=0x29), is_short_branch=True),
 
     # Long branches
-    Instruction(mnemonic="LBCC", mode=Mode(rel=0x1024), is_branch=True),
-    Instruction(mnemonic="LBCS", mode=Mode(rel=0x1025), is_branch=True),
-    Instruction(mnemonic="LBEQ", mode=Mode(rel=0x1027), is_branch=True),
-    Instruction(mnemonic="LBGE", mode=Mode(rel=0x102C), is_branch=True),
-    Instruction(mnemonic="LBGT", mode=Mode(rel=0x102E), is_branch=True),
-    Instruction(mnemonic="LBHI", mode=Mode(rel=0x1022), is_branch=True),
-    Instruction(mnemonic="LBHS", mode=Mode(rel=0x1024), is_branch=True),
-    Instruction(mnemonic="LBLE", mode=Mode(rel=0x102F), is_branch=True),
-    Instruction(mnemonic="LBLO", mode=Mode(rel=0x1025), is_branch=True),
-    Instruction(mnemonic="LBLS", mode=Mode(rel=0x1023), is_branch=True),
-    Instruction(mnemonic="LBLT", mode=Mode(rel=0x102D), is_branch=True),
-    Instruction(mnemonic="LBMI", mode=Mode(rel=0x102B), is_branch=True),
-    Instruction(mnemonic="LBNE", mode=Mode(rel=0x1026), is_branch=True),
-    Instruction(mnemonic="LBPL", mode=Mode(rel=0x102A), is_branch=True),
-    Instruction(mnemonic="LBRA", mode=Mode(rel=0x1020), is_branch=True),
-    Instruction(mnemonic="LBRN", mode=Mode(rel=0x1021), is_branch=True),
-    Instruction(mnemonic="LBSR", mode=Mode(rel=0x17), is_branch=True),
-    Instruction(mnemonic="LBVC", mode=Mode(rel=0x1028), is_branch=True),
-    Instruction(mnemonic="LBVS", mode=Mode(rel=0x1029), is_branch=True),
+    Instruction(mnemonic="LBCC", mode=Mode(rel=0x1024), is_long_branch=True),
+    Instruction(mnemonic="LBCS", mode=Mode(rel=0x1025), is_long_branch=True),
+    Instruction(mnemonic="LBEQ", mode=Mode(rel=0x1027), is_long_branch=True),
+    Instruction(mnemonic="LBGE", mode=Mode(rel=0x102C), is_long_branch=True),
+    Instruction(mnemonic="LBGT", mode=Mode(rel=0x102E), is_long_branch=True),
+    Instruction(mnemonic="LBHI", mode=Mode(rel=0x1022), is_long_branch=True),
+    Instruction(mnemonic="LBHS", mode=Mode(rel=0x1024), is_long_branch=True),
+    Instruction(mnemonic="LBLE", mode=Mode(rel=0x102F), is_long_branch=True),
+    Instruction(mnemonic="LBLO", mode=Mode(rel=0x1025), is_long_branch=True),
+    Instruction(mnemonic="LBLS", mode=Mode(rel=0x1023), is_long_branch=True),
+    Instruction(mnemonic="LBLT", mode=Mode(rel=0x102D), is_long_branch=True),
+    Instruction(mnemonic="LBMI", mode=Mode(rel=0x102B), is_long_branch=True),
+    Instruction(mnemonic="LBNE", mode=Mode(rel=0x1026), is_long_branch=True),
+    Instruction(mnemonic="LBPL", mode=Mode(rel=0x102A), is_long_branch=True),
+    Instruction(mnemonic="LBRA", mode=Mode(rel=0x1020), is_long_branch=True),
+    Instruction(mnemonic="LBRN", mode=Mode(rel=0x1021), is_long_branch=True),
+    Instruction(mnemonic="LBSR", mode=Mode(rel=0x17), is_long_branch=True),
+    Instruction(mnemonic="LBVC", mode=Mode(rel=0x1028), is_long_branch=True),
+    Instruction(mnemonic="LBVS", mode=Mode(rel=0x1029), is_long_branch=True),
 
     # Pseudo operations
     Instruction(mnemonic="END", pseudo=True),
