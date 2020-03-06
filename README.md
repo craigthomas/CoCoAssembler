@@ -111,8 +111,8 @@ compatible with EDTASM+ assembler mnemonics).
 
 | Mnemonic | Description |
 | -------- | ----------- |
-| `FCC`    | Defines a string constant value. The string is enclosed in a matching pair             | 
-|          | of delimiters. e.g. `"hello"` or `zworldz`                                             |
+| `FCC`    | Defines a string constant value. The string is enclosed in a matching pair              
+             of delimiters. e.g. `"hello"` or `zworldz`                                             |
 | `ORG`    | Defines where in memory the program should originate at. e.g. `ORG $0E00`              |
 | `SETDP`  | Sets the direct page value for the assembler. Used for memory and instruction          |
 |          | optimization. For example, if `SETDP $0E00` is set, any machine instructions that      |
