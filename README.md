@@ -109,17 +109,20 @@ compatible with EDTASM+ assembler mnemonics).
 
 ### Pseudo Operations
 
-| Mnemonic | Description |
-| -------- | ----------- |
-| `FCC`    | Defines a string constant value. The string is enclosed in a matching pair              
-             of delimiters. e.g. `"hello"` or `zworldz`                                             |
-| `ORG`    | Defines where in memory the program should originate at. e.g. `ORG $0E00`              |
-| `SETDP`  | Sets the direct page value for the assembler. Used for memory and instruction          |
-|          | optimization. For example, if `SETDP $0E00` is set, any machine instructions that      |
-|          | use `$0EXX` as a memory location will be assembled using the direct page addressing    |
-|          | mode. So instructions such as `JMP $0E8F` will become `JMP >$8F`. Note that the        |
-|          | programmer is responsible for loading the direct page register manually - the `SETDP`  |
-|          | mnemonic is only used internally for the assembler itself.                             |
+| Mnemonic | Description | Example |
+| -------- | ----------- | ------- |
+| `FCC`    | Defines a string constant value enclosed in a matching pair of delimiters. | `"hello"` or `zworldz` |
+| `INCLUDE`| Includes another assembly source file at this location.                    | `INCLUDE globals.asm`  |
+| `ORG`    | Defines where in memory the program should originate at.                   | `ORG $0E00`            |
+| `SETDP`  | Sets the direct page value for the assembler (see notes below).            | `SETDP $0E00`          |
+
+**Notes**
+
+* `SETDP` - this mnemonic is used for memory and instruction optimization by the assembler. For example, 
+if `SETDP $0E00` is set, any machine instructions that use `$0EXX` as a memory location will be assembled 
+using direct page addressing. Instructions such as `JMP $0E8F` will become `JMP >$8F`. The programmer is 
+responsible for loading the direct page register manually - this mnemonic does not output opcodes that
+change the direct page register. 
 
 ### Operands
 
