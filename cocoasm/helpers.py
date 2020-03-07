@@ -1,5 +1,5 @@
 """
-Copyright (C) 2019 Craig Thomas
+Copyright (C) 2019-2020 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
