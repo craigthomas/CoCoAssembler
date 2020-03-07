@@ -120,7 +120,7 @@ class Program(object):
 
         address = 0
         for index, statement in enumerate(self.statements):
-            address = int(statement.set_address(address), 16)
+            address = statement.set_address(address)
             address += statement.get_size()
 
         for index, statement in enumerate(self.statements):
@@ -155,7 +155,7 @@ class Program(object):
         """
         print("-- Assembled Statements --")
         for index, statement in enumerate(self.statements):
-            print("{} {}".format(statement, index))
+            print("{}".format(statement))
 
     @staticmethod
     def throw_error(error):

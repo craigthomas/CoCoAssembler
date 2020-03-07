@@ -26,7 +26,7 @@ REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
 # C L A S S E S ###############################################################
 
 class InstructionBundle(object):
-    def __init__(self, op_code=None, address=None, post_byte=0x00, additional=0x00):
+    def __init__(self, op_code=None, address=None, post_byte=None, additional=None):
         self.op_code = op_code
         self.address = address
         self.post_byte = post_byte
@@ -158,6 +158,9 @@ class Instruction(NamedTuple):
             hex_array = ["{:X}".format(ord(x)) for x in operand.get_string_value()[1:-1]]
             return InstructionBundle(additional=hex_array)
 
+        if self.mnemonic == "END":
+            return InstructionBundle()
+
     def translate_special(self, operand, statement):
         """
         Translates special non-pseudo operations.
@@ -170,6 +173,7 @@ class Instruction(NamedTuple):
 
         if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
             registers = operand.get_string_value().split(",")
+            instruction_bundle.post_byte = 0x00
             for register in registers:
                 if register not in REGISTERS:
                     raise ValueError("unknown register {}".format(register))
@@ -187,6 +191,7 @@ class Instruction(NamedTuple):
 
         if self.mnemonic == "EXG" or self.mnemonic == "TFR":
             registers = operand.get_string_value().split(",")
+            instruction_bundle.post_byte = 0x00
             if len(registers) != 2:
                 raise TranslationError("{} requires exactly 2 registers".format(self.mnemonic), statement)
 

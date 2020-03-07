@@ -12,7 +12,7 @@ from copy import copy
 
 from cocoasm.exceptions import ParseError, TranslationError
 from cocoasm.instruction import INSTRUCTIONS, InstructionBundle
-from cocoasm.operand import Operand
+from cocoasm.operand import Operand, OperandType
 from cocoasm.helpers import hex_value
 
 # C O N S T A N T S ###########################################################
@@ -57,7 +57,6 @@ class Statement(object):
         self.mnemonic = None
         self.state = None
         self.instruction_bundle = InstructionBundle()
-        self.set_address(0x0)
         self.parse_line(line)
 
     def __str__(self):
@@ -85,8 +84,8 @@ class Statement(object):
         :return: the address for this statement
         """
         if self.instruction_bundle:
-            return self.instruction_bundle.address or "0000"
-        return "0000"
+            return hex_value(self.instruction_bundle.address, 4)
+        return "None"
 
     def get_label(self):
         """
@@ -214,11 +213,10 @@ class Statement(object):
             raise TranslationError("Invalid mnemonic [{}]".format(self.mnemonic), self)
 
     def set_address(self, address):
-        if not self.instruction_bundle:
-            self.instruction_bundle = InstructionBundle()
-        if not self.instruction_bundle.address:
-            self.instruction_bundle.address = hex_value(address, 4)
-        return self.instruction_bundle.address or '0'
+        if self.instruction_bundle.address is not None:
+            return int(self.instruction_bundle.address, 16)
+        self.instruction_bundle.address = address
+        return self.instruction_bundle.address
 
     def translate_pseudo(self, symbol_table):
         if self.instruction.is_pseudo():
@@ -259,12 +257,20 @@ class Statement(object):
                                        self)
             self.instruction_bundle.op_code = self.instruction.mode.imm
             # Figure out the next portion of the operand
-            # operand = Operand(self.operand.get_immediate())
-            # operand.check_symbol(symbol_table)
-            # if operand.is_address():
-            #     self.instruction_bundle.additional = operand.get_string_value()
-            # else:
-            #     self.instruction_bundle.additional = operand.get_string_value()
+            operand = Operand(self.operand.get_immediate())
+            if operand.is_direct() or operand.is_extended():
+                self.instruction_bundle.additional = int(operand.get_extended(), 16)
+            elif operand.is_value():
+                self.instruction_bundle.additional = int(operand.get_integer())
+            else:
+                operand.check_symbol(symbol_table)
+                if operand.is_address():
+                    self.operand.operand_type = OperandType.ADDRESS
+                    self.instruction_bundle.additional = operand.get_string_value()
+                    self.set_size()
+                    return
+                else:
+                    self.instruction_bundle.additional = operand.get_string_value()
 
         if self.operand.is_indexed():
             if not self.instruction.mode.supports_indexed():
@@ -334,6 +340,7 @@ class Statement(object):
                 for statement in statements[this_index+1:branch_index]:
                     length += statement.get_size()
                 self.instruction_bundle.additional = "{:X}".format(length)
+            return
 
         if self.instruction.is_long_branch:
             branch_index = int(self.instruction_bundle.additional)
@@ -347,5 +354,9 @@ class Statement(object):
                 for statement in statements[this_index+1:branch_index]:
                     length += statement.get_size()
                 self.instruction_bundle.additional = "{:4X}".format(length)
+            return
+
+        if self.operand.is_address():
+            self.instruction_bundle.additional = statements[int(self.instruction_bundle.additional)].get_address()
 
 # E N D   O F   F I L E #######################################################

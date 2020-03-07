@@ -55,6 +55,7 @@ class OperandType(Enum):
     EXPRESSION = 9
     VALUE = 10
     ADDRESS = 11
+    STATEMENT_INDEX = 12
 
 
 class Operand(object):
@@ -92,6 +93,10 @@ class Operand(object):
         if self.get_hex_value() != "":
             operand_hex_value = hex_value(self.operand)
             self.operand_type = OperandType.DIRECT if len(operand_hex_value) < 3 else OperandType.EXTENDED
+            return
+
+        if self.get_integer() != "":
+            self.operand_type = OperandType.VALUE
             return
 
         self.operand_type = OperandType.SYMBOL
@@ -147,6 +152,10 @@ class Operand(object):
 
     def get_hex_value(self):
         match = HEX_REGEX.match(self.operand) or ""
+        return match.group("value") if match else ""
+
+    def get_integer(self):
+        match = INT_REGEX.match(self.operand) or ""
         return match.group("value") if match else ""
 
     def get_extended(self):

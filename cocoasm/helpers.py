@@ -34,7 +34,7 @@ def decimal_value(value, size=2):
 def value_with_base_to_hex(value, size, base):
     format_specifier = "{{:0>{}X}}".format(size)
 
-    if not value:
+    if value is None:
         return ""
 
     if type(value) is int:
