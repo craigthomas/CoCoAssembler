@@ -7,7 +7,6 @@ A Color Computer Assembler - see the README.md file for details.
 # I M P O R T S ###############################################################
 
 from typing import NamedTuple, Callable
-from codecs import encode
 
 from cocoasm.exceptions import TranslationError
 
