@@ -23,14 +23,17 @@ INT_REGEX = re.compile(
 # C L A S S E S  ##############################################################
 
 
-class Value(object):
+class NumericValue(object):
     """
-    Represents a base value that can be retrieved as an integer or hex value
+    Represents a numeric value that can be retrieved as an integer or hex value
     string.
     """
     def __init__(self, value):
         self.int_value = 0
         self.parse_input(value)
+
+    def __str__(self):
+        return self.get_hex_str()
 
     def parse_input(self, value):
         """

@@ -8,14 +8,14 @@ A Color Computer Assembler - see the README.md file for details.
 
 import unittest
 
-from cocoasm.value import Value
+from cocoasm.numeric_value import NumericValue
 
 # C L A S S E S ###############################################################
 
 
-class TestInstructionBundle(unittest.TestCase):
+class TestNumericValue(unittest.TestCase):
     """
-    A test class for the InstructionBundle class.
+    A test class for the NumericValue class.
     """
     def setUp(self):
         """
@@ -24,43 +24,47 @@ class TestInstructionBundle(unittest.TestCase):
         pass
 
     def test_parse_input_recognizes_valid_hex(self):
-        result = Value("$DEAD")
+        result = NumericValue("$DEAD")
         self.assertEqual("DEAD", result.get_hex_str())
 
     def test_parse_input_recognizes_valid_integer(self):
-        result = Value("1234")
+        result = NumericValue("1234")
         self.assertEqual(1234, result.get_integer())
 
     def test_parse_input_raises_exception_on_long_strings(self):
         with self.assertRaises(ValueError) as context:
-            Value("$DEADBEEF")
+            NumericValue("$DEADBEEF")
         self.assertEqual("hex value length cannot exceed 4 characters", str(context.exception))
 
     def test_parse_input_raises_exception_on_large_integer(self):
         with self.assertRaises(ValueError) as context:
-            Value("65536")
+            NumericValue("65536")
         self.assertEqual("integer value cannot exceed 65535", str(context.exception))
 
     def test_parse_input_raises_exception_on_invalid_strings(self):
         with self.assertRaises(ValueError) as context:
-            Value("this is not a valid string")
+            NumericValue("this is not a valid string")
         self.assertEqual("supplied value is neither integer or hex value", str(context.exception))
 
     def test_get_hex_length_correctly_calculated(self):
-        result = Value("$DEAD")
+        result = NumericValue("$DEAD")
         self.assertEqual(4, result.get_hex_length())
 
     def test_get_hex_byte_size_correctly_calculated(self):
-        result = Value("$DEAD")
+        result = NumericValue("$DEAD")
         self.assertEqual(2, result.get_hex_byte_size())
 
     def test_integer_value_correctly_calculated(self):
-        result = Value("$DEAD")
+        result = NumericValue("$DEAD")
         self.assertEqual(57005, result.get_integer())
 
     def test_hex_value_correctly_calculated(self):
-        result = Value("57005")
+        result = NumericValue("57005")
         self.assertEqual("DEAD", result.get_hex_str())
+
+    def test_str_correct(self):
+        result = NumericValue("57005")
+        self.assertEqual("DEAD", str(result))
 
 # M A I N #####################################################################
 
