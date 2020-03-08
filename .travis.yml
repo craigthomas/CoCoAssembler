@@ -2,8 +2,6 @@ language: python
 sudo: false
 python:
   - 3.6
-virtalenv:
-  system_site_packages: true
 script:
   - nosetests -v --with-coverage --cover-package=cocoasm
 after_success:
