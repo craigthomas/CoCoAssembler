@@ -8,6 +8,8 @@ A Color Computer Assembler - see the README.md file for details.
 
 import re
 
+from abc import ABC, abstractmethod
+
 # C O N S T A N T S ###########################################################
 
 # Pattern to recognize a hex value
@@ -23,19 +25,99 @@ INT_REGEX = re.compile(
 # C L A S S E S  ##############################################################
 
 
-class NumericValue(object):
+class Value(ABC):
+    def __init__(self, value):
+        self.original_string = value
+
+    def __str__(self):
+        return self.get_hex_str()
+
+    def get_ascii_string(self):
+        """
+        Returns the original ascii representation of the value.
+
+        :return: the original ascii representation of the value
+        """
+        return self.original_string
+
+    def get_hex_byte_size(self):
+        """
+        Returns how many bytes are in the hex representation.
+
+        :return: the number of hex bytes in the object
+        """
+        return int(self.get_hex_length() / 2)
+
+    @abstractmethod
+    def get_hex_str(self):
+        """
+        Returns the hex representation of the object.
+
+        :return: the hex representation of the object
+        """
+        pass
+
+    @abstractmethod
+    def get_hex_length(self):
+        """
+        Returns the full length of the hex representation.
+
+        :return: the full number of hex characters
+        """
+        pass
+
+
+class StringValue(Value):
     """
     Represents a numeric value that can be retrieved as an integer or hex value
     string.
     """
     def __init__(self, value):
+        super().__init__(value)
+        self.hex_array = []
+        self.parse(value)
+
+    def parse(self, value):
+        """
+        Parses an input string value. Input strings are simply string values
+        that must begin and end with the same character.
+
+        :param value: the value to parse
+        """
+        delimiter = value[0]
+        if not value[-1] == delimiter:
+            raise ValueError("string must begin and end with same delimiter")
+        self.original_string = value[1:-1]
+        self.hex_array = ["{:X}".format(ord(x)) for x in value[1:-1]]
+
+    def get_hex_str(self):
+        """
+        Returns a hex string representation of the object.
+
+        :return: the hex representation of the object
+        """
+        return "".join(self.hex_array)
+
+    def get_hex_length(self):
+        """
+        Returns the full length of the hex representation.
+
+        :return: the full number of hex characters
+        """
+        return len(self.get_hex_str())
+
+
+class NumericValue(Value):
+    """
+    Represents a numeric value that can be retrieved as an integer or hex value
+    string.
+    """
+    def __init__(self, value):
+        super().__init__(value)
         self.int_value = 0
-        self.parse_input(value)
+        self.parse(value)
 
-    def __str__(self):
-        return self.get_hex_str()
-
-    def parse_input(self, value):
+    def parse(self, value):
         """
         Parses an input string value. Input strings are either integer values,
         or a hex value starting with $.
@@ -84,13 +166,5 @@ class NumericValue(object):
         :return: the full number of hex characters
         """
         return len(hex(self.int_value)[2:])
-
-    def get_hex_byte_size(self):
-        """
-        Returns how many bytes are in the hex representation.
-
-        :return: the number of hex bytes in the object
-        """
-        return int(self.get_hex_length() / 2)
 
 # E N D   O F   F I L E #######################################################

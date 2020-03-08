@@ -8,7 +8,7 @@ A Color Computer Assembler - see the README.md file for details.
 
 import unittest
 
-from cocoasm.string_value import StringValue
+from cocoasm.values import StringValue
 
 # C L A S S E S ###############################################################
 
