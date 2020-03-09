@@ -11,24 +11,31 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from cocoasm.values import StringValue, NumericValue
+from cocoasm.values import StringValue, NumericValue, SymbolValue,  \
+    NoneValue, ExpressionValue
 
 # C O N S T A N T S ###########################################################
 
-# Patten to recognize an expression
-EXPR_REGEX = re.compile(
-    r"^(?P<symbol0>[\d\w]+)(?P<operation>[\+\-\/\*])(?P<symbol1>[\d\w]+)"
+# Pattern to recognize an immediate value
+IMMEDIATE_REGEX = re.compile(
+    r"^#(?P<value>.*)"
 )
 
 # Pattern to recognize an immediate value
-IMM_REGEX = re.compile(
-    r"^#(?P<value>.*)"
+DIRECT_REGEX = re.compile(
+    r"^\<(?P<value>.*)"
+)
+
+# Pattern to recognize an immediate value
+EXTENDED_REGEX = re.compile(
+    r"^\<(?P<value>.*)"
 )
 
 # Pattern to recognize an indexed value
 EXTENDED_INDIRECT_REGEX = re.compile(
     r"^\[(?P<value>.*)\]"
 )
+
 
 # C L A S S E S ###############################################################
 
@@ -42,8 +49,7 @@ class OperandType(Enum):
     EXTENDED = 5
     DIRECT = 6
     RELATIVE = 7
-    SYMBOL = 8
-    EXPRESSION = 9
+    SYMBOL_OR_EXPRESSION = 8
     VALUE = 10
     ADDRESS = 11
     STATEMENT_INDEX = 12
@@ -52,12 +58,13 @@ class OperandType(Enum):
 class Operand(ABC):
     def __init__(self):
         self.type = OperandType.UNKNOWN
-        self.operand_string = None
+        self.operand_string = ""
         self.requires_resolution = False
-        self.sub_expression = None
+        self.sub_expression = NoneValue(None)
 
     @classmethod
-    def create_from_operand(cls, operand_string):
+    def create_from_str(cls, operand_string):
+        print("operand_string: {}".format(operand_string))
         try:
             return InherentOperand(operand_string)
         except ValueError:
@@ -68,12 +75,32 @@ class Operand(ABC):
         except ValueError:
             pass
 
+        try:
+            return DirectOperand(operand_string)
+        except ValueError:
+            pass
+
+        try:
+            return ExtendedOperand(operand_string)
+        except ValueError:
+            pass
+
+        try:
+            return SymbolOrExpressionOperand(operand_string)
+        except ValueError:
+            pass
+
+        raise ValueError("unknown operand type {}".format(operand_string))
+
     @abstractmethod
     def parse_operand(self, operand):
         pass
 
     def is_type(self, operand_type):
         return self.type == operand_type
+
+    def get_type(self):
+        return self.type
 
     def get_operand_string(self):
         return self.operand_string
@@ -91,14 +118,27 @@ class Operand(ABC):
         except ValueError:
             pass
 
-        self.requires_resolution = True
+        try:
+            self.sub_expression = SymbolValue(value)
+            self.requires_resolution = True
+            return
+        except ValueError:
+            pass
+
+        try:
+            self.sub_expression = ExpressionValue(value)
+            self.requires_resolution = True
+            return
+        except ValueError:
+            pass
+
+        raise ValueError("cannot parse sub expression")
 
     def requires_resolution(self):
         return self.requires_resolution
 
-
-class ExpressionOperand(Operand):
-    pass
+    def get_hex_value(self):
+        return self.sub_expression.get_hex_str()
 
 
 class InherentOperand(Operand):
@@ -127,18 +167,106 @@ class ImmediateOperand(Operand):
 
         :return: True if the operand is immediate
         """
-        match = IMM_REGEX.match(self.operand_string)
+        match = IMMEDIATE_REGEX.match(self.operand_string)
         if not match:
             raise ValueError("operand is not an immediate value")
         self.parsed_value = match.group("value")
-        self.parse_sub_expression()
+        self.parse_sub_expression(self.parsed_value)
 
 
 class DirectOperand(Operand):
-    pass
+    def __init__(self, operand_string):
+        super().__init__()
+        self.type = OperandType.DIRECT
+        self.operand_string = operand_string
+        self.parsed_value = None
+        self.sub_expression = None
+        self.parse_operand(operand_string)
+
+    def parse_operand(self, operand_string):
+        """
+        Returns true if the operand is immediate data.
+
+        :return: True if the operand is immediate
+        """
+        match = DIRECT_REGEX.match(self.operand_string)
+        if match:
+            self.parsed_value = match.group("value")
+        else:
+            self.parsed_value = self.operand_string
+            self.parse_sub_expression(self.parsed_value)
+            if self.sub_expression is None:
+                raise ValueError("operand is not a direct value")
+            if self.sub_expression.get_hex_byte_size() != 1:
+                raise ValueError("operand is not a direct value")
 
 
 class ExtendedOperand(Operand):
-    pass
+    def __init__(self, operand_string):
+        super().__init__()
+        self.type = OperandType.EXTENDED
+        self.operand_string = operand_string
+        self.parsed_value = None
+        self.sub_expression = None
+        self.parse_operand(operand_string)
+
+    def parse_operand(self, operand_string):
+        """
+        Returns true if the operand is immediate data.
+
+        :return: True if the operand is immediate
+        """
+        match = EXTENDED_REGEX.match(self.operand_string)
+        if match:
+            self.parsed_value = match.group("value")
+        else:
+            self.parsed_value = self.operand_string
+            self.parse_sub_expression(self.parsed_value)
+            if self.sub_expression is None:
+                raise ValueError("operand is not an extended value")
+            if self.sub_expression.get_hex_byte_size() != 2:
+                raise ValueError("operand is not an extended value")
+
+
+class ExtendedIndirectOperand(Operand):
+    def __init__(self, operand_string):
+        super().__init__()
+        self.type = OperandType.EXTENDED_INDIRECT
+        self.operand_string = operand_string
+        self.parsed_value = None
+        self.sub_expression = None
+        self.parse_operand(operand_string)
+
+    def parse_operand(self, operand_string):
+        """
+        Returns true if the operand is immediate data.
+
+        :return: True if the operand is immediate
+        """
+        match = EXTENDED_INDIRECT_REGEX.match(self.operand_string)
+        if not match:
+            raise ValueError("operand is not an extended indirect value")
+        self.parsed_value = match.group("value")
+        self.parse_sub_expression(self.parsed_value)
+
+
+class SymbolOrExpressionOperand(Operand):
+    def __init__(self, operand_string):
+        super().__init__()
+        self.type = OperandType.SYMBOL_OR_EXPRESSION
+        self.operand_string = operand_string
+        self.parsed_value = None
+        self.sub_expression = None
+        self.parse_operand(operand_string)
+
+    def parse_operand(self, operand_string):
+        """
+        Returns true if the operand is immediate data.
+
+        :return: True if the operand is immediate
+        """
+        self.parsed_value = operand_string
+        self.parse_sub_expression(self.parsed_value)
+
 
 # E N D   O F   F I L E #######################################################

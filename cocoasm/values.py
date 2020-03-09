@@ -9,30 +9,51 @@ A Color Computer Assembler - see the README.md file for details.
 import re
 
 from abc import ABC, abstractmethod
+from enum import Enum
 
 # C O N S T A N T S ###########################################################
 
 # Pattern to recognize a hex value
 HEX_REGEX = re.compile(
-    r"^\$(?P<value>[0-9a-fA-F]+)"
+    r"^\$(?P<value>[0-9a-fA-F]+)$"
 )
 
 # Pattern to recognize an integer value
 INT_REGEX = re.compile(
-    r"^(?P<value>[\d]+)"
+    r"^(?P<value>[\d]+)$"
+)
+
+# Pattern to recognize a symbol value
+SYMBOL_REGEX = re.compile(
+    r"^(?P<value>[a-zA-Z0-9\@]+)$"
+)
+
+# Patten to recognize an expression
+EXPRESSION_REGEX = re.compile(
+    r"^(?P<left>[\d\w]+)(?P<operation>[\+\-\/\*])(?P<right>[\d\w]+)$"
 )
 
 # C L A S S E S  ##############################################################
 
 
+class ValueType(Enum):
+    UNKNOWN = 0
+    NUMERIC = 1
+    STRING = 2
+    SYMBOL = 3
+    EXPRESSION = 4
+    NONE = 5
+
+
 class Value(ABC):
     def __init__(self, value):
         self.original_string = value
+        self.type = ValueType.UNKNOWN
 
     def __str__(self):
         return self.get_hex_str()
 
-    def get_ascii_string(self):
+    def get_ascii_str(self):
         """
         Returns the original ascii representation of the value.
 
@@ -67,6 +88,18 @@ class Value(ABC):
         pass
 
 
+class NoneValue(Value):
+    def __init__(self, value):
+        super().__init__(value)
+        self.type = ValueType.NONE
+
+    def get_hex_str(self):
+        return ""
+
+    def get_hex_length(self):
+        return 0
+
+
 class StringValue(Value):
     """
     Represents a numeric value that can be retrieved as an integer or hex value
@@ -75,6 +108,7 @@ class StringValue(Value):
     def __init__(self, value):
         super().__init__(value)
         self.hex_array = []
+        self.type = ValueType.STRING
         self.parse(value)
 
     def parse(self, value):
@@ -115,6 +149,7 @@ class NumericValue(Value):
     def __init__(self, value):
         super().__init__(value)
         self.int_value = 0
+        self.type = ValueType.NUMERIC
         self.parse(value)
 
     def parse(self, value):
@@ -166,5 +201,98 @@ class NumericValue(Value):
         :return: the full number of hex characters
         """
         return len(hex(self.int_value)[2:])
+
+
+class SymbolValue(Value):
+    """
+    Represents a symbol value that stores an address or index.
+    """
+    def __init__(self, value):
+        super().__init__(value)
+        self.value = None
+        self.resolved = False
+        self.type = ValueType.SYMBOL
+        self.parse(value)
+
+    def parse(self, value):
+        """
+        Parses an input symbol value.
+
+        :param value: the value to parse
+        """
+        data = SYMBOL_REGEX.match(value)
+        if data:
+            return
+
+        raise ValueError("supplied value is not a valid symbol")
+
+    def get_hex_str(self):
+        """
+        Returns a hex string representation of the object.
+
+        :return: the hex representation of the object
+        """
+        if self.resolved:
+            return self.value.get_hex_str()
+        return ""
+
+    def get_hex_length(self):
+        """
+        Returns the full length of the hex representation.
+
+        :return: the full number of hex characters
+        """
+        if self.resolved:
+            return self.value.get_hex_length()
+        return 0
+
+    def resolve(self, symbol_table):
+        pass
+
+
+class ExpressionValue(Value):
+    """
+    Represents an expression that occurs between two values.
+    """
+    def __init__(self, value):
+        super().__init__(value)
+        self.left = None
+        self.right = None
+        self.operation = None
+        self.resolved = False
+        self.value = None
+        self.type = ValueType.EXPRESSION
+        self.parse(value)
+
+    def parse(self, value):
+        match = EXPRESSION_REGEX.match(value)
+        if not match:
+            raise ValueError("supplied value is not a valid expression")
+        self.left = match.group("left")
+        self.right = match.group("right")
+        self.operation = match.group("operation")
+
+    def get_hex_str(self):
+        """
+        Returns a hex string representation of the object.
+
+        :return: the hex representation of the object
+        """
+        if self.resolved:
+            return self.value.get_hex_str()
+        return ""
+
+    def get_hex_length(self):
+        """
+        Returns the full length of the hex representation.
+
+        :return: the full number of hex characters
+        """
+        if self.resolved:
+            return self.value.get_hex_length()
+        return 0
+
+    def resolve(self, symbol_table):
+        pass
 
 # E N D   O F   F I L E #######################################################

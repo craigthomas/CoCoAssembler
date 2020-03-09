@@ -120,7 +120,7 @@ compatible with EDTASM+ assembler mnemonics).
 
 * `SETDP` - this mnemonic is used for memory and instruction optimization by the assembler. For example, 
 if `SETDP $0E00` is set, any machine instructions that use `$0EXX` as a memory location will be assembled 
-using direct page addressing. Instructions such as `JMP $0E8F` will become `JMP >$8F`. The programmer is 
+using direct page addressing. Instructions such as `JMP $0E8F` will become `JMP <$8F`. The programmer is 
 responsible for loading the direct page register manually - this mnemonic does not output opcodes that
 change the direct page register. 
 
