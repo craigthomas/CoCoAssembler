@@ -64,7 +64,6 @@ class Operand(ABC):
 
     @classmethod
     def create_from_str(cls, operand_string):
-        print("operand_string: {}".format(operand_string))
         try:
             return InherentOperand(operand_string)
         except ValueError:
@@ -82,6 +81,16 @@ class Operand(ABC):
 
         try:
             return ExtendedOperand(operand_string)
+        except ValueError:
+            pass
+
+        try:
+            return ExtendedIndirectOperand(operand_string)
+        except ValueError:
+            pass
+
+        try:
+            return IndexedOperand(operand_string)
         except ValueError:
             pass
 
@@ -248,6 +257,27 @@ class ExtendedIndirectOperand(Operand):
             raise ValueError("operand is not an extended indirect value")
         self.parsed_value = match.group("value")
         self.parse_sub_expression(self.parsed_value)
+
+
+class IndexedOperand(Operand):
+    def __init__(self, operand_string):
+        super().__init__()
+        self.type = OperandType.INDEXED
+        self.operand_string = operand_string
+        self.parsed_value = None
+        self.sub_expression = None
+        self.parse_operand(operand_string)
+
+    def parse_operand(self, operand_string):
+        """
+        Returns true if the operand is immediate data.
+
+        :return: True if the operand is immediate
+        """
+        if "," not in operand_string:
+            raise ValueError("operand is not an indexed value")
+        self.parsed_value = operand_string
+        self.sub_expression = NoneValue(operand_string)
 
 
 class SymbolOrExpressionOperand(Operand):

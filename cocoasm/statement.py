@@ -192,20 +192,18 @@ class Statement(object):
         if data:
             self.label = data.group("label") or None
             self.mnemonic = data.group("mnemonic").upper() or None
-            self.operand = Operand.create_from_str(data.group("operands"))
-            self.comment = data.group("comment").strip() or None
-            self.empty = False
-
-            print(self)
-            # Check to see if we have a string definition
             if self.mnemonic == "FCC":
-                original_operand = self.operand.get_operand_string()
-                if self.comment:
-                    original_operand = "{} {}".format(self.operand.get_operand_string(), self.comment)
+                original_operand = data.group("operands")
+                if data.group("comment"):
+                    original_operand = "{} {}".format(data.group("operands"), data.group("comment").strip())
                 starting_symbol = original_operand[0]
                 ending_location = original_operand.find(starting_symbol, 1)
-                self.operand = Operand.create_from_str(original_operand[0:ending_location+1])
-                self.comment = original_operand[ending_location+2:].strip() or None
+                self.operand = Operand.create_from_str(original_operand[0:ending_location + 1])
+                self.comment = original_operand[ending_location + 2:].strip() or None
+            else:
+                self.operand = Operand.create_from_str(data.group("operands"))
+                self.comment = data.group("comment").strip() or None
+                self.empty = False
             return
 
         raise ParseError("Could not parse line [{}]".format(line), self)
