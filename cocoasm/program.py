@@ -11,7 +11,8 @@ import sys
 from cocoasm.exceptions import TranslationError, ParseError
 from cocoasm.statement import Statement
 from cocoasm.assembler_state import AssemblerState
-from cocoasm.symbol import Symbol
+from cocoasm.operands import Operand
+from cocoasm.symbol import AddressSymbol, ValueSymbol
 
 # C L A S S E S ###############################################################
 
@@ -101,7 +102,10 @@ class Program(object):
         if label:
             if label in self.symbol_table:
                 raise TranslationError("Label [" + label + "] redefined", statement)
-            self.symbol_table[label] = Symbol(label, index)
+            if statement.instruction.is_pseudo_define():
+                self.symbol_table[label] = statement.operand
+            else:
+                self.symbol_table[label] = AddressSymbol(index)
 
     def translate_statements(self):
         """

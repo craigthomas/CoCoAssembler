@@ -9,6 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 from typing import NamedTuple, Callable
 
 from cocoasm.exceptions import TranslationError
+from cocoasm.values import StringValue
 
 # C O N S T A N T S ###########################################################
 
@@ -128,6 +129,9 @@ class Instruction(NamedTuple):
     def is_pseudo(self):
         return self.mnemonic in ["FCC", "FCB", "FDB", "EQU", "INCLUDE", "END", "ORG"]
 
+    def is_pseudo_define(self):
+        return self.mnemonic in ["EQU"]
+
     def is_special(self):
         return self.mnemonic in ["PULS", "PSHS", "EXG", "TFR"]
 
@@ -141,21 +145,19 @@ class Instruction(NamedTuple):
         :return: returns the value of the pseudo operation
         """
         if self.mnemonic == "FCB":
-            return InstructionBundle(additional=operand.get_string_value())
+            return InstructionBundle(additional=operand.get_hex_value())
 
         if self.mnemonic == "FDB":
-            return InstructionBundle(additional=operand.get_string_value())
+            return InstructionBundle(additional=operand.get_hex_value())
 
         if self.mnemonic == "EQU":
-            symbol_table[label].set_value(operand.get_string_value())
             return InstructionBundle()
 
         if self.mnemonic == "ORG":
-            return InstructionBundle(address=operand.get_extended())
+            return InstructionBundle(address=operand.get_hex_value())
 
         if self.mnemonic == "FCC":
-            hex_array = ["{:X}".format(ord(x)) for x in operand.get_string_value()[1:-1]]
-            return InstructionBundle(additional=hex_array)
+            return InstructionBundle(additional=operand.get_hex_value())
 
         if self.mnemonic == "END":
             return InstructionBundle()
@@ -171,7 +173,7 @@ class Instruction(NamedTuple):
         instruction_bundle.op_code = statement.get_instruction().mode.imm
 
         if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
-            registers = operand.get_string_value().split(",")
+            registers = operand.get_operand_string().split(",")
             instruction_bundle.post_byte = 0x00
             for register in registers:
                 if register not in REGISTERS:
@@ -189,7 +191,7 @@ class Instruction(NamedTuple):
             return instruction_bundle
 
         if self.mnemonic == "EXG" or self.mnemonic == "TFR":
-            registers = operand.get_string_value().split(",")
+            registers = operand.get_operand_string().split(",")
             instruction_bundle.post_byte = 0x00
             if len(registers) != 2:
                 raise TranslationError("{} requires exactly 2 registers".format(self.mnemonic), statement)

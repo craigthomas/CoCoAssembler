@@ -222,6 +222,7 @@ class SymbolValue(Value):
         """
         data = SYMBOL_REGEX.match(value)
         if data:
+            self.value = value
             return
 
         raise ValueError("supplied value is not a valid symbol")

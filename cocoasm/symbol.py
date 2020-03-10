@@ -6,40 +6,39 @@ A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
-from cocoasm.helpers import hex_value
+from abc import ABC
+from enum import Enum
 
 # C L A S S E S  ##############################################################
 
 
-class Symbol(object):
-    def __init__(self, label, index):
-        self.label = label
-        self.index = index
-        self.value = None
-        self.address = None
+class SymbolType(Enum):
+    UNKNOWN = 0
+    ADDRESS = 1
+    VALUE = 2
 
-    def __str__(self):
-        if self.is_value():
-            return "${} {}".format(
-                hex_value(self.value),
-                self.label.upper()
-            )
-        return "{:04d} ${} {}".format(
-            self.index,
-            hex_value(self.address),
-            self.label.upper()
-        )
 
-    def set_value(self, value):
+class Symbol(ABC):
+    def __init__(self, value):
+        self.type = SymbolType.UNKNOWN
         self.value = value
 
-    def get_value(self):
+    def __str__(self):
         return self.value
 
-    def is_value(self):
-        return self.value is not None
+    def is_type(self, symbol_type):
+        return self.type == symbol_type
 
-    def get_address(self):
-        return self.index
+
+class AddressSymbol(Symbol):
+    def __init__(self, value):
+        super().__init__(value)
+        self.type = SymbolType.ADDRESS
+
+
+class ValueSymbol(Symbol):
+    def __init__(self, value):
+        super().__init__(value)
+        self.type = SymbolType.VALUE
 
 # E N D   O F   F I L E #######################################################
