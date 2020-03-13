@@ -9,10 +9,11 @@ A Color Computer Assembler - see the README.md file for details.
 import re
 
 from abc import ABC, abstractmethod
+from copy import copy
 from enum import Enum
 
 from cocoasm.values import StringValue, NumericValue, SymbolValue,  \
-    NoneValue, ExpressionValue
+    NoneValue, ExpressionValue, ValueType
 
 # C O N S T A N T S ###########################################################
 
@@ -49,53 +50,60 @@ class OperandType(Enum):
     EXTENDED = 5
     DIRECT = 6
     RELATIVE = 7
-    SYMBOL_OR_EXPRESSION = 8
+    SYMBOL = 8
+    EXPRESSION = 9
     VALUE = 10
     ADDRESS = 11
     STATEMENT_INDEX = 12
 
 
 class Operand(ABC):
-    def __init__(self):
+    def __init__(self, mnemonic):
         self.type = OperandType.UNKNOWN
         self.operand_string = ""
+        self.mnemonic = mnemonic
         self.requires_resolution = False
         self.sub_expression = NoneValue(None)
 
     @classmethod
-    def create_from_str(cls, operand_string):
+    def create_from_str(cls, operand_string, mnemonic):
         try:
-            return InherentOperand(operand_string)
+            return InherentOperand(operand_string, mnemonic)
         except ValueError:
             pass
 
         try:
-            return ImmediateOperand(operand_string)
+            return ImmediateOperand(operand_string, mnemonic)
         except ValueError:
             pass
 
         try:
-            return DirectOperand(operand_string)
+            return DirectOperand(operand_string, mnemonic)
         except ValueError:
             pass
 
         try:
-            return ExtendedOperand(operand_string)
+            return ExtendedOperand(operand_string, mnemonic)
         except ValueError:
             pass
 
         try:
-            return ExtendedIndirectOperand(operand_string)
+            return ExtendedIndirectOperand(operand_string, mnemonic)
         except ValueError:
             pass
 
         try:
-            return IndexedOperand(operand_string)
+            return IndexedOperand(operand_string, mnemonic)
         except ValueError:
             pass
 
         try:
-            return SymbolOrExpressionOperand(operand_string)
+            return ExpressionOperand(operand_string, mnemonic)
+        except ValueError:
+            pass
+
+        try:
+            return SymbolOperand(operand_string, mnemonic)
         except ValueError:
             pass
 
@@ -121,11 +129,12 @@ class Operand(ABC):
         except ValueError:
             pass
 
-        try:
-            self.sub_expression = StringValue(value)
-            return
-        except ValueError:
-            pass
+        if self.mnemonic == "FCC":
+            try:
+                self.sub_expression = StringValue(value)
+                return
+            except ValueError:
+                pass
 
         try:
             self.sub_expression = SymbolValue(value)
@@ -151,8 +160,8 @@ class Operand(ABC):
 
 
 class InherentOperand(Operand):
-    def __init__(self, operand_string):
-        super().__init__()
+    def __init__(self, operand_string, mnemonic):
+        super().__init__(mnemonic)
         self.type = OperandType.INHERENT
         self.parse_operand(operand_string)
 
@@ -162,8 +171,8 @@ class InherentOperand(Operand):
 
 
 class ImmediateOperand(Operand):
-    def __init__(self, operand_string):
-        super().__init__()
+    def __init__(self, operand_string, mnemonic):
+        super().__init__(mnemonic)
         self.type = OperandType.IMMEDIATE
         self.operand_string = operand_string
         self.parsed_value = None
@@ -184,8 +193,8 @@ class ImmediateOperand(Operand):
 
 
 class DirectOperand(Operand):
-    def __init__(self, operand_string):
-        super().__init__()
+    def __init__(self, operand_string, mnemonic):
+        super().__init__(mnemonic)
         self.type = OperandType.DIRECT
         self.operand_string = operand_string
         self.parsed_value = None
@@ -211,8 +220,8 @@ class DirectOperand(Operand):
 
 
 class ExtendedOperand(Operand):
-    def __init__(self, operand_string):
-        super().__init__()
+    def __init__(self, operand_string, mnemonic):
+        super().__init__(mnemonic)
         self.type = OperandType.EXTENDED
         self.operand_string = operand_string
         self.parsed_value = None
@@ -238,8 +247,8 @@ class ExtendedOperand(Operand):
 
 
 class ExtendedIndirectOperand(Operand):
-    def __init__(self, operand_string):
-        super().__init__()
+    def __init__(self, operand_string, mnemonic):
+        super().__init__(mnemonic)
         self.type = OperandType.EXTENDED_INDIRECT
         self.operand_string = operand_string
         self.parsed_value = None
@@ -260,8 +269,8 @@ class ExtendedIndirectOperand(Operand):
 
 
 class IndexedOperand(Operand):
-    def __init__(self, operand_string):
-        super().__init__()
+    def __init__(self, operand_string, mnemonic):
+        super().__init__(mnemonic)
         self.type = OperandType.INDEXED
         self.operand_string = operand_string
         self.parsed_value = None
@@ -280,10 +289,10 @@ class IndexedOperand(Operand):
         self.sub_expression = NoneValue(operand_string)
 
 
-class SymbolOrExpressionOperand(Operand):
-    def __init__(self, operand_string):
-        super().__init__()
-        self.type = OperandType.SYMBOL_OR_EXPRESSION
+class SymbolOperand(Operand):
+    def __init__(self, operand_string, mnemonic):
+        super().__init__(mnemonic)
+        self.type = OperandType.SYMBOL
         self.operand_string = operand_string
         self.parsed_value = None
         self.sub_expression = None
@@ -298,5 +307,50 @@ class SymbolOrExpressionOperand(Operand):
         self.parsed_value = operand_string
         self.parse_sub_expression(self.parsed_value)
 
+    def resolve(self, symbol_table):
+        symbol_string = self.sub_expression.get_ascii_str()
+        if symbol_string not in symbol_table:
+            raise ValueError("{} not in symbol table".format(symbol_string))
+        return copy(symbol_table[symbol_string])
+
+
+class ExpressionOperand(Operand):
+    def __init__(self, operand_string, mnemonic):
+        super().__init__(mnemonic)
+        self.type = OperandType.EXPRESSION
+        self.operand_string = operand_string
+        self.sub_expression = None
+        self.parse_operand(operand_string)
+
+    def parse_operand(self, operand_string):
+        """
+        Returns true if the operand is immediate data.
+
+        :return: True if the operand is immediate
+        """
+        self.sub_expression = ExpressionValue(operand_string)
+
+    def resolve(self, symbol_table):
+        pass
+
+
+class AddressOperand(Operand):
+    def __init__(self, operand_string, mnemonic):
+        super().__init__(mnemonic)
+        self.type = OperandType.ADDRESS
+        self.operand_string = operand_string
+        self.sub_expression = None
+        self.parse_operand(operand_string)
+
+    def parse_operand(self, operand_string):
+        """
+        Returns true if the operand is immediate data.
+
+        :return: True if the operand is immediate
+        """
+        self.sub_expression = NumericValue(operand_string)
+
+    def resolve(self, symbol_table):
+        pass
 
 # E N D   O F   F I L E #######################################################

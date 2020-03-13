@@ -11,8 +11,7 @@ import sys
 from cocoasm.exceptions import TranslationError, ParseError
 from cocoasm.statement import Statement
 from cocoasm.assembler_state import AssemblerState
-from cocoasm.operands import Operand
-from cocoasm.symbol import AddressSymbol, ValueSymbol
+from cocoasm.operands import AddressOperand
 
 # C L A S S E S ###############################################################
 
@@ -105,7 +104,7 @@ class Program(object):
             if statement.instruction.is_pseudo_define():
                 self.symbol_table[label] = statement.operand
             else:
-                self.symbol_table[label] = AddressSymbol(index)
+                self.symbol_table[label] = AddressOperand(str(index), "")
 
     def translate_statements(self):
         """

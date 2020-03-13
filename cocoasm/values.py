@@ -11,6 +11,8 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 
+from cocoasm.symbol import SymbolType
+
 # C O N S T A N T S ###########################################################
 
 # Pattern to recognize a hex value
@@ -68,6 +70,24 @@ class Value(ABC):
         :return: the number of hex bytes in the object
         """
         return int(self.get_hex_length() / 2)
+
+    def is_type(self, value_type):
+        return self.type == value_type
+
+    @classmethod
+    def create_from_str(cls, value):
+        print("creating Value from {}".format(value))
+        try:
+            return NumericValue(value)
+        except ValueError:
+            pass
+
+        try:
+            return StringValue(value)
+        except ValueError:
+            pass
+
+        raise ValueError("unknown value type")
 
     @abstractmethod
     def get_hex_str(self):
@@ -247,13 +267,10 @@ class SymbolValue(Value):
             return self.value.get_hex_length()
         return 0
 
-    def resolve(self, symbol_table):
-        pass
-
 
 class ExpressionValue(Value):
     """
-    Represents an expression that occurs between two values.
+    Represents a symbol value that stores an address or index.
     """
     def __init__(self, value):
         super().__init__(value)
@@ -266,6 +283,11 @@ class ExpressionValue(Value):
         self.parse(value)
 
     def parse(self, value):
+        """
+        Parses an input symbol value.
+
+        :param value: the value to parse
+        """
         match = EXPRESSION_REGEX.match(value)
         if not match:
             raise ValueError("supplied value is not a valid expression")
@@ -292,8 +314,5 @@ class ExpressionValue(Value):
         if self.resolved:
             return self.value.get_hex_length()
         return 0
-
-    def resolve(self, symbol_table):
-        pass
 
 # E N D   O F   F I L E #######################################################

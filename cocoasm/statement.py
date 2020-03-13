@@ -52,6 +52,7 @@ class Statement(object):
         self.instruction = None
         self.label = None
         self.operand = None
+        self.original_operand = None
         self.comment = None
         self.size = 0
         self.mnemonic = None
@@ -73,7 +74,7 @@ class Statement(object):
             op_code_string.ljust(10, ' '),
             self.get_label().rjust(10, ' '),
             self.get_mnemonic().rjust(5, ' '),
-            self.operand.get_operand_string().ljust(30, ' '),
+            self.original_operand.get_operand_string().ljust(30, ' '),
             self.get_comment().ljust(40, ' '),
             self.operand.get_type(),
             self.operand.sub_expression.type
@@ -117,9 +118,7 @@ class Statement(object):
 
     def get_additional(self):
         if self.instruction_bundle:
-            if type(self.instruction_bundle.additional) is list:
-                return "".join(self.instruction_bundle.additional)
-            return hex_value(self.instruction_bundle.additional) or None
+            return self.instruction_bundle.additional or None
         return None
 
     def get_post_byte(self):
@@ -198,10 +197,13 @@ class Statement(object):
                     original_operand = "{} {}".format(data.group("operands"), data.group("comment").strip())
                 starting_symbol = original_operand[0]
                 ending_location = original_operand.find(starting_symbol, 1)
-                self.operand = Operand.create_from_str(original_operand[0:ending_location + 1])
+                self.operand = Operand.create_from_str(original_operand[0:ending_location + 1], self.mnemonic)
+                self.original_operand = copy(self.operand)
                 self.comment = original_operand[ending_location + 2:].strip() or None
+                self.empty = False
             else:
-                self.operand = Operand.create_from_str(data.group("operands"))
+                self.operand = Operand.create_from_str(data.group("operands"), self.mnemonic)
+                self.original_operand = copy(self.operand)
                 self.comment = data.group("comment").strip() or None
                 self.empty = False
             return
@@ -238,7 +240,8 @@ class Statement(object):
             self.set_size()
             return
 
-        #self.operand.check_symbol(symbol_table)
+        if self.operand.is_type(OperandType.SYMBOL):
+            self.operand = self.operand.resolve(symbol_table)
 
         # if self.instruction.is_short_branch or self.instruction.is_long_branch:
         #     self.instruction_bundle.op_code = self.instruction.mode.rel
@@ -308,8 +311,8 @@ class Statement(object):
         # if self.instruction_bundle.op_code:
         #     self.size += int((len(self.get_op_codes()) / 2))
         #
-        # if self.instruction_bundle.additional:
-        #     self.size += int((len(self.get_additional()) / 2))
+        if self.instruction_bundle.additional:
+            self.size += int((len(self.get_additional()) / 2))
         #
         # if self.instruction_bundle.post_byte:
         #     self.size += int((len(self.get_post_byte()) / 2))
