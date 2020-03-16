@@ -224,7 +224,8 @@ class Statement(object):
     def translate_pseudo(self, symbol_table):
         if self.instruction.is_pseudo():
             self.instruction_bundle = self.instruction.translate_pseudo(self.get_label(), self.operand, symbol_table)
-            self.set_size()
+            if self.instruction_bundle:
+                self.size = self.instruction_bundle.get_size()
 
     def translate(self, symbol_table):
         """
@@ -237,7 +238,7 @@ class Statement(object):
 
         if self.instruction.is_special():
             self.instruction_bundle = self.instruction.translate_special(self.operand, self)
-            self.set_size()
+            self.size = self.instruction_bundle.get_size()
             return
 
         if self.operand.is_type(OperandType.SYMBOL):
@@ -254,6 +255,7 @@ class Statement(object):
             if not self.instruction.mode.supports_inherent():
                 raise TranslationError("Instruction [{}] requires an operand".format(self.mnemonic), self)
             self.instruction_bundle.op_code = self.instruction.mode.inh
+            self.size = self.instruction.mode.inh_sz
 
         if self.operand.is_type(OperandType.IMMEDIATE):
             if not self.instruction.mode.supports_immediate():
@@ -261,6 +263,7 @@ class Statement(object):
                                        self)
             self.instruction_bundle.op_code = self.instruction.mode.imm
             self.instruction_bundle.additional = self.operand.get_hex_value()
+            self.size = self.instruction.mode.imm_sz
         #
         # if self.operand.is_indexed():
         #     if not self.instruction.mode.supports_indexed():
@@ -279,6 +282,7 @@ class Statement(object):
             self.instruction_bundle.additional = self.operand.get_hex_value()
             # TODO: properly translate what the post-byte code should be
             self.instruction_bundle.post_byte = 0x9F
+            self.size = self.instruction.mode.ind_sz
 
         if self.operand.is_type(OperandType.DIRECT):
             if not self.instruction.mode.supports_direct():
@@ -286,6 +290,7 @@ class Statement(object):
                                        self)
             self.instruction_bundle.op_code = self.instruction.mode.dir
             self.instruction_bundle.additional = self.operand.get_hex_value()
+            self.size = self.instruction.mode.dir_sz
 
         if self.operand.is_type(OperandType.EXTENDED):
             if not self.instruction.mode.supports_extended():
@@ -293,29 +298,7 @@ class Statement(object):
                                        self)
             self.instruction_bundle.op_code = self.instruction.mode.ext
             self.instruction_bundle.additional = self.operand.get_hex_value()
-
-        self.set_size()
-
-    def set_size(self):
-        if not self.instruction_bundle:
-            return
-
-        # if self.instruction.is_short_branch:
-        #     self.size += int((len(self.get_op_codes()) / 2)) + 1
-        #     return
-        #
-        # if self.instruction.is_long_branch:
-        #     self.size += int((len(self.get_op_codes()) / 2)) + 2
-        #     return
-        #
-        # if self.instruction_bundle.op_code:
-        #     self.size += int((len(self.get_op_codes()) / 2))
-        #
-        if self.instruction_bundle.additional:
-            self.size += int((len(self.get_additional()) / 2))
-        #
-        # if self.instruction_bundle.post_byte:
-        #     self.size += int((len(self.get_post_byte()) / 2))
+            self.size = self.instruction.mode.ext_sz
 
     def fix_addresses(self, statements, this_index):
         # if self.instruction.is_short_branch:
