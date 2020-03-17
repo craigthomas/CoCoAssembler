@@ -44,14 +44,14 @@ class InstructionBundle(object):
     def get_size(self):
         size = 0
 
-        # if self.op_code:
-        #     size += int((len(self.get_op_codes()) / 2))
+        if self.op_code:
+            size += int((len(self.op_code) / 2))
 
         if self.additional:
             size += int((len(self.additional) / 2))
 
-        # if self.instruction_bundle.post_byte:
-        #     self.size += int((len(self.get_post_byte()) / 2))
+        if self.post_byte:
+            size += int((len(self.post_byte) / 2))
 
         return size
 
@@ -190,7 +190,7 @@ class Instruction(NamedTuple):
         :param statement: the statement that this operation came from
         """
         instruction_bundle = InstructionBundle()
-        instruction_bundle.op_code = statement.get_instruction().mode.imm
+        instruction_bundle.op_code = "{:02X}".format(statement.get_instruction().mode.imm)
 
         if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
             registers = operand.get_operand_string().split(",")
@@ -208,7 +208,6 @@ class Instruction(NamedTuple):
                 instruction_bundle.post_byte |= 0x20 if register == "Y" else 0x00
                 instruction_bundle.post_byte |= 0x40 if register == "U" else 0x00
                 instruction_bundle.post_byte |= 0x80 if register == "PC" else 0x00
-            return instruction_bundle
 
         if self.mnemonic == "EXG" or self.mnemonic == "TFR":
             registers = operand.get_operand_string().split(",")
@@ -263,6 +262,7 @@ class Instruction(NamedTuple):
                 raise TranslationError("{} of {} to {} not allowed".format(self.mnemonic, registers[0], registers[1]),
                                        statement)
 
+        instruction_bundle.post_byte = "{:02X}".format(instruction_bundle.post_byte)
         return instruction_bundle
 
 

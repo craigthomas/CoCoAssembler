@@ -244,12 +244,12 @@ class Statement(object):
         if self.operand.is_type(OperandType.SYMBOL):
             self.operand = self.operand.resolve(symbol_table)
 
-        # if self.instruction.is_short_branch or self.instruction.is_long_branch:
-        #     self.instruction_bundle.op_code = self.instruction.mode.rel
-        #     if self.operand.is_address():
-        #         self.instruction_bundle.additional = self.operand.get_string_value()
-        #     self.set_size()
-        #     return
+        if self.instruction.is_short_branch or self.instruction.is_long_branch:
+            self.instruction_bundle.op_code = self.instruction.mode.rel
+            if self.operand.is_type(OperandType.ADDRESS):
+                self.instruction_bundle.additional = self.operand.get_hex_value()
+            self.size = self.instruction.mode.rel_sz
+            return
 
         if self.operand.is_type(OperandType.INHERENT):
             if not self.instruction.mode.supports_inherent():
@@ -264,16 +264,7 @@ class Statement(object):
             self.instruction_bundle.op_code = self.instruction.mode.imm
             self.instruction_bundle.additional = self.operand.get_hex_value()
             self.size = self.instruction.mode.imm_sz
-        #
-        # if self.operand.is_indexed():
-        #     if not self.instruction.mode.supports_indexed():
-        #         raise TranslationError("Instruction [{}] does not support indexed addressing".format(self.mnemonic),
-        #                                self)
-        #     self.instruction_bundle.op_code = self.instruction.mode.ind
-        #     # TODO: properly translate indexed values and post-byte codes
-        #     self.instruction_bundle.additional = 0x0
-        #     self.instruction_bundle.post_byte = 0x0
-        #
+
         if self.operand.is_type(OperandType.INDEXED):
             if not self.instruction.mode.supports_indexed():
                 raise TranslationError("Instruction [{}] does not support indexed addressing".format(self.mnemonic),
@@ -300,37 +291,44 @@ class Statement(object):
             self.instruction_bundle.additional = self.operand.get_hex_value()
             self.size = self.instruction.mode.ext_sz
 
+        if self.operand.is_type(OperandType.ADDRESS):
+            if not self.instruction.mode.supports_extended():
+                raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic),
+                                       self)
+            self.instruction_bundle.op_code = self.instruction.mode.ext
+            self.instruction_bundle.additional = self.operand.get_hex_value()
+            self.size = self.instruction.mode.ext_sz
+
     def fix_addresses(self, statements, this_index):
-        # if self.instruction.is_short_branch:
-        #     branch_index = int(self.instruction_bundle.additional)
-        #     length = 0
-        #     if branch_index < this_index:
-        #         length = 1
-        #         for statement in statements[branch_index:this_index]:
-        #             length += statement.get_size()
-        #         self.instruction_bundle.additional = "{:X}".format(0xFF - length)
-        #     else:
-        #         for statement in statements[this_index+1:branch_index]:
-        #             length += statement.get_size()
-        #         self.instruction_bundle.additional = "{:X}".format(length)
-        #     return
-        #
-        # if self.instruction.is_long_branch:
-        #     branch_index = int(self.instruction_bundle.additional)
-        #     length = 0
-        #     if branch_index < this_index:
-        #         length = 1
-        #         for statement in statements[branch_index:this_index]:
-        #             length += statement.get_size()
-        #         self.instruction_bundle.additional = "{:4X}".format(0xFFFF - length)
-        #     else:
-        #         for statement in statements[this_index+1:branch_index]:
-        #             length += statement.get_size()
-        #         self.instruction_bundle.additional = "{:4X}".format(length)
-        #     return
-        #
-        # if self.operand.is_address():
-        #     self.instruction_bundle.additional = statements[int(self.instruction_bundle.additional)].get_address()
-        pass
+        if self.instruction.is_short_branch:
+            branch_index = int(self.instruction_bundle.additional, 16)
+            length = 0
+            if branch_index < this_index:
+                length = 1
+                for statement in statements[branch_index:this_index]:
+                    length += statement.get_size()
+                self.instruction_bundle.additional = "{:02X}".format(0xFF - length)
+            else:
+                for statement in statements[this_index+1:branch_index]:
+                    length += statement.get_size()
+                self.instruction_bundle.additional = "{:02X}".format(length)
+            return
+
+        if self.instruction.is_long_branch:
+            branch_index = int(self.instruction_bundle.additional, 16)
+            length = 0
+            if branch_index < this_index:
+                length = 1
+                for statement in statements[branch_index:this_index]:
+                    length += statement.get_size()
+                self.instruction_bundle.additional = "{:04X}".format(0xFFFF - length)
+            else:
+                for statement in statements[this_index+1:branch_index]:
+                    length += statement.get_size()
+                self.instruction_bundle.additional = "{:04X}".format(length)
+            return
+
+        if self.operand.is_type(OperandType.ADDRESS):
+            self.instruction_bundle.additional = statements[int(self.instruction_bundle.additional, 16)].get_address()
 
 # E N D   O F   F I L E #######################################################
