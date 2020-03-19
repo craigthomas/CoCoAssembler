@@ -43,14 +43,16 @@ class ValueType(Enum):
     NUMERIC = 1
     STRING = 2
     SYMBOL = 3
-    EXPRESSION = 4
-    NONE = 5
+    ADDRESS = 4
+    EXPRESSION = 5
+    NONE = 6
 
 
 class Value(ABC):
     def __init__(self, value):
         self.original_string = value
         self.type = ValueType.UNKNOWN
+        self.resolved = True
 
     def __str__(self):
         return self.get_hex_str()
@@ -88,6 +90,9 @@ class Value(ABC):
             pass
 
         raise ValueError("unknown value type")
+
+    def requires_resolution(self):
+        return not self.resolved
 
     @abstractmethod
     def get_hex_str(self):
@@ -266,6 +271,43 @@ class SymbolValue(Value):
         if self.resolved:
             return self.value.get_hex_length()
         return 0
+
+
+class AddressValue(Value):
+    """
+    Represents a symbol value that stores an index to a statement.
+    """
+    def __init__(self, value):
+        super().__init__(value)
+        self.int_value = int(value)
+        self.type = ValueType.ADDRESS
+
+    def get_integer(self):
+        """
+        Returns an integer value for the object.
+
+        :return: the integer value of the object
+        """
+        return self.int_value
+
+    def get_hex_str(self):
+        """
+        Returns a hex string representation of the object.
+
+        :return: the hex representation of the object
+        """
+        size = self.get_hex_length()
+        size += 1 if size % 2 == 1 else 0
+        format_specifier = "{{:0>{}X}}".format(size)
+        return format_specifier.format(self.get_integer())
+
+    def get_hex_length(self):
+        """
+        Returns the full length of the hex representation.
+
+        :return: the full number of hex characters
+        """
+        return len(hex(self.int_value)[2:])
 
 
 class ExpressionValue(Value):

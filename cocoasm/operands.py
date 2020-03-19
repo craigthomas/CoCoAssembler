@@ -13,7 +13,8 @@ from copy import copy
 from enum import Enum
 
 from cocoasm.values import StringValue, NumericValue, SymbolValue,  \
-    NoneValue, ExpressionValue, ValueType
+    NoneValue, ExpressionValue, ValueType, AddressValue
+from cocoasm.symbol import SymbolType
 
 # C O N S T A N T S ###########################################################
 
@@ -52,9 +53,6 @@ class OperandType(Enum):
     RELATIVE = 7
     SYMBOL = 8
     EXPRESSION = 9
-    VALUE = 10
-    ADDRESS = 11
-    STATEMENT_INDEX = 12
 
 
 class Operand(ABC):
@@ -103,21 +101,14 @@ class Operand(ABC):
             pass
 
         try:
-            return SymbolOperand(operand_string, mnemonic)
+            return UnknownOperand(operand_string, mnemonic)
         except ValueError:
             pass
 
         raise ValueError("unknown operand type {}".format(operand_string))
 
-    @abstractmethod
-    def parse_operand(self, operand):
-        pass
-
     def is_type(self, operand_type):
         return self.type == operand_type
-
-    def get_type(self):
-        return self.type
 
     def get_operand_string(self):
         return self.operand_string
@@ -158,14 +149,36 @@ class Operand(ABC):
     def get_hex_value(self):
         return self.sub_expression.get_hex_str()
 
+    def resolve_symbols(self, symbol_table):
+        if not self.sub_expression.is_type(ValueType.SYMBOL):
+            return
+
+        symbol_label = self.sub_expression.get_ascii_str()
+        if symbol_label not in symbol_table:
+            raise ValueError("{} not in symbol table".format(symbol_label))
+
+        symbol = symbol_table[symbol_label]
+        if symbol.is_type(ValueType.ADDRESS):
+            self.sub_expression = AddressValue(symbol.get_integer())
+            self.type = OperandType.EXTENDED if self.type == OperandType.UNKNOWN else self.type
+            return
+
+        if symbol.is_type(ValueType.NUMERIC):
+            self.sub_expression = copy(symbol)
+            self.type = OperandType.DIRECT if self.sub_expression.get_hex_length() == 2 else OperandType.EXTENDED
+
+
+class UnknownOperand(Operand):
+    def __init__(self, operand_string, mnemonic):
+        super().__init__(mnemonic)
+        self.operand_string = operand_string
+        self.parse_sub_expression(operand_string)
+
 
 class InherentOperand(Operand):
     def __init__(self, operand_string, mnemonic):
         super().__init__(mnemonic)
         self.type = OperandType.INHERENT
-        self.parse_operand(operand_string)
-
-    def parse_operand(self, operand_string):
         if operand_string:
             raise ValueError("inherent operands do not have values")
 
@@ -289,31 +302,6 @@ class IndexedOperand(Operand):
         self.sub_expression = NoneValue(operand_string)
 
 
-class SymbolOperand(Operand):
-    def __init__(self, operand_string, mnemonic):
-        super().__init__(mnemonic)
-        self.type = OperandType.SYMBOL
-        self.operand_string = operand_string
-        self.parsed_value = None
-        self.sub_expression = None
-        self.parse_operand(operand_string)
-
-    def parse_operand(self, operand_string):
-        """
-        Returns true if the operand is immediate data.
-
-        :return: True if the operand is immediate
-        """
-        self.parsed_value = operand_string
-        self.parse_sub_expression(self.parsed_value)
-
-    def resolve(self, symbol_table):
-        symbol_string = self.sub_expression.get_ascii_str()
-        if symbol_string not in symbol_table:
-            raise ValueError("{} not in symbol table".format(symbol_string))
-        return copy(symbol_table[symbol_string])
-
-
 class ExpressionOperand(Operand):
     def __init__(self, operand_string, mnemonic):
         super().__init__(mnemonic)
@@ -329,28 +317,5 @@ class ExpressionOperand(Operand):
         :return: True if the operand is immediate
         """
         self.sub_expression = ExpressionValue(operand_string)
-
-    def resolve(self, symbol_table):
-        pass
-
-
-class AddressOperand(Operand):
-    def __init__(self, operand_string, mnemonic):
-        super().__init__(mnemonic)
-        self.type = OperandType.ADDRESS
-        self.operand_string = operand_string
-        self.sub_expression = None
-        self.parse_operand(operand_string)
-
-    def parse_operand(self, operand_string):
-        """
-        Returns true if the operand is immediate data.
-
-        :return: True if the operand is immediate
-        """
-        self.sub_expression = NumericValue(operand_string)
-
-    def resolve(self, symbol_table):
-        pass
 
 # E N D   O F   F I L E #######################################################

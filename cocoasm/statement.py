@@ -13,6 +13,7 @@ from copy import copy
 from cocoasm.exceptions import ParseError, TranslationError
 from cocoasm.instruction import INSTRUCTIONS, InstructionBundle
 from cocoasm.operands import Operand, OperandType
+from cocoasm.values import ValueType
 from cocoasm.helpers import hex_value
 
 # C O N S T A N T S ###########################################################
@@ -76,7 +77,7 @@ class Statement(object):
             self.get_mnemonic().rjust(5, ' '),
             self.original_operand.get_operand_string().ljust(30, ' '),
             self.get_comment().ljust(40, ' '),
-            self.operand.get_type(),
+            self.operand.type,
             self.operand.sub_expression.type
         )
 
@@ -241,13 +242,13 @@ class Statement(object):
             self.size = self.instruction_bundle.get_size()
             return
 
-        if self.operand.is_type(OperandType.SYMBOL):
-            self.operand = self.operand.resolve(symbol_table)
+        if self.operand.sub_expression.requires_resolution():
+            self.operand.resolve_symbols(symbol_table)
 
         if self.instruction.is_short_branch or self.instruction.is_long_branch:
             self.instruction_bundle.op_code = self.instruction.mode.rel
-            if self.operand.is_type(OperandType.ADDRESS):
-                self.instruction_bundle.additional = self.operand.get_hex_value()
+            if self.operand.sub_expression.is_type(ValueType.ADDRESS):
+                self.instruction_bundle.additional = self.operand.sub_expression.get_hex_str()
             self.size = self.instruction.mode.rel_sz
             return
 
@@ -291,14 +292,6 @@ class Statement(object):
             self.instruction_bundle.additional = self.operand.get_hex_value()
             self.size = self.instruction.mode.ext_sz
 
-        if self.operand.is_type(OperandType.ADDRESS):
-            if not self.instruction.mode.supports_extended():
-                raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic),
-                                       self)
-            self.instruction_bundle.op_code = self.instruction.mode.ext
-            self.instruction_bundle.additional = self.operand.get_hex_value()
-            self.size = self.instruction.mode.ext_sz
-
     def fix_addresses(self, statements, this_index):
         if self.instruction.is_short_branch:
             branch_index = int(self.instruction_bundle.additional, 16)
@@ -328,7 +321,7 @@ class Statement(object):
                 self.instruction_bundle.additional = "{:04X}".format(length)
             return
 
-        if self.operand.is_type(OperandType.ADDRESS):
-            self.instruction_bundle.additional = statements[int(self.instruction_bundle.additional, 16)].get_address()
+        if self.operand.sub_expression.is_type(ValueType.ADDRESS):
+            self.instruction_bundle.additional = statements[int(self.operand.sub_expression.get_hex_str(), 16)].get_address()
 
 # E N D   O F   F I L E #######################################################
