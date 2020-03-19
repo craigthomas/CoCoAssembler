@@ -11,8 +11,6 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from cocoasm.symbol import SymbolType
-
 # C O N S T A N T S ###########################################################
 
 # Pattern to recognize a hex value
@@ -27,12 +25,12 @@ INT_REGEX = re.compile(
 
 # Pattern to recognize a symbol value
 SYMBOL_REGEX = re.compile(
-    r"^(?P<value>[a-zA-Z0-9\@]+)$"
+    r"^(?P<value>[a-zA-Z0-9@]+)$"
 )
 
 # Patten to recognize an expression
 EXPRESSION_REGEX = re.compile(
-    r"^(?P<left>[\d\w]+)(?P<operation>[\+\-\/\*])(?P<right>[\d\w]+)$"
+    r"^(?P<left>[\d\w]+)(?P<operation>[+\-/*])(?P<right>[\d\w]+)$"
 )
 
 # C L A S S E S  ##############################################################
@@ -55,9 +53,9 @@ class Value(ABC):
         self.resolved = True
 
     def __str__(self):
-        return self.get_hex_str()
+        return self.hex()
 
-    def get_ascii_str(self):
+    def ascii(self):
         """
         Returns the original ascii representation of the value.
 
@@ -65,13 +63,13 @@ class Value(ABC):
         """
         return self.original_string
 
-    def get_hex_byte_size(self):
+    def byte_len(self):
         """
         Returns how many bytes are in the hex representation.
 
         :return: the number of hex bytes in the object
         """
-        return int(self.get_hex_length() / 2)
+        return int(self.hex_len() / 2)
 
     def is_type(self, value_type):
         return self.type == value_type
@@ -95,7 +93,7 @@ class Value(ABC):
         return not self.resolved
 
     @abstractmethod
-    def get_hex_str(self):
+    def hex(self):
         """
         Returns the hex representation of the object.
 
@@ -104,7 +102,7 @@ class Value(ABC):
         pass
 
     @abstractmethod
-    def get_hex_length(self):
+    def hex_len(self):
         """
         Returns the full length of the hex representation.
 
@@ -118,10 +116,10 @@ class NoneValue(Value):
         super().__init__(value)
         self.type = ValueType.NONE
 
-    def get_hex_str(self):
+    def hex(self):
         return ""
 
-    def get_hex_length(self):
+    def hex_len(self):
         return 0
 
 
@@ -134,22 +132,13 @@ class StringValue(Value):
         super().__init__(value)
         self.hex_array = []
         self.type = ValueType.STRING
-        self.parse(value)
-
-    def parse(self, value):
-        """
-        Parses an input string value. Input strings are simply string values
-        that must begin and end with the same character.
-
-        :param value: the value to parse
-        """
         delimiter = value[0]
         if not value[-1] == delimiter:
             raise ValueError("string must begin and end with same delimiter")
         self.original_string = value[1:-1]
         self.hex_array = ["{:X}".format(ord(x)) for x in value[1:-1]]
 
-    def get_hex_str(self):
+    def hex(self):
         """
         Returns a hex string representation of the object.
 
@@ -157,13 +146,13 @@ class StringValue(Value):
         """
         return "".join(self.hex_array)
 
-    def get_hex_length(self):
+    def hex_len(self):
         """
         Returns the full length of the hex representation.
 
         :return: the full number of hex characters
         """
-        return len(self.get_hex_str())
+        return len(self.hex())
 
 
 class NumericValue(Value):
@@ -175,15 +164,6 @@ class NumericValue(Value):
         super().__init__(value)
         self.int_value = 0
         self.type = ValueType.NUMERIC
-        self.parse(value)
-
-    def parse(self, value):
-        """
-        Parses an input string value. Input strings are either integer values,
-        or a hex value starting with $.
-
-        :param value: the value to parse
-        """
         data = HEX_REGEX.match(value)
         if data:
             if len(data.group("value")) > 4:
@@ -200,7 +180,7 @@ class NumericValue(Value):
 
         raise ValueError("supplied value is neither integer or hex value")
 
-    def get_integer(self):
+    def int(self):
         """
         Returns an integer value for the object.
 
@@ -208,18 +188,18 @@ class NumericValue(Value):
         """
         return self.int_value
 
-    def get_hex_str(self):
+    def hex(self):
         """
         Returns a hex string representation of the object.
 
         :return: the hex representation of the object
         """
-        size = self.get_hex_length()
+        size = self.hex_len()
         size += 1 if size % 2 == 1 else 0
         format_specifier = "{{:0>{}X}}".format(size)
-        return format_specifier.format(self.get_integer())
+        return format_specifier.format(self.int())
 
-    def get_hex_length(self):
+    def hex_len(self):
         """
         Returns the full length of the hex representation.
 
@@ -237,40 +217,26 @@ class SymbolValue(Value):
         self.value = None
         self.resolved = False
         self.type = ValueType.SYMBOL
-        self.parse(value)
-
-    def parse(self, value):
-        """
-        Parses an input symbol value.
-
-        :param value: the value to parse
-        """
         data = SYMBOL_REGEX.match(value)
-        if data:
-            self.value = value
-            return
+        if not data:
+            raise ValueError("{} is not a valid symbol".format(value))
+        self.value = value
 
-        raise ValueError("supplied value is not a valid symbol")
-
-    def get_hex_str(self):
+    def hex(self):
         """
         Returns a hex string representation of the object.
 
         :return: the hex representation of the object
         """
-        if self.resolved:
-            return self.value.get_hex_str()
-        return ""
+        return self.value.hex() if self.resolved else ""
 
-    def get_hex_length(self):
+    def hex_len(self):
         """
         Returns the full length of the hex representation.
 
         :return: the full number of hex characters
         """
-        if self.resolved:
-            return self.value.get_hex_length()
-        return 0
+        return self.value.hex_len() if self.resolved else 0
 
 
 class AddressValue(Value):
@@ -290,18 +256,18 @@ class AddressValue(Value):
         """
         return self.int_value
 
-    def get_hex_str(self):
+    def hex(self):
         """
         Returns a hex string representation of the object.
 
         :return: the hex representation of the object
         """
-        size = self.get_hex_length()
+        size = self.hex_len()
         size += 1 if size % 2 == 1 else 0
         format_specifier = "{{:0>{}X}}".format(size)
         return format_specifier.format(self.get_integer())
 
-    def get_hex_length(self):
+    def hex_len(self):
         """
         Returns the full length of the hex representation.
 
@@ -316,20 +282,9 @@ class ExpressionValue(Value):
     """
     def __init__(self, value):
         super().__init__(value)
-        self.left = None
-        self.right = None
-        self.operation = None
         self.resolved = False
         self.value = None
         self.type = ValueType.EXPRESSION
-        self.parse(value)
-
-    def parse(self, value):
-        """
-        Parses an input symbol value.
-
-        :param value: the value to parse
-        """
         match = EXPRESSION_REGEX.match(value)
         if not match:
             raise ValueError("supplied value is not a valid expression")
@@ -337,24 +292,20 @@ class ExpressionValue(Value):
         self.right = match.group("right")
         self.operation = match.group("operation")
 
-    def get_hex_str(self):
+    def hex(self):
         """
         Returns a hex string representation of the object.
 
         :return: the hex representation of the object
         """
-        if self.resolved:
-            return self.value.get_hex_str()
-        return ""
+        return self.value.hex() if self.resolved else ""
 
-    def get_hex_length(self):
+    def hex_len(self):
         """
         Returns the full length of the hex representation.
 
         :return: the full number of hex characters
         """
-        if self.resolved:
-            return self.value.get_hex_length()
-        return 0
+        return self.value.hex_len() if self.resolved else 0
 
 # E N D   O F   F I L E #######################################################

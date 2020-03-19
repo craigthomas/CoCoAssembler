@@ -8,13 +8,12 @@ A Color Computer Assembler - see the README.md file for details.
 
 import re
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from copy import copy
 from enum import Enum
 
 from cocoasm.values import StringValue, NumericValue, SymbolValue,  \
     NoneValue, ExpressionValue, ValueType, AddressValue
-from cocoasm.symbol import SymbolType
 
 # C O N S T A N T S ###########################################################
 
@@ -25,12 +24,12 @@ IMMEDIATE_REGEX = re.compile(
 
 # Pattern to recognize an immediate value
 DIRECT_REGEX = re.compile(
-    r"^\<(?P<value>.*)"
+    r"^<(?P<value>.*)"
 )
 
 # Pattern to recognize an immediate value
 EXTENDED_REGEX = re.compile(
-    r"^\<(?P<value>.*)"
+    r"^<(?P<value>.*)"
 )
 
 # Pattern to recognize an indexed value
@@ -61,7 +60,7 @@ class Operand(ABC):
         self.operand_string = ""
         self.mnemonic = mnemonic
         self.requires_resolution = False
-        self.sub_expression = NoneValue(None)
+        self.value = NoneValue(None)
 
     @classmethod
     def create_from_str(cls, operand_string, mnemonic):
@@ -105,74 +104,65 @@ class Operand(ABC):
         except ValueError:
             pass
 
-        raise ValueError("unknown operand type {}".format(operand_string))
+        raise ValueError("unknown operand type: {}".format(operand_string))
 
     def is_type(self, operand_type):
         return self.type == operand_type
 
-    def get_operand_string(self):
-        return self.operand_string
-
-    def parse_sub_expression(self, value):
+    def parse_value(self, value):
         try:
-            self.sub_expression = NumericValue(value)
+            self.value = NumericValue(value)
             return
         except ValueError:
             pass
 
         if self.mnemonic == "FCC":
             try:
-                self.sub_expression = StringValue(value)
+                self.value = StringValue(value)
                 return
             except ValueError:
                 pass
 
         try:
-            self.sub_expression = SymbolValue(value)
+            self.value = SymbolValue(value)
             self.requires_resolution = True
             return
         except ValueError:
             pass
 
         try:
-            self.sub_expression = ExpressionValue(value)
+            self.value = ExpressionValue(value)
             self.requires_resolution = True
             return
         except ValueError:
             pass
 
-        raise ValueError("cannot parse sub expression")
-
-    def requires_resolution(self):
-        return self.requires_resolution
-
-    def get_hex_value(self):
-        return self.sub_expression.get_hex_str()
+        raise ValueError("cannot parse value: {}".format(value))
 
     def resolve_symbols(self, symbol_table):
-        if not self.sub_expression.is_type(ValueType.SYMBOL):
+        if not self.value.is_type(ValueType.SYMBOL):
             return
 
-        symbol_label = self.sub_expression.get_ascii_str()
+        symbol_label = self.value.ascii()
         if symbol_label not in symbol_table:
             raise ValueError("{} not in symbol table".format(symbol_label))
 
         symbol = symbol_table[symbol_label]
         if symbol.is_type(ValueType.ADDRESS):
-            self.sub_expression = AddressValue(symbol.get_integer())
+            self.value = AddressValue(symbol.get_integer())
             self.type = OperandType.EXTENDED if self.type == OperandType.UNKNOWN else self.type
             return
 
         if symbol.is_type(ValueType.NUMERIC):
-            self.sub_expression = copy(symbol)
-            self.type = OperandType.DIRECT if self.sub_expression.get_hex_length() == 2 else OperandType.EXTENDED
+            self.value = copy(symbol)
+            self.type = OperandType.DIRECT if self.value.hex_len() == 2 else OperandType.EXTENDED
 
 
 class UnknownOperand(Operand):
     def __init__(self, operand_string, mnemonic):
         super().__init__(mnemonic)
         self.operand_string = operand_string
-        self.parse_sub_expression(operand_string)
+        self.parse_value(operand_string)
 
 
 class InherentOperand(Operand):
@@ -180,7 +170,7 @@ class InherentOperand(Operand):
         super().__init__(mnemonic)
         self.type = OperandType.INHERENT
         if operand_string:
-            raise ValueError("inherent operands do not have values")
+            raise ValueError("{} is not an inherent value".format(operand_string))
 
 
 class ImmediateOperand(Operand):
@@ -188,21 +178,10 @@ class ImmediateOperand(Operand):
         super().__init__(mnemonic)
         self.type = OperandType.IMMEDIATE
         self.operand_string = operand_string
-        self.parsed_value = None
-        self.sub_expression = None
-        self.parse_operand(operand_string)
-
-    def parse_operand(self, operand_string):
-        """
-        Returns true if the operand is immediate data.
-
-        :return: True if the operand is immediate
-        """
-        match = IMMEDIATE_REGEX.match(self.operand_string)
+        match = IMMEDIATE_REGEX.match(operand_string)
         if not match:
-            raise ValueError("operand is not an immediate value")
-        self.parsed_value = match.group("value")
-        self.parse_sub_expression(self.parsed_value)
+            raise ValueError("{} is not an immediate value".format(operand_string))
+        self.parse_value(match.group("value"))
 
 
 class DirectOperand(Operand):
@@ -210,26 +189,13 @@ class DirectOperand(Operand):
         super().__init__(mnemonic)
         self.type = OperandType.DIRECT
         self.operand_string = operand_string
-        self.parsed_value = None
-        self.sub_expression = None
-        self.parse_operand(operand_string)
-
-    def parse_operand(self, operand_string):
-        """
-        Returns true if the operand is immediate data.
-
-        :return: True if the operand is immediate
-        """
         match = DIRECT_REGEX.match(self.operand_string)
         if match:
-            self.parsed_value = match.group("value")
+            self.parse_value(match.group("value")[1:])
         else:
-            self.parsed_value = self.operand_string
-            self.parse_sub_expression(self.parsed_value)
-            if self.sub_expression is None:
-                raise ValueError("operand is not a direct value")
-            if self.sub_expression.get_hex_byte_size() != 1:
-                raise ValueError("operand is not a direct value")
+            self.parse_value(operand_string)
+        if self.value is None or self.value.byte_len() != 1:
+            raise ValueError("{} is not a direct value".format(operand_string))
 
 
 class ExtendedOperand(Operand):
@@ -237,26 +203,13 @@ class ExtendedOperand(Operand):
         super().__init__(mnemonic)
         self.type = OperandType.EXTENDED
         self.operand_string = operand_string
-        self.parsed_value = None
-        self.sub_expression = None
-        self.parse_operand(operand_string)
-
-    def parse_operand(self, operand_string):
-        """
-        Returns true if the operand is immediate data.
-
-        :return: True if the operand is immediate
-        """
         match = EXTENDED_REGEX.match(self.operand_string)
         if match:
-            self.parsed_value = match.group("value")
+            self.parse_value(match.group("value")[1:])
         else:
-            self.parsed_value = self.operand_string
-            self.parse_sub_expression(self.parsed_value)
-            if self.sub_expression is None:
-                raise ValueError("operand is not an extended value")
-            if self.sub_expression.get_hex_byte_size() != 2:
-                raise ValueError("operand is not an extended value")
+            self.parse_value(operand_string)
+        if self.value is None or self.value.byte_len() != 2:
+            raise ValueError("{} is not an extended value".format(operand_string))
 
 
 class ExtendedIndirectOperand(Operand):
@@ -264,21 +217,10 @@ class ExtendedIndirectOperand(Operand):
         super().__init__(mnemonic)
         self.type = OperandType.EXTENDED_INDIRECT
         self.operand_string = operand_string
-        self.parsed_value = None
-        self.sub_expression = None
-        self.parse_operand(operand_string)
-
-    def parse_operand(self, operand_string):
-        """
-        Returns true if the operand is immediate data.
-
-        :return: True if the operand is immediate
-        """
         match = EXTENDED_INDIRECT_REGEX.match(self.operand_string)
         if not match:
             raise ValueError("operand is not an extended indirect value")
-        self.parsed_value = match.group("value")
-        self.parse_sub_expression(self.parsed_value)
+        self.parse_value(match.group("value"))
 
 
 class IndexedOperand(Operand):
@@ -286,20 +228,9 @@ class IndexedOperand(Operand):
         super().__init__(mnemonic)
         self.type = OperandType.INDEXED
         self.operand_string = operand_string
-        self.parsed_value = None
-        self.sub_expression = None
-        self.parse_operand(operand_string)
-
-    def parse_operand(self, operand_string):
-        """
-        Returns true if the operand is immediate data.
-
-        :return: True if the operand is immediate
-        """
         if "," not in operand_string:
             raise ValueError("operand is not an indexed value")
-        self.parsed_value = operand_string
-        self.sub_expression = NoneValue(operand_string)
+        self.value = NoneValue(operand_string)
 
 
 class ExpressionOperand(Operand):
@@ -307,15 +238,6 @@ class ExpressionOperand(Operand):
         super().__init__(mnemonic)
         self.type = OperandType.EXPRESSION
         self.operand_string = operand_string
-        self.sub_expression = None
-        self.parse_operand(operand_string)
-
-    def parse_operand(self, operand_string):
-        """
-        Returns true if the operand is immediate data.
-
-        :return: True if the operand is immediate
-        """
-        self.sub_expression = ExpressionValue(operand_string)
+        self.value = ExpressionValue(operand_string)
 
 # E N D   O F   F I L E #######################################################

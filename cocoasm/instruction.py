@@ -165,19 +165,19 @@ class Instruction(NamedTuple):
         :return: returns the value of the pseudo operation
         """
         if self.mnemonic == "FCB":
-            return InstructionBundle(additional=operand.get_hex_value())
+            return InstructionBundle(additional=operand.value.hex())
 
         if self.mnemonic == "FDB":
-            return InstructionBundle(additional=operand.get_hex_value())
+            return InstructionBundle(additional=operand.value.hex())
 
         if self.mnemonic == "EQU":
             return InstructionBundle()
 
         if self.mnemonic == "ORG":
-            return InstructionBundle(address=operand.get_hex_value())
+            return InstructionBundle(address=operand.value.hex())
 
         if self.mnemonic == "FCC":
-            return InstructionBundle(additional=operand.get_hex_value())
+            return InstructionBundle(additional=operand.value.hex())
 
         if self.mnemonic == "END":
             return InstructionBundle()
@@ -193,7 +193,7 @@ class Instruction(NamedTuple):
         instruction_bundle.op_code = "{:02X}".format(statement.get_instruction().mode.imm)
 
         if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
-            registers = operand.get_operand_string().split(",")
+            registers = operand.operand_string.split(",")
             instruction_bundle.post_byte = 0x00
             for register in registers:
                 if register not in REGISTERS:
@@ -210,7 +210,7 @@ class Instruction(NamedTuple):
                 instruction_bundle.post_byte |= 0x80 if register == "PC" else 0x00
 
         if self.mnemonic == "EXG" or self.mnemonic == "TFR":
-            registers = operand.get_operand_string().split(",")
+            registers = operand.operand_string.split(",")
             instruction_bundle.post_byte = 0x00
             if len(registers) != 2:
                 raise TranslationError("{} requires exactly 2 registers".format(self.mnemonic), statement)

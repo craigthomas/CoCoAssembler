@@ -75,10 +75,10 @@ class Statement(object):
             op_code_string.ljust(10, ' '),
             self.get_label().rjust(10, ' '),
             self.get_mnemonic().rjust(5, ' '),
-            self.original_operand.get_operand_string().ljust(30, ' '),
+            self.original_operand.operand_string.ljust(30, ' '),
             self.get_comment().ljust(40, ' '),
             self.operand.type,
-            self.operand.sub_expression.type
+            self.operand.value.type
         )
 
     def get_address(self):
@@ -242,13 +242,13 @@ class Statement(object):
             self.size = self.instruction_bundle.get_size()
             return
 
-        if self.operand.sub_expression.requires_resolution():
+        if self.operand.value.requires_resolution():
             self.operand.resolve_symbols(symbol_table)
 
         if self.instruction.is_short_branch or self.instruction.is_long_branch:
             self.instruction_bundle.op_code = self.instruction.mode.rel
-            if self.operand.sub_expression.is_type(ValueType.ADDRESS):
-                self.instruction_bundle.additional = self.operand.sub_expression.get_hex_str()
+            if self.operand.value.is_type(ValueType.ADDRESS):
+                self.instruction_bundle.additional = self.operand.value.hex()
             self.size = self.instruction.mode.rel_sz
             return
 
@@ -263,7 +263,7 @@ class Statement(object):
                 raise TranslationError("Instruction [{}] does not support immediate addressing".format(self.mnemonic),
                                        self)
             self.instruction_bundle.op_code = self.instruction.mode.imm
-            self.instruction_bundle.additional = self.operand.get_hex_value()
+            self.instruction_bundle.additional = self.operand.value.hex()
             self.size = self.instruction.mode.imm_sz
 
         if self.operand.is_type(OperandType.INDEXED):
@@ -271,7 +271,7 @@ class Statement(object):
                 raise TranslationError("Instruction [{}] does not support indexed addressing".format(self.mnemonic),
                                        self)
             self.instruction_bundle.op_code = self.instruction.mode.ind
-            self.instruction_bundle.additional = self.operand.get_hex_value()
+            self.instruction_bundle.additional = self.operand.value.hex()
             # TODO: properly translate what the post-byte code should be
             self.instruction_bundle.post_byte = 0x9F
             self.size = self.instruction.mode.ind_sz
@@ -281,7 +281,7 @@ class Statement(object):
                 raise TranslationError("Instruction [{}] does not support direct addressing".format(self.mnemonic),
                                        self)
             self.instruction_bundle.op_code = self.instruction.mode.dir
-            self.instruction_bundle.additional = self.operand.get_hex_value()
+            self.instruction_bundle.additional = self.operand.value.hex()
             self.size = self.instruction.mode.dir_sz
 
         if self.operand.is_type(OperandType.EXTENDED):
@@ -289,7 +289,7 @@ class Statement(object):
                 raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic),
                                        self)
             self.instruction_bundle.op_code = self.instruction.mode.ext
-            self.instruction_bundle.additional = self.operand.get_hex_value()
+            self.instruction_bundle.additional = self.operand.value.hex()
             self.size = self.instruction.mode.ext_sz
 
     def fix_addresses(self, statements, this_index):
@@ -321,7 +321,7 @@ class Statement(object):
                 self.instruction_bundle.additional = "{:04X}".format(length)
             return
 
-        if self.operand.sub_expression.is_type(ValueType.ADDRESS):
-            self.instruction_bundle.additional = statements[int(self.operand.sub_expression.get_hex_str(), 16)].get_address()
+        if self.operand.value.is_type(ValueType.ADDRESS):
+            self.instruction_bundle.additional = statements[int(self.operand.value.hex(), 16)].get_address()
 
 # E N D   O F   F I L E #######################################################
