@@ -13,7 +13,7 @@ from copy import copy
 from enum import Enum
 
 from cocoasm.values import StringValue, NumericValue, SymbolValue,  \
-    NoneValue, ExpressionValue, ValueType, AddressValue
+    NoneValue, ValueType, AddressValue
 
 # C O N S T A N T S ###########################################################
 
@@ -37,11 +37,18 @@ EXTENDED_INDIRECT_REGEX = re.compile(
     r"^\[(?P<value>.*)\]"
 )
 
+# Patten to recognize an expression
+EXPRESSION_REGEX = re.compile(
+    r"^(?P<left>[\d\w]+)(?P<operation>[+\-/*])(?P<right>[\d\w]+)$"
+)
 
 # C L A S S E S ###############################################################
 
 
 class OperandType(Enum):
+    """
+    The OperandType enumeration stores what kind of operand we have parsed.
+    """
     UNKNOWN = 0
     INHERENT = 1
     IMMEDIATE = 2
@@ -107,9 +114,21 @@ class Operand(ABC):
         raise ValueError("unknown operand type: {}".format(operand_string))
 
     def is_type(self, operand_type):
+        """
+        Returns True if the type of this operand class is the type being compared.
+
+        :param operand_type: the OperandType to check
+        :return: True if the OperandType values match, False otherwise
+        """
         return self.type == operand_type
 
     def parse_value(self, value):
+        """
+        Parses the value by trying to instantiate various Value classes.
+
+        :param value: the string value to parse
+        :return: the Value class parsed
+        """
         try:
             self.value = NumericValue(value)
             return
@@ -130,13 +149,6 @@ class Operand(ABC):
         except ValueError:
             pass
 
-        try:
-            self.value = ExpressionValue(value)
-            self.requires_resolution = True
-            return
-        except ValueError:
-            pass
-
         raise ValueError("cannot parse value: {}".format(value))
 
     def resolve_symbols(self, symbol_table):
@@ -145,7 +157,7 @@ class Operand(ABC):
 
         symbol_label = self.value.ascii()
         if symbol_label not in symbol_table:
-            raise ValueError("{} not in symbol table".format(symbol_label))
+            raise ValueError("[{}] not in symbol table".format(symbol_label))
 
         symbol = symbol_table[symbol_label]
         if symbol.is_type(ValueType.ADDRESS):
@@ -170,7 +182,7 @@ class InherentOperand(Operand):
         super().__init__(mnemonic)
         self.type = OperandType.INHERENT
         if operand_string:
-            raise ValueError("{} is not an inherent value".format(operand_string))
+            raise ValueError("[{}] is not an inherent value".format(operand_string))
 
 
 class ImmediateOperand(Operand):
@@ -180,7 +192,7 @@ class ImmediateOperand(Operand):
         self.operand_string = operand_string
         match = IMMEDIATE_REGEX.match(operand_string)
         if not match:
-            raise ValueError("{} is not an immediate value".format(operand_string))
+            raise ValueError("[{}] is not an immediate value".format(operand_string))
         self.parse_value(match.group("value"))
 
 
@@ -195,7 +207,7 @@ class DirectOperand(Operand):
         else:
             self.parse_value(operand_string)
         if self.value is None or self.value.byte_len() != 1:
-            raise ValueError("{} is not a direct value".format(operand_string))
+            raise ValueError("[{}] is not a direct value".format(operand_string))
 
 
 class ExtendedOperand(Operand):
@@ -209,7 +221,7 @@ class ExtendedOperand(Operand):
         else:
             self.parse_value(operand_string)
         if self.value is None or self.value.byte_len() != 2:
-            raise ValueError("{} is not an extended value".format(operand_string))
+            raise ValueError("[{}] is not an extended value".format(operand_string))
 
 
 class ExtendedIndirectOperand(Operand):
@@ -219,7 +231,7 @@ class ExtendedIndirectOperand(Operand):
         self.operand_string = operand_string
         match = EXTENDED_INDIRECT_REGEX.match(self.operand_string)
         if not match:
-            raise ValueError("operand is not an extended indirect value")
+            raise ValueError("[{}] is not an extended indirect value".format(operand_string))
         self.parse_value(match.group("value"))
 
 
@@ -229,7 +241,7 @@ class IndexedOperand(Operand):
         self.type = OperandType.INDEXED
         self.operand_string = operand_string
         if "," not in operand_string:
-            raise ValueError("operand is not an indexed value")
+            raise ValueError("[{}] is not an indexed value".format(operand_string))
         self.value = NoneValue(operand_string)
 
 
@@ -238,6 +250,14 @@ class ExpressionOperand(Operand):
         super().__init__(mnemonic)
         self.type = OperandType.EXPRESSION
         self.operand_string = operand_string
-        self.value = ExpressionValue(operand_string)
+        match = EXPRESSION_REGEX.match(operand_string)
+        if not match:
+            raise ValueError("[{}] is not a valid expression".format(operand_string))
+        self.left = match.group("left")
+        self.right = match.group("right")
+        self.operation = match.group("operation")
+
+    def resolve_expression(self, symbol_table):
+        pass
 
 # E N D   O F   F I L E #######################################################

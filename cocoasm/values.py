@@ -28,11 +28,6 @@ SYMBOL_REGEX = re.compile(
     r"^(?P<value>[a-zA-Z0-9@]+)$"
 )
 
-# Patten to recognize an expression
-EXPRESSION_REGEX = re.compile(
-    r"^(?P<left>[\d\w]+)(?P<operation>[+\-/*])(?P<right>[\d\w]+)$"
-)
-
 # C L A S S E S  ##############################################################
 
 
@@ -46,8 +41,7 @@ class ValueType(Enum):
     STRING = 2
     SYMBOL = 3
     ADDRESS = 4
-    EXPRESSION = 5
-    NONE = 6
+    NONE = 5
 
 
 class Value(ABC):
@@ -217,28 +211,5 @@ class AddressValue(Value):
 
     def hex_len(self):
         return len(hex(self.int)[2:])
-
-
-class ExpressionValue(Value):
-    """
-    Represents a symbol value that stores an address or index.
-    """
-    def __init__(self, value):
-        super().__init__(value)
-        self.resolved = False
-        self.value = None
-        self.type = ValueType.EXPRESSION
-        match = EXPRESSION_REGEX.match(value)
-        if not match:
-            raise ValueError("[{}] is not a valid expression".format(value))
-        self.left = match.group("left")
-        self.right = match.group("right")
-        self.operation = match.group("operation")
-
-    def hex(self):
-        return self.value.hex() if self.resolved else ""
-
-    def hex_len(self):
-        return self.value.hex_len() if self.resolved else 0
 
 # E N D   O F   F I L E #######################################################
