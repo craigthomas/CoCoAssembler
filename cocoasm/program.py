@@ -66,7 +66,7 @@ class Program(object):
         with open(filename) as infile:
             for line in infile:
                 statement = Statement(line)
-                if not statement.is_empty() and not statement.is_comment_only():
+                if not statement.is_empty and not statement.is_comment_only:
                     statements.append(statement)
 
         return statements
@@ -124,7 +124,7 @@ class Program(object):
         address = 0
         for index, statement in enumerate(self.statements):
             address = statement.set_address(address)
-            address += statement.get_size()
+            address += statement.size
 
         for index, statement in enumerate(self.statements):
             statement.fix_addresses(self.statements, index)

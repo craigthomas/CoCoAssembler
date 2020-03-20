@@ -190,7 +190,7 @@ class Instruction(NamedTuple):
         :param statement: the statement that this operation came from
         """
         instruction_bundle = InstructionBundle()
-        instruction_bundle.op_code = "{:02X}".format(statement.get_instruction().mode.imm)
+        instruction_bundle.op_code = "{:02X}".format(statement.instruction.mode.imm)
 
         if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
             registers = operand.operand_string.split(",")

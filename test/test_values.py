@@ -8,7 +8,8 @@ A Color Computer Assembler - see the README.md file for details.
 
 import unittest
 
-from cocoasm.values import NumericValue, StringValue, NoneValue, ValueType
+from cocoasm.values import NumericValue, StringValue, NoneValue, SymbolValue, \
+    ValueType
 
 # C L A S S E S ###############################################################
 
@@ -29,7 +30,7 @@ class TestNumericValue(unittest.TestCase):
 
     def test_numeric_recognizes_valid_integer(self):
         result = NumericValue("1234")
-        self.assertEqual(1234, result.int())
+        self.assertEqual(1234, result.int)
 
     def test_numeric_raises_exception_on_long_strings(self):
         with self.assertRaises(ValueError) as context:
@@ -56,7 +57,7 @@ class TestNumericValue(unittest.TestCase):
 
     def test_numeric_int_correctly_calculated(self):
         result = NumericValue("$DEAD")
-        self.assertEqual(57005, result.int())
+        self.assertEqual(57005, result.int)
 
     def test_numeric_hex_correctly_calculated(self):
         result = NumericValue("57005")
@@ -144,6 +145,65 @@ class TestNoneValue(unittest.TestCase):
     def test_none_is_type_correct(self):
         result = NoneValue('"abc"')
         self.assertTrue(result.is_type(ValueType.NONE))
+
+
+class TestSymbolValue(unittest.TestCase):
+    """
+    A test class for the SymbolValue class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        pass
+
+    def test_symbol_ascii_works_correctly(self):
+        result = SymbolValue('symbol')
+        self.assertEqual("symbol", result.ascii())
+
+    def test_symbol_hex_empty_when_not_resolved(self):
+        result = SymbolValue('symbol')
+        self.assertFalse(result.resolved)
+        self.assertEqual("", result.hex())
+
+    def test_symbol_hex_correct_when_resolved(self):
+        result = SymbolValue('symbol')
+        result.resolved = True
+        result.value = NumericValue("$AB")
+        self.assertEqual("AB", result.hex())
+
+    def test_symbol_str_empty_when_not_resolved(self):
+        result = SymbolValue('symbol')
+        self.assertFalse(result.resolved)
+        self.assertEqual("", str(result))
+
+    def test_symbol_str_correct_when_resolved(self):
+        result = SymbolValue('symbol')
+        result.resolved = True
+        result.value = NumericValue("$AB")
+        self.assertEqual("AB", str(result))
+
+    def test_symbol_hex_len_zero_when_not_resolved(self):
+        result = SymbolValue('symbol')
+        self.assertFalse(result.resolved)
+        self.assertEqual(0, result.hex_len())
+
+    def test_symbol_hex_len_correct_when_resolved(self):
+        result = SymbolValue('symbol')
+        result.resolved = True
+        result.value = NumericValue("$AB")
+        self.assertEqual(2, result.hex_len())
+
+    def test_symbol_byte_len_zero_when_not_resolved(self):
+        result = SymbolValue('symbol')
+        self.assertFalse(result.resolved)
+        self.assertEqual(0, result.byte_len())
+
+    def test_symbol_byte_len_correct_when_resolved(self):
+        result = SymbolValue('symbol')
+        result.resolved = True
+        result.value = NumericValue("$AB")
+        self.assertEqual(1, result.byte_len())
 
 # M A I N #####################################################################
 

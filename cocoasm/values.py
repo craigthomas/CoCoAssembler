@@ -160,31 +160,23 @@ class NumericValue(Value):
     """
     def __init__(self, value):
         super().__init__(value)
-        self.int_value = 0
+        self.int = 0
         self.type = ValueType.NUMERIC
         data = HEX_REGEX.match(value)
         if data:
             if len(data.group("value")) > 4:
                 raise ValueError("hex value length cannot exceed 4 characters")
-            self.int_value = int(data.group("value"), 16)
+            self.int = int(data.group("value"), 16)
             return
 
         data = INT_REGEX.match(value)
         if data:
-            self.int_value = int(data.group("value"), 10)
-            if self.int_value > 65535:
+            self.int = int(data.group("value"), 10)
+            if self.int > 65535:
                 raise ValueError("integer value cannot exceed 65535")
             return
 
         raise ValueError("[{}] is neither integer or hex value".format(value))
-
-    def int(self):
-        """
-        Returns an integer value for the object.
-
-        :return: the integer value of the object
-        """
-        return self.int_value
 
     def hex(self):
         """
@@ -195,7 +187,7 @@ class NumericValue(Value):
         size = self.hex_len()
         size += 1 if size % 2 == 1 else 0
         format_specifier = "{{:0>{}X}}".format(size)
-        return format_specifier.format(self.int())
+        return format_specifier.format(self.int)
 
     def hex_len(self):
         """
@@ -203,7 +195,7 @@ class NumericValue(Value):
 
         :return: the full number of hex characters
         """
-        return len(hex(self.int_value)[2:])
+        return len(hex(self.int)[2:])
 
 
 class SymbolValue(Value):
@@ -243,16 +235,8 @@ class AddressValue(Value):
     """
     def __init__(self, value):
         super().__init__(value)
-        self.int_value = int(value)
+        self.int = int(value)
         self.type = ValueType.ADDRESS
-
-    def get_integer(self):
-        """
-        Returns an integer value for the object.
-
-        :return: the integer value of the object
-        """
-        return self.int_value
 
     def hex(self):
         """
@@ -263,7 +247,7 @@ class AddressValue(Value):
         size = self.hex_len()
         size += 1 if size % 2 == 1 else 0
         format_specifier = "{{:0>{}X}}".format(size)
-        return format_specifier.format(self.get_integer())
+        return format_specifier.format(self.int)
 
     def hex_len(self):
         """
@@ -271,7 +255,7 @@ class AddressValue(Value):
 
         :return: the full number of hex characters
         """
-        return len(hex(self.int_value)[2:])
+        return len(hex(self.int)[2:])
 
 
 class ExpressionValue(Value):

@@ -48,8 +48,8 @@ class Statement(object):
     equivalent.
     """
     def __init__(self, line):
-        self.empty = True
-        self.comment_only = False
+        self.is_empty = True
+        self.is_comment_only = False
         self.instruction = None
         self.label = None
         self.operand = None
@@ -135,18 +135,6 @@ class Statement(object):
         """
         return self.comment if self.comment else ""
 
-    def get_size(self):
-        return self.size
-
-    def is_empty(self):
-        """
-        Returns True if there is no operation that is contained within the
-        statement.
-
-        :return: True if the statement is empty, False otherwise
-        """
-        return self.empty
-
     def match_operation(self):
         """
         Returns the instruction with the specified mnemonic, or None if the
@@ -155,9 +143,6 @@ class Statement(object):
         :return: the instruction associated with the mnemonic
         """
         return next((op for op in INSTRUCTIONS if op.mnemonic == self.mnemonic), None)
-
-    def is_comment_only(self):
-        return self.comment_only
 
     def get_include_filename(self):
         """
@@ -168,9 +153,6 @@ class Statement(object):
         :return: the name of the file to include
         """
         return self.operand.get_operand_string() if self.instruction.is_include() else None
-
-    def get_instruction(self):
-        return self.instruction
 
     def parse_line(self, line):
         """
@@ -183,8 +165,8 @@ class Statement(object):
 
         data = COMMENT_LINE_REGEX.match(line)
         if data:
-            self.empty = False
-            self.comment_only = True
+            self.is_empty = False
+            self.is_comment_only = True
             self.comment = data.group("comment").strip()
             return
 
@@ -201,12 +183,12 @@ class Statement(object):
                 self.operand = Operand.create_from_str(original_operand[0:ending_location + 1], self.mnemonic)
                 self.original_operand = copy(self.operand)
                 self.comment = original_operand[ending_location + 2:].strip() or None
-                self.empty = False
+                self.is_empty = False
             else:
                 self.operand = Operand.create_from_str(data.group("operands"), self.mnemonic)
                 self.original_operand = copy(self.operand)
                 self.comment = data.group("comment").strip() or None
-                self.empty = False
+                self.is_empty = False
             return
 
         raise ParseError("Could not parse line [{}]".format(line), self)
@@ -299,11 +281,11 @@ class Statement(object):
             if branch_index < this_index:
                 length = 1
                 for statement in statements[branch_index:this_index]:
-                    length += statement.get_size()
+                    length += statement.size
                 self.instruction_bundle.additional = "{:02X}".format(0xFF - length)
             else:
                 for statement in statements[this_index+1:branch_index]:
-                    length += statement.get_size()
+                    length += statement.size
                 self.instruction_bundle.additional = "{:02X}".format(length)
             return
 
@@ -313,11 +295,11 @@ class Statement(object):
             if branch_index < this_index:
                 length = 1
                 for statement in statements[branch_index:this_index]:
-                    length += statement.get_size()
+                    length += statement.size
                 self.instruction_bundle.additional = "{:04X}".format(0xFFFF - length)
             else:
                 for statement in statements[this_index+1:branch_index]:
-                    length += statement.get_size()
+                    length += statement.size
                 self.instruction_bundle.additional = "{:04X}".format(length)
             return
 

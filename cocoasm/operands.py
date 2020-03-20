@@ -149,7 +149,7 @@ class Operand(ABC):
 
         symbol = symbol_table[symbol_label]
         if symbol.is_type(ValueType.ADDRESS):
-            self.value = AddressValue(symbol.get_integer())
+            self.value = AddressValue(symbol.int)
             self.type = OperandType.EXTENDED if self.type == OperandType.UNKNOWN else self.type
             return
 
