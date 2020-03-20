@@ -39,6 +39,11 @@ class TestValue(unittest.TestCase):
         result = Value.create_from_str("symbol", "")
         self.assertTrue(result.is_type(ValueType.SYMBOL))
 
+    def test_value_create_from_str_raises_on_bad_string_value(self):
+        with self.assertRaises(ValueError) as context:
+            Value.create_from_str("'bad string", "FCC")
+        self.assertEqual("['bad string] is an invalid value", str(context.exception))
+
     def test_value_create_from_str_raises_on_bad_value(self):
         with self.assertRaises(ValueError) as context:
             Value.create_from_str("invalid!", "")
