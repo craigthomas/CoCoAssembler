@@ -37,6 +37,10 @@ EXPRESSION_REGEX = re.compile(
 
 
 class ValueType(Enum):
+    """
+    The ValueType enumeration stores what type of value is stored in a
+    particular class.
+    """
     UNKNOWN = 0
     NUMERIC = 1
     STRING = 2
@@ -47,6 +51,11 @@ class ValueType(Enum):
 
 
 class Value(ABC):
+    """
+    A Value stores a basic value recognized by the assembler. Values are
+    one of several types, being Unknown, Numeric, String, Symbol,
+    Address, Expression or a special None type.
+    """
     def __init__(self, value):
         self.original_string = value
         self.type = ValueType.UNKNOWN
@@ -72,11 +81,22 @@ class Value(ABC):
         return int(self.hex_len() / 2)
 
     def is_type(self, value_type):
+        """
+        Returns whether the Value is the type specified.
+
+        :param value_type: the ValueType to check
+        :return: True if the type of the Value is the type being checked, False otherwise
+        """
         return self.type == value_type
 
     @classmethod
     def create_from_str(cls, value):
-        print("creating Value from {}".format(value))
+        """
+        Creates a Value from the specified string.
+
+        :param value: the string to create a value from
+        :return: a Value class that best represents the string value parsed
+        """
         try:
             return NumericValue(value)
         except ValueError:
@@ -96,7 +116,6 @@ class Value(ABC):
 
         :return: the hex representation of the object
         """
-        pass
 
     @abstractmethod
     def hex_len(self):
@@ -105,10 +124,12 @@ class Value(ABC):
 
         :return: the full number of hex characters
         """
-        pass
 
 
 class NoneValue(Value):
+    """
+    Represents a special None type value that does not store any information.
+    """
     def __init__(self, value):
         super().__init__(value)
         self.type = ValueType.NONE
@@ -137,19 +158,9 @@ class StringValue(Value):
         self.hex_array = ["{:X}".format(ord(x)) for x in value[1:-1]]
 
     def hex(self):
-        """
-        Returns a hex string representation of the object.
-
-        :return: the hex representation of the object
-        """
         return "".join(self.hex_array)
 
     def hex_len(self):
-        """
-        Returns the full length of the hex representation.
-
-        :return: the full number of hex characters
-        """
         return len(self.hex())
 
 
@@ -179,22 +190,12 @@ class NumericValue(Value):
         raise ValueError("[{}] is neither integer or hex value".format(value))
 
     def hex(self):
-        """
-        Returns a hex string representation of the object.
-
-        :return: the hex representation of the object
-        """
         size = self.hex_len()
         size += 1 if size % 2 == 1 else 0
         format_specifier = "{{:0>{}X}}".format(size)
         return format_specifier.format(self.int)
 
     def hex_len(self):
-        """
-        Returns the full length of the hex representation.
-
-        :return: the full number of hex characters
-        """
         return len(hex(self.int)[2:])
 
 
@@ -213,19 +214,9 @@ class SymbolValue(Value):
         self.value = value
 
     def hex(self):
-        """
-        Returns a hex string representation of the object.
-
-        :return: the hex representation of the object
-        """
         return self.value.hex() if self.resolved else ""
 
     def hex_len(self):
-        """
-        Returns the full length of the hex representation.
-
-        :return: the full number of hex characters
-        """
         return self.value.hex_len() if self.resolved else 0
 
 
@@ -239,22 +230,12 @@ class AddressValue(Value):
         self.type = ValueType.ADDRESS
 
     def hex(self):
-        """
-        Returns a hex string representation of the object.
-
-        :return: the hex representation of the object
-        """
         size = self.hex_len()
         size += 1 if size % 2 == 1 else 0
         format_specifier = "{{:0>{}X}}".format(size)
         return format_specifier.format(self.int)
 
     def hex_len(self):
-        """
-        Returns the full length of the hex representation.
-
-        :return: the full number of hex characters
-        """
         return len(hex(self.int)[2:])
 
 
@@ -275,19 +256,9 @@ class ExpressionValue(Value):
         self.operation = match.group("operation")
 
     def hex(self):
-        """
-        Returns a hex string representation of the object.
-
-        :return: the hex representation of the object
-        """
         return self.value.hex() if self.resolved else ""
 
     def hex_len(self):
-        """
-        Returns the full length of the hex representation.
-
-        :return: the full number of hex characters
-        """
         return self.value.hex_len() if self.resolved else 0
 
 # E N D   O F   F I L E #######################################################
