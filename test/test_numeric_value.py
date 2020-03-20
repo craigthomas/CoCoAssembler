@@ -25,11 +25,11 @@ class TestNumericValue(unittest.TestCase):
 
     def test_parse_input_recognizes_valid_hex(self):
         result = NumericValue("$DEAD")
-        self.assertEqual("DEAD", result.get_hex_str())
+        self.assertEqual("DEAD", result.hex())
 
     def test_parse_input_recognizes_valid_integer(self):
         result = NumericValue("1234")
-        self.assertEqual(1234, result.get_integer())
+        self.assertEqual(1234, result.int())
 
     def test_parse_input_raises_exception_on_long_strings(self):
         with self.assertRaises(ValueError) as context:
@@ -48,19 +48,19 @@ class TestNumericValue(unittest.TestCase):
 
     def test_get_hex_length_correctly_calculated(self):
         result = NumericValue("$DEAD")
-        self.assertEqual(4, result.get_hex_length())
+        self.assertEqual(4, result.hex_len())
 
     def test_get_hex_byte_size_correctly_calculated(self):
         result = NumericValue("$DEAD")
-        self.assertEqual(2, result.get_hex_byte_size())
+        self.assertEqual(2, result.byte_len())
 
     def test_integer_value_correctly_calculated(self):
         result = NumericValue("$DEAD")
-        self.assertEqual(57005, result.get_integer())
+        self.assertEqual(57005, result.int())
 
     def test_hex_value_correctly_calculated(self):
         result = NumericValue("57005")
-        self.assertEqual("DEAD", result.get_hex_str())
+        self.assertEqual("DEAD", result.hex())
 
     def test_str_correct(self):
         result = NumericValue("57005")

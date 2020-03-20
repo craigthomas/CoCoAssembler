@@ -25,7 +25,7 @@ class TestNumericValue(unittest.TestCase):
 
     def test_parse_string_works_correctly(self):
         result = StringValue('"test string"')
-        self.assertEqual("test string", result.get_ascii_str())
+        self.assertEqual("test string", result.ascii())
 
     def test_parse_string_raises_exception_on_mismatched_delimiters(self):
         with self.assertRaises(ValueError) as context:
@@ -34,7 +34,7 @@ class TestNumericValue(unittest.TestCase):
 
     def test_get_hex_str_works_correctly(self):
         result = StringValue('"abc"')
-        self.assertEqual("616263", result.get_hex_str())
+        self.assertEqual("616263", result.hex())
 
     def test_str_works_correctly(self):
         result = StringValue('"abc"')
@@ -42,11 +42,11 @@ class TestNumericValue(unittest.TestCase):
 
     def test_get_hex_length_works_correctly(self):
         result = StringValue('"abc"')
-        self.assertEqual(6, result.get_hex_length())
+        self.assertEqual(6, result.hex_len())
 
     def test_get_hex_byte_size_works_correctly(self):
         result = StringValue('"abc"')
-        self.assertEqual(3, result.get_hex_byte_size())
+        self.assertEqual(3, result.byte_len())
 
 # M A I N #####################################################################
 
