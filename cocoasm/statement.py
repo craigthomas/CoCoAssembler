@@ -26,7 +26,7 @@ COMMENT_LINE_REGEX = re.compile(r"^\s*;\s*(?P<comment>.*)$")
 
 # Pattern to parse a single line
 ASM_LINE_REGEX = re.compile(
-    r"^(?P<label>[\w\@]*)\s+(?P<mnemonic>\w*)\s+(?P<operands>[\w\[\]#$,+-\.\*\@\"]*)\s*[;]*(?P<comment>.*)$"
+    r"^(?P<label>[\w@]*)\s+(?P<mnemonic>\w*)\s+(?P<operands>[\w\[\]#$,+-.*@\"]*)\s*[;]*(?P<comment>.*)$"
 )
 
 # Pattern to recognize a direct value

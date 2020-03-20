@@ -9,9 +9,40 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.values import NumericValue, StringValue, NoneValue, SymbolValue, \
-    AddressValue, ValueType
+    AddressValue, ValueType, Value
+
 
 # C L A S S E S ###############################################################
+
+
+class TestValue(unittest.TestCase):
+    """
+    A test class for the base Value class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        pass
+
+    def test_value_create_from_str_numeric_correct(self):
+        result = Value.create_from_str("$DEAD", "")
+        self.assertTrue(result.is_type(ValueType.NUMERIC))
+        self.assertEqual("DEAD", result.hex())
+
+    def test_value_create_from_str_string_correct(self):
+        result = Value.create_from_str("'$DEAD'", "FCC")
+        self.assertTrue(result.is_type(ValueType.STRING))
+        self.assertEqual("$DEAD", result.ascii())
+
+    def test_value_create_from_str_symbol_correct(self):
+        result = Value.create_from_str("symbol", "")
+        self.assertTrue(result.is_type(ValueType.SYMBOL))
+
+    def test_value_create_from_str_raises_on_bad_value(self):
+        with self.assertRaises(ValueError) as context:
+            Value.create_from_str("invalid!", "")
+        self.assertEqual("[invalid!] is an invalid value", str(context.exception))
 
 
 class TestNumericValue(unittest.TestCase):

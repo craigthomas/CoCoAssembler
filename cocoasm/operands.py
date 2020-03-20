@@ -12,8 +12,7 @@ from abc import ABC
 from copy import copy
 from enum import Enum
 
-from cocoasm.values import StringValue, NumericValue, SymbolValue,  \
-    NoneValue, ValueType, AddressValue
+from cocoasm.values import NoneValue, ValueType, AddressValue, Value
 
 # C O N S T A N T S ###########################################################
 
@@ -122,44 +121,16 @@ class Operand(ABC):
         """
         return self.type == operand_type
 
-    def parse_value(self, value):
-        """
-        Parses the value by trying to instantiate various Value classes.
-
-        :param value: the string value to parse
-        :return: the Value class parsed
-        """
-        try:
-            self.value = NumericValue(value)
-            return
-        except ValueError:
-            pass
-
-        if self.mnemonic == "FCC":
-            try:
-                self.value = StringValue(value)
-                return
-            except ValueError:
-                pass
-
-        try:
-            self.value = SymbolValue(value)
-            self.requires_resolution = True
-            return
-        except ValueError:
-            pass
-
-        raise ValueError("cannot parse value: {}".format(value))
-
     def resolve_symbols(self, symbol_table):
+        if self.is_type(OperandType.EXPRESSION):
+            self.resolve_symbols(symbol_table)
+            return
+
         if not self.value.is_type(ValueType.SYMBOL):
             return
 
-        symbol_label = self.value.ascii()
-        if symbol_label not in symbol_table:
-            raise ValueError("[{}] not in symbol table".format(symbol_label))
+        symbol = self.get_symbol(self.value.ascii(), symbol_table)
 
-        symbol = symbol_table[symbol_label]
         if symbol.is_type(ValueType.ADDRESS):
             self.value = AddressValue(symbol.int)
             self.type = OperandType.EXTENDED if self.type == OperandType.UNKNOWN else self.type
@@ -169,12 +140,18 @@ class Operand(ABC):
             self.value = copy(symbol)
             self.type = OperandType.DIRECT if self.value.hex_len() == 2 else OperandType.EXTENDED
 
+    @staticmethod
+    def get_symbol(symbol_label, symbol_table):
+        if symbol_label not in symbol_table:
+            raise ValueError("[{}] not in symbol table".format(symbol_label))
+        return symbol_table[symbol_label]
+
 
 class UnknownOperand(Operand):
     def __init__(self, operand_string, mnemonic):
         super().__init__(mnemonic)
         self.operand_string = operand_string
-        self.parse_value(operand_string)
+        self.value = Value.create_from_str(operand_string, mnemonic)
 
 
 class InherentOperand(Operand):
@@ -193,7 +170,7 @@ class ImmediateOperand(Operand):
         match = IMMEDIATE_REGEX.match(operand_string)
         if not match:
             raise ValueError("[{}] is not an immediate value".format(operand_string))
-        self.parse_value(match.group("value"))
+        self.value = Value.create_from_str(match.group("value"), mnemonic)
 
 
 class DirectOperand(Operand):
@@ -203,9 +180,9 @@ class DirectOperand(Operand):
         self.operand_string = operand_string
         match = DIRECT_REGEX.match(self.operand_string)
         if match:
-            self.parse_value(match.group("value")[1:])
+            self.value = Value.create_from_str(match.group("value")[1:], mnemonic)
         else:
-            self.parse_value(operand_string)
+            self.value = Value.create_from_str(operand_string, mnemonic)
         if self.value is None or self.value.byte_len() != 1:
             raise ValueError("[{}] is not a direct value".format(operand_string))
 
@@ -217,9 +194,9 @@ class ExtendedOperand(Operand):
         self.operand_string = operand_string
         match = EXTENDED_REGEX.match(self.operand_string)
         if match:
-            self.parse_value(match.group("value")[1:])
+            self.value = Value.create_from_str(match.group("value")[1:], mnemonic)
         else:
-            self.parse_value(operand_string)
+            self.value = Value.create_from_str(operand_string, mnemonic)
         if self.value is None or self.value.byte_len() != 2:
             raise ValueError("[{}] is not an extended value".format(operand_string))
 
@@ -232,7 +209,7 @@ class ExtendedIndirectOperand(Operand):
         match = EXTENDED_INDIRECT_REGEX.match(self.operand_string)
         if not match:
             raise ValueError("[{}] is not an extended indirect value".format(operand_string))
-        self.parse_value(match.group("value"))
+        self.value = Value.create_from_str(match.group("value"), mnemonic)
 
 
 class IndexedOperand(Operand):

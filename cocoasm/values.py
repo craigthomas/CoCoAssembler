@@ -99,6 +99,33 @@ class Value(ABC):
         :return: the full number of hex characters
         """
 
+    @classmethod
+    def create_from_str(cls, value, mnemonic):
+        """
+        Parses the value by trying to instantiate various Value classes.
+
+        :param value: the string value to parse
+        :param mnemonic: the instruction mnemonic
+        :return: the Value class parsed
+        """
+        try:
+            return NumericValue(value)
+        except ValueError:
+            pass
+
+        if mnemonic == "FCC":
+            try:
+                return StringValue(value)
+            except ValueError:
+                pass
+
+        try:
+            return SymbolValue(value)
+        except ValueError:
+            pass
+
+        raise ValueError("[{}] is an invalid value".format(value))
+
 
 class NoneValue(Value):
     """
