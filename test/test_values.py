@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.values import NumericValue, StringValue, NoneValue, SymbolValue, \
-    ValueType
+    AddressValue, ValueType
 
 # C L A S S E S ###############################################################
 
@@ -157,6 +157,11 @@ class TestSymbolValue(unittest.TestCase):
         """
         pass
 
+    def test_symbol_raises_exception_on_invalid_strings(self):
+        with self.assertRaises(ValueError) as context:
+            SymbolValue("invalid!")
+        self.assertEqual("invalid! is not a valid symbol", str(context.exception))
+
     def test_symbol_ascii_works_correctly(self):
         result = SymbolValue('symbol')
         self.assertEqual("symbol", result.ascii())
@@ -203,6 +208,37 @@ class TestSymbolValue(unittest.TestCase):
         result = SymbolValue('symbol')
         result.resolved = True
         result.value = NumericValue("$AB")
+        self.assertEqual(1, result.byte_len())
+
+
+class TestAddressValue(unittest.TestCase):
+    """
+    A test class for the AddressValue class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        pass
+
+    def test_address_ascii_works_correctly(self):
+        result = AddressValue('11')
+        self.assertEqual("11", result.ascii())
+
+    def test_address_hex_correct(self):
+        result = AddressValue('16')
+        self.assertEqual("10", result.hex())
+
+    def test_address_str_correct(self):
+        result = AddressValue('16')
+        self.assertEqual("10", str(result))
+
+    def test_address_hex_len_correct(self):
+        result = AddressValue('16')
+        self.assertEqual(2, result.hex_len())
+
+    def test_symbol_byte_len_correct(self):
+        result = AddressValue('16')
         self.assertEqual(1, result.byte_len())
 
 # M A I N #####################################################################
