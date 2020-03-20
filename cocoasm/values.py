@@ -89,9 +89,6 @@ class Value(ABC):
 
         raise ValueError("unknown value type")
 
-    def requires_resolution(self):
-        return not self.resolved
-
     @abstractmethod
     def hex(self):
         """
@@ -178,7 +175,7 @@ class NumericValue(Value):
                 raise ValueError("integer value cannot exceed 65535")
             return
 
-        raise ValueError("supplied value is neither integer or hex value")
+        raise ValueError("[{}] is neither integer or hex value".format(value))
 
     def int(self):
         """
