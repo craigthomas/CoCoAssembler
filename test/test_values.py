@@ -160,7 +160,7 @@ class TestSymbolValue(unittest.TestCase):
     def test_symbol_raises_exception_on_invalid_strings(self):
         with self.assertRaises(ValueError) as context:
             SymbolValue("invalid!")
-        self.assertEqual("invalid! is not a valid symbol", str(context.exception))
+        self.assertEqual("[invalid!] is not a valid symbol", str(context.exception))
 
     def test_symbol_ascii_works_correctly(self):
         result = SymbolValue('symbol')

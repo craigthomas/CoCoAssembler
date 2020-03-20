@@ -89,26 +89,6 @@ class Value(ABC):
         """
         return self.type == value_type
 
-    @classmethod
-    def create_from_str(cls, value):
-        """
-        Creates a Value from the specified string.
-
-        :param value: the string to create a value from
-        :return: a Value class that best represents the string value parsed
-        """
-        try:
-            return NumericValue(value)
-        except ValueError:
-            pass
-
-        try:
-            return StringValue(value)
-        except ValueError:
-            pass
-
-        raise ValueError("unknown value type")
-
     @abstractmethod
     def hex(self):
         """
@@ -210,7 +190,7 @@ class SymbolValue(Value):
         self.type = ValueType.SYMBOL
         data = SYMBOL_REGEX.match(value)
         if not data:
-            raise ValueError("{} is not a valid symbol".format(value))
+            raise ValueError("[{}] is not a valid symbol".format(value))
         self.value = value
 
     def hex(self):
@@ -250,7 +230,7 @@ class ExpressionValue(Value):
         self.type = ValueType.EXPRESSION
         match = EXPRESSION_REGEX.match(value)
         if not match:
-            raise ValueError("supplied value is not a valid expression")
+            raise ValueError("[{}] is not a valid expression".format(value))
         self.left = match.group("left")
         self.right = match.group("right")
         self.operation = match.group("operation")
