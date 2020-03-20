@@ -8,7 +8,7 @@ A Color Computer Assembler - see the README.md file for details.
 
 import unittest
 
-from cocoasm.values import NumericValue, StringValue, ValueType
+from cocoasm.values import NumericValue, StringValue, NoneValue, ValueType
 
 # C L A S S E S ###############################################################
 
@@ -110,6 +110,40 @@ class TestStringValue(unittest.TestCase):
         result = StringValue('"abc"')
         self.assertTrue(result.is_type(ValueType.STRING))
 
+
+class TestNoneValue(unittest.TestCase):
+    """
+    A test class for the NoneValue class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        pass
+
+    def test_none_ascii_works_correctly(self):
+        result = NoneValue('"test string"')
+        self.assertEqual("", result.ascii())
+
+    def test_none_hex_works_correctly(self):
+        result = NoneValue('"abc"')
+        self.assertEqual("", result.hex())
+
+    def test_none_str_works_correctly(self):
+        result = NoneValue('"abc"')
+        self.assertEqual("", str(result))
+
+    def test_none_hex_len_works_correctly(self):
+        result = NoneValue('"abc"')
+        self.assertEqual(0, result.hex_len())
+
+    def test_none_byte_len_works_correctly(self):
+        result = NoneValue('"abc"')
+        self.assertEqual(0, result.byte_len())
+
+    def test_none_is_type_correct(self):
+        result = NoneValue('"abc"')
+        self.assertTrue(result.is_type(ValueType.NONE))
 
 # M A I N #####################################################################
 
