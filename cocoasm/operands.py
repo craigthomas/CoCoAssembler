@@ -12,7 +12,7 @@ from abc import ABC
 from copy import copy
 from enum import Enum
 
-from cocoasm.values import NoneValue, ValueType, AddressValue, Value
+from cocoasm.values import NoneValue, ValueType, AddressValue, Value, NumericValue
 
 # C O N S T A N T S ###########################################################
 
@@ -67,6 +67,9 @@ class Operand(ABC):
         self.mnemonic = mnemonic
         self.requires_resolution = False
         self.value = NoneValue(None)
+        self.left = NoneValue(None)
+        self.right = NoneValue(None)
+        self.operation = ""
 
     @classmethod
     def create_from_str(cls, operand_string, mnemonic):
@@ -123,7 +126,7 @@ class Operand(ABC):
 
     def resolve_symbols(self, symbol_table):
         if self.is_type(OperandType.EXPRESSION):
-            self.resolve_symbols(symbol_table)
+            self.resolve_expression(symbol_table)
             return
 
         if not self.value.is_type(ValueType.SYMBOL):
@@ -139,6 +142,29 @@ class Operand(ABC):
         if symbol.is_type(ValueType.NUMERIC):
             self.value = copy(symbol)
             self.type = OperandType.DIRECT if self.value.hex_len() == 2 else OperandType.EXTENDED
+
+    def resolve_expression(self, symbol_table):
+        if self.left.is_type(ValueType.SYMBOL):
+            self.left = self.get_symbol(self.left.ascii(), symbol_table)
+
+        if self.right.is_type(ValueType.SYMBOL):
+            self.right = self.get_symbol(self.right.ascii(), symbol_table)
+
+        if self.right.is_type(ValueType.NUMERIC) and self.left.is_type(ValueType.NUMERIC):
+            left = self.left.int
+            right = self.right.int
+            if self.operation == "+":
+                self.value = NumericValue("{}".format(left + right))
+            if self.operation == "-":
+                self.value = NumericValue("{}".format(left - right))
+            if self.operation == "*":
+                self.value = NumericValue("{}".format(left * right))
+            if self.operation == "/":
+                self.value = NumericValue("{}".format(left / right))
+            self.type = OperandType.DIRECT if self.value.hex_len() == 2 else OperandType.EXTENDED
+            return
+
+        self.value = NoneValue("")
 
     @staticmethod
     def get_symbol(symbol_label, symbol_table):
@@ -230,11 +256,9 @@ class ExpressionOperand(Operand):
         match = EXPRESSION_REGEX.match(operand_string)
         if not match:
             raise ValueError("[{}] is not a valid expression".format(operand_string))
-        self.left = match.group("left")
-        self.right = match.group("right")
+        self.left = Value.create_from_str(match.group("left"), mnemonic)
+        self.right = Value.create_from_str(match.group("right"), mnemonic)
         self.operation = match.group("operation")
-
-    def resolve_expression(self, symbol_table):
-        pass
+        self.value = NoneValue("")
 
 # E N D   O F   F I L E #######################################################

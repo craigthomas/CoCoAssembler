@@ -224,8 +224,7 @@ class Statement(object):
             self.size = self.instruction_bundle.get_size()
             return
 
-        if not self.operand.value.resolved:
-            self.operand.resolve_symbols(symbol_table)
+        self.operand.resolve_symbols(symbol_table)
 
         if self.instruction.is_short_branch or self.instruction.is_long_branch:
             self.instruction_bundle.op_code = self.instruction.mode.rel
