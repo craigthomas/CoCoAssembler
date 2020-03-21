@@ -243,7 +243,7 @@ class IndexedOperand(Operand):
         super().__init__(mnemonic)
         self.type = OperandType.INDEXED
         self.operand_string = operand_string
-        if "," not in operand_string:
+        if "," not in operand_string or mnemonic == "FCC":
             raise ValueError("[{}] is not an indexed value".format(operand_string))
         self.value = NoneValue(operand_string)
 

@@ -26,34 +26,36 @@ REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
 # C L A S S E S ###############################################################
 
 class InstructionBundle(object):
-    def __init__(self, op_code=None, address=None, post_byte=None, additional=None):
+    def __init__(self, op_code=None, address=None, post_byte=None, additional=None, size=0):
         self.op_code = op_code
         self.address = address
         self.post_byte = post_byte
         self.additional = additional
         self.branch_index = 0
+        self.size = size
 
     def __str__(self):
-        return "op_code: {}, address: {}, post_byte: {}, additional: {}".format(
-            self.op_code, self.address, self.post_byte, self.additional
+        return "op_code: {}, address: {}, post_byte: {}, additional: {}, size: {}".format(
+            self.op_code, self.address, self.post_byte, self.additional, self.size
         )
 
     def set_branch_index(self, index):
         self.branch_index = index
 
     def get_size(self):
-        size = 0
+        if self.size != 0:
+            return self.size
 
         if self.op_code:
-            size += int((len(self.op_code) / 2))
+            self.size += int((len(self.op_code) / 2))
 
         if self.additional:
-            size += int((len(self.additional) / 2))
+            self.size += int((len(self.additional) / 2))
 
         if self.post_byte:
-            size += int((len(self.post_byte) / 2))
+            self.size += int((len(self.post_byte) / 2))
 
-        return size
+        return self.size
 
 
 class Mode(NamedTuple):
@@ -165,10 +167,10 @@ class Instruction(NamedTuple):
         :return: returns the value of the pseudo operation
         """
         if self.mnemonic == "FCB":
-            return InstructionBundle(additional=operand.value.hex())
+            return InstructionBundle(additional=operand.value.hex(), size=1)
 
         if self.mnemonic == "FDB":
-            return InstructionBundle(additional=operand.value.hex())
+            return InstructionBundle(additional=operand.value.hex(), size=2)
 
         if self.mnemonic == "EQU":
             return InstructionBundle()
@@ -177,7 +179,7 @@ class Instruction(NamedTuple):
             return InstructionBundle(address=operand.value.hex())
 
         if self.mnemonic == "FCC":
-            return InstructionBundle(additional=operand.value.hex())
+            return InstructionBundle(additional=operand.value.hex(), size=operand.value.byte_len())
 
         if self.mnemonic == "END":
             return InstructionBundle()
