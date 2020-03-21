@@ -26,7 +26,7 @@ class TestInstructionBundle(unittest.TestCase):
 
     def test_str(self):
         result = InstructionBundle(op_code=1, address=2, post_byte=3, additional=4)
-        self.assertEqual("op_code: 1, address: 2, post_byte: 3, additional: 4", str(result))
+        self.assertEqual("op_code: 1, address: 2, post_byte: 3, additional: 4, size: 0", str(result))
 
 # M A I N #####################################################################
 
