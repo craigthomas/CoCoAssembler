@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 from typing import NamedTuple, Callable
 
 from cocoasm.exceptions import TranslationError
-from cocoasm.values import NumericValue
+from cocoasm.values import NumericValue, NoneValue
 
 # C O N S T A N T S ###########################################################
 
@@ -26,7 +26,7 @@ REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
 # C L A S S E S ###############################################################
 
 class InstructionBundle(object):
-    def __init__(self, op_code=None, address=None, post_byte=None, additional=None, size=0):
+    def __init__(self, op_code=NoneValue(), address=NoneValue(), post_byte=NoneValue(), additional=NoneValue(), size=0):
         self.op_code = op_code
         self.address = address
         self.post_byte = post_byte

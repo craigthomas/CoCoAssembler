@@ -54,6 +54,7 @@ class Value(ABC):
         self.original_string = value
         self.type = ValueType.UNKNOWN
         self.resolved = True
+        self.int = 0
 
     def __str__(self):
         return self.hex()
@@ -84,7 +85,7 @@ class Value(ABC):
         return self.type == value_type
 
     @abstractmethod
-    def hex(self):
+    def hex(self, size=0):
         """
         Returns the hex representation of the object.
 
@@ -131,12 +132,12 @@ class NoneValue(Value):
     """
     Represents a special None type value that does not store any information.
     """
-    def __init__(self, value):
+    def __init__(self, value=None):
         super().__init__(value)
         self.type = ValueType.NONE
         self.original_string = ""
 
-    def hex(self):
+    def hex(self, size=0):
         return ""
 
     def hex_len(self):
@@ -158,7 +159,7 @@ class StringValue(Value):
         self.original_string = value[1:-1]
         self.hex_array = ["{:X}".format(ord(x)) for x in value[1:-1]]
 
-    def hex(self):
+    def hex(self, size=0):
         return "".join(self.hex_array)
 
     def hex_len(self):
@@ -172,7 +173,6 @@ class NumericValue(Value):
     """
     def __init__(self, value):
         super().__init__(value)
-        self.int = 0
         self.type = ValueType.NUMERIC
         if type(value) == int:
             self.int = value
@@ -196,9 +196,10 @@ class NumericValue(Value):
 
         raise ValueError("[{}] is neither integer or hex value".format(value))
 
-    def hex(self):
-        size = self.hex_len()
-        size += 1 if size % 2 == 1 else 0
+    def hex(self, size=0):
+        if size == 0:
+            size = self.hex_len()
+            size += 1 if size % 2 == 1 else 0
         format_specifier = "{{:0>{}X}}".format(size)
         return format_specifier.format(self.int)
 
@@ -220,7 +221,7 @@ class SymbolValue(Value):
             raise ValueError("[{}] is not a valid symbol".format(value))
         self.value = value
 
-    def hex(self):
+    def hex(self, size=0):
         return self.value.hex() if self.resolved else ""
 
     def hex_len(self):
@@ -236,9 +237,10 @@ class AddressValue(Value):
         self.int = int(value)
         self.type = ValueType.ADDRESS
 
-    def hex(self):
-        size = self.hex_len()
-        size += 1 if size % 2 == 1 else 0
+    def hex(self, size=0):
+        if size == 0:
+            size = self.hex_len()
+            size += 1 if size % 2 == 1 else 0
         format_specifier = "{{:0>{}X}}".format(size)
         return format_specifier.format(self.int)
 

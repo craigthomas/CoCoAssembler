@@ -71,7 +71,7 @@ class Statement(object):
             op_code_string += self.get_additional()
 
         return "${} {:.10} {} {} {} ; {} {} {}".format(
-            self.get_address(),
+            self.instruction_bundle.address.hex(size=4),
             op_code_string.ljust(10, ' '),
             self.get_label().rjust(10, ' '),
             self.get_mnemonic().rjust(5, ' '),
@@ -87,9 +87,7 @@ class Statement(object):
 
         :return: the address for this statement
         """
-        if self.instruction_bundle and self.instruction_bundle.address:
-            return self.instruction_bundle.address
-        return "None"
+        return self.instruction_bundle.address
 
     def get_label(self):
         """
@@ -199,7 +197,7 @@ class Statement(object):
             raise TranslationError("Invalid mnemonic [{}]".format(self.mnemonic), self)
 
     def set_address(self, address):
-        if self.instruction_bundle.address is not None:
+        if not self.instruction_bundle.address.is_type(ValueType.NONE):
             return self.instruction_bundle.address.int
         self.instruction_bundle.address = NumericValue(address)
         return self.instruction_bundle.address.int
