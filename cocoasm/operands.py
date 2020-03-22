@@ -21,12 +21,12 @@ IMMEDIATE_REGEX = re.compile(
     r"^#(?P<value>.*)"
 )
 
-# Pattern to recognize an immediate value
+# Pattern to recognize a direct value
 DIRECT_REGEX = re.compile(
     r"^<(?P<value>.*)"
 )
 
-# Pattern to recognize an immediate value
+# Pattern to recognize an extended value
 EXTENDED_REGEX = re.compile(
     r"^<(?P<value>.*)"
 )

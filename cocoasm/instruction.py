@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 from typing import NamedTuple, Callable
 
 from cocoasm.exceptions import TranslationError
-from cocoasm.values import StringValue
+from cocoasm.values import NumericValue
 
 # C O N S T A N T S ###########################################################
 
@@ -47,13 +47,13 @@ class InstructionBundle(object):
             return self.size
 
         if self.op_code:
-            self.size += int((len(self.op_code) / 2))
+            self.size += self.op_code.byte_len()
 
         if self.additional:
-            self.size += int((len(self.additional) / 2))
+            self.size += self.additional.byte_len()
 
         if self.post_byte:
-            self.size += int((len(self.post_byte) / 2))
+            self.size += self.post_byte.byte_len()
 
         return self.size
 
@@ -157,29 +157,27 @@ class Instruction(NamedTuple):
     def is_special(self):
         return self.mnemonic in ["PULS", "PSHS", "EXG", "TFR"]
 
-    def translate_pseudo(self, label, operand, symbol_table):
+    def translate_pseudo(self, operand):
         """
         Translates a pseudo operation.
 
-        :param label: the label attached to the pseudo operation
         :param operand: the operand value of the pseudo operation
-        :param symbol_table: the current symbol table
         :return: returns the value of the pseudo operation
         """
         if self.mnemonic == "FCB":
-            return InstructionBundle(additional=operand.value.hex(), size=1)
+            return InstructionBundle(additional=operand.value, size=1)
 
         if self.mnemonic == "FDB":
-            return InstructionBundle(additional=operand.value.hex(), size=2)
+            return InstructionBundle(additional=operand.value, size=2)
 
         if self.mnemonic == "EQU":
             return InstructionBundle()
 
         if self.mnemonic == "ORG":
-            return InstructionBundle(address=operand.value.hex())
+            return InstructionBundle(address=operand.value)
 
         if self.mnemonic == "FCC":
-            return InstructionBundle(additional=operand.value.hex(), size=operand.value.byte_len())
+            return InstructionBundle(additional=operand.value, size=operand.value.byte_len())
 
         if self.mnemonic == "END":
             return InstructionBundle()
@@ -192,7 +190,7 @@ class Instruction(NamedTuple):
         :param statement: the statement that this operation came from
         """
         instruction_bundle = InstructionBundle()
-        instruction_bundle.op_code = "{:02X}".format(statement.instruction.mode.imm)
+        instruction_bundle.op_code = NumericValue(statement.instruction.mode.imm)
 
         if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
             registers = operand.operand_string.split(",")
@@ -264,7 +262,7 @@ class Instruction(NamedTuple):
                 raise TranslationError("{} of {} to {} not allowed".format(self.mnemonic, registers[0], registers[1]),
                                        statement)
 
-        instruction_bundle.post_byte = "{:02X}".format(instruction_bundle.post_byte)
+        instruction_bundle.post_byte = NumericValue(instruction_bundle.post_byte)
         return instruction_bundle
 
 

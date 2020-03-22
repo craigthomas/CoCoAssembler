@@ -71,11 +71,11 @@ class TestImmediateOperand(unittest.TestCase):
         """
         pass
 
-    def test_inherent_type_correct(self):
+    def test_immediate_type_correct(self):
         result = ImmediateOperand("#blah", None)
         self.assertTrue(result.is_type(OperandType.IMMEDIATE))
 
-    def test_inherent_string_correct(self):
+    def test_immediate_string_correct(self):
         result = ImmediateOperand("#blah", None)
         self.assertEqual("#blah", result.operand_string)
 

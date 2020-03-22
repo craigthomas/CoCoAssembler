@@ -174,6 +174,12 @@ class NumericValue(Value):
         super().__init__(value)
         self.int = 0
         self.type = ValueType.NUMERIC
+        if type(value) == int:
+            self.int = value
+            if self.int > 65535:
+                raise ValueError("integer value cannot exceed 65535")
+            return
+
         data = HEX_REGEX.match(value)
         if data:
             if len(data.group("value")) > 4:
