@@ -14,7 +14,6 @@ from cocoasm.exceptions import ParseError, TranslationError
 from cocoasm.instruction import INSTRUCTIONS, InstructionBundle
 from cocoasm.operands import Operand, OperandType
 from cocoasm.values import ValueType, NumericValue
-from cocoasm.helpers import hex_value
 
 # C O N S T A N T S ###########################################################
 
@@ -51,87 +50,32 @@ class Statement(object):
         self.is_empty = True
         self.is_comment_only = False
         self.instruction = None
-        self.label = None
+        self.label = ""
         self.operand = None
         self.original_operand = None
         self.comment = None
         self.size = 0
-        self.mnemonic = None
+        self.mnemonic = ""
         self.state = None
         self.instruction_bundle = InstructionBundle()
         self.parse_line(line)
 
     def __str__(self):
         op_code_string = ""
-        if self.get_op_codes():
-            op_code_string += self.get_op_codes()
-        if self.get_post_byte():
-            op_code_string += self.get_post_byte()
-        if self.get_additional():
-            op_code_string += self.get_additional()
+        op_code_string += self.instruction_bundle.op_code.hex()
+        op_code_string += self.instruction_bundle.post_byte.hex()
+        op_code_string += self.instruction_bundle.additional.hex()
 
         return "${} {:.10} {} {} {} ; {} {} {}".format(
             self.instruction_bundle.address.hex(size=4),
             op_code_string.ljust(10, ' '),
-            self.get_label().rjust(10, ' '),
-            self.get_mnemonic().rjust(5, ' '),
+            self.label.rjust(10, ' '),
+            self.mnemonic.rjust(5, ' '),
             self.original_operand.operand_string.ljust(30, ' '),
-            self.get_comment().ljust(40, ' '),
+            self.comment.ljust(40, ' '),
             self.operand.type,
             self.operand.value.type
         )
-
-    def get_address(self):
-        """
-        Returns the address for this statement.
-
-        :return: the address for this statement
-        """
-        return self.instruction_bundle.address
-
-    def get_label(self):
-        """
-        Returns the label associated with this statement.
-
-        :return: the label for this statement
-        """
-        return self.label or ""
-
-    def get_mnemonic(self):
-        """
-        Returns the mnemonic for this statement.
-
-        :return: the mnemonic for this statement
-        """
-        return self.mnemonic or ""
-
-    def get_op_codes(self):
-        """
-        Returns the operation codes for this statement.
-
-        :return: the operation codes for this statement
-        """
-        if self.instruction_bundle and self.instruction_bundle.op_code:
-            return self.instruction_bundle.op_code.hex() or None
-        return None
-
-    def get_additional(self):
-        if self.instruction_bundle and self.instruction_bundle.additional:
-            return self.instruction_bundle.additional.hex() or None
-        return None
-
-    def get_post_byte(self):
-        if self.instruction_bundle and self.instruction_bundle.post_byte:
-            return self.instruction_bundle.post_byte.hex() or None
-        return None
-
-    def get_comment(self):
-        """
-        Returns the comment for this statement.
-
-        :return: the comment for this statement
-        """
-        return self.comment if self.comment else ""
 
     def match_operation(self):
         """
@@ -170,8 +114,8 @@ class Statement(object):
 
         data = ASM_LINE_REGEX.match(line)
         if data:
-            self.label = data.group("label") or None
-            self.mnemonic = data.group("mnemonic").upper() or None
+            self.label = data.group("label") or ""
+            self.mnemonic = data.group("mnemonic").upper() or ""
             if self.mnemonic == "FCC":
                 original_operand = data.group("operands")
                 if data.group("comment"):
@@ -180,12 +124,12 @@ class Statement(object):
                 ending_location = original_operand.find(starting_symbol, 1)
                 self.operand = Operand.create_from_str(original_operand[0:ending_location + 1], self.mnemonic)
                 self.original_operand = copy(self.operand)
-                self.comment = original_operand[ending_location + 2:].strip() or None
+                self.comment = original_operand[ending_location + 2:].strip() or ""
                 self.is_empty = False
             else:
                 self.operand = Operand.create_from_str(data.group("operands"), self.mnemonic)
                 self.original_operand = copy(self.operand)
-                self.comment = data.group("comment").strip() or None
+                self.comment = data.group("comment").strip() or ""
                 self.is_empty = False
             return
 
@@ -301,6 +245,6 @@ class Statement(object):
             return
 
         if self.operand.value.is_type(ValueType.ADDRESS):
-            self.instruction_bundle.additional = statements[int(self.operand.value.hex(), 16)].get_address()
+            self.instruction_bundle.additional = statements[self.operand.value.int].instruction_bundle.address
 
 # E N D   O F   F I L E #######################################################

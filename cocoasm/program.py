@@ -97,7 +97,7 @@ class Program(object):
         :param index: the index into the list of statements where the label occurs
         :param statement: the statement with the label
         """
-        label = statement.get_label()
+        label = statement.label
         if label:
             if label in self.symbol_table:
                 raise TranslationError("Label [" + label + "] redefined", statement)

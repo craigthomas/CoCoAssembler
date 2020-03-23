@@ -39,23 +39,9 @@ class InstructionBundle(object):
             self.op_code, self.address, self.post_byte, self.additional, self.size
         )
 
-    def set_branch_index(self, index):
-        self.branch_index = index
-
     def get_size(self):
-        if self.size != 0:
-            return self.size
-
-        if self.op_code:
-            self.size += self.op_code.byte_len()
-
-        if self.additional:
-            self.size += self.additional.byte_len()
-
-        if self.post_byte:
-            self.size += self.post_byte.byte_len()
-
-        return self.size
+        return self.size if self.size != 0 else \
+            self.op_code.byte_len() + self.additional.byte_len() + self.post_byte.byte_len()
 
 
 class Mode(NamedTuple):
