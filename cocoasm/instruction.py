@@ -14,10 +14,10 @@ from cocoasm.values import NumericValue, NoneValue
 # C O N S T A N T S ###########################################################
 
 # Invalid operation
-IVLD = 0x01
+IVLD = -1
 
 # Illegal addressing mode
-ILLEGAL_MODE = 0x00
+ILLEGAL_MODE = -1
 
 # Recognized register names
 REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
@@ -25,13 +25,12 @@ REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
 
 # C L A S S E S ###############################################################
 
-class InstructionBundle(object):
+class CodePackage(object):
     def __init__(self, op_code=NoneValue(), address=NoneValue(), post_byte=NoneValue(), additional=NoneValue(), size=0):
         self.op_code = op_code
         self.address = address
         self.post_byte = post_byte
         self.additional = additional
-        self.branch_index = 0
         self.size = size
 
     def __str__(self):
@@ -120,28 +119,13 @@ class Instruction(NamedTuple):
     """
     mnemonic: str = ""
     mode: Mode = Mode()
-    pseudo: bool = False
+    is_pseudo: bool = False
+    is_pseudo_define: bool = False
+    is_special: bool = False
+    is_include: bool = False
     is_short_branch: bool = False
     is_long_branch: bool = False
     func: Callable[..., str] = None
-
-    def is_include(self):
-        """
-        Returns true if the pseudo operation is an INCLUDE directive,
-        false otherwise.
-
-        :return: True if the operation is an INCLUDE operation, False otherwise
-        """
-        return self.mnemonic == "INCLUDE"
-
-    def is_pseudo(self):
-        return self.mnemonic in ["FCC", "FCB", "FDB", "EQU", "INCLUDE", "END", "ORG"]
-
-    def is_pseudo_define(self):
-        return self.mnemonic in ["EQU"]
-
-    def is_special(self):
-        return self.mnemonic in ["PULS", "PSHS", "EXG", "TFR"]
 
     def translate_pseudo(self, operand):
         """
@@ -151,22 +135,22 @@ class Instruction(NamedTuple):
         :return: returns the value of the pseudo operation
         """
         if self.mnemonic == "FCB":
-            return InstructionBundle(additional=operand.value, size=1)
+            return CodePackage(additional=operand.value, size=1)
 
         if self.mnemonic == "FDB":
-            return InstructionBundle(additional=operand.value, size=2)
+            return CodePackage(additional=operand.value, size=2)
 
         if self.mnemonic == "EQU":
-            return InstructionBundle()
+            return CodePackage()
 
         if self.mnemonic == "ORG":
-            return InstructionBundle(address=operand.value)
+            return CodePackage(address=operand.value)
 
         if self.mnemonic == "FCC":
-            return InstructionBundle(additional=operand.value, size=operand.value.byte_len())
+            return CodePackage(additional=operand.value, size=operand.value.byte_len())
 
         if self.mnemonic == "END":
-            return InstructionBundle()
+            return CodePackage()
 
     def translate_special(self, operand, statement):
         """
@@ -175,29 +159,29 @@ class Instruction(NamedTuple):
         :param operand: the operand to process
         :param statement: the statement that this operation came from
         """
-        instruction_bundle = InstructionBundle()
-        instruction_bundle.op_code = NumericValue(statement.instruction.mode.imm)
+        code_pkg = CodePackage()
+        code_pkg.op_code = NumericValue(statement.instruction.mode.imm)
 
         if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
             registers = operand.operand_string.split(",")
-            instruction_bundle.post_byte = 0x00
+            code_pkg.post_byte = 0x00
             for register in registers:
                 if register not in REGISTERS:
                     raise ValueError("unknown register {}".format(register))
 
-                instruction_bundle.post_byte |= 0x06 if register == "D" else 0x00
-                instruction_bundle.post_byte |= 0x01 if register == "CC" else 0x00
-                instruction_bundle.post_byte |= 0x02 if register == "A" else 0x00
-                instruction_bundle.post_byte |= 0x04 if register == "B" else 0x00
-                instruction_bundle.post_byte |= 0x08 if register == "DP" else 0x00
-                instruction_bundle.post_byte |= 0x10 if register == "X" else 0x00
-                instruction_bundle.post_byte |= 0x20 if register == "Y" else 0x00
-                instruction_bundle.post_byte |= 0x40 if register == "U" else 0x00
-                instruction_bundle.post_byte |= 0x80 if register == "PC" else 0x00
+                code_pkg.post_byte |= 0x06 if register == "D" else 0x00
+                code_pkg.post_byte |= 0x01 if register == "CC" else 0x00
+                code_pkg.post_byte |= 0x02 if register == "A" else 0x00
+                code_pkg.post_byte |= 0x04 if register == "B" else 0x00
+                code_pkg.post_byte |= 0x08 if register == "DP" else 0x00
+                code_pkg.post_byte |= 0x10 if register == "X" else 0x00
+                code_pkg.post_byte |= 0x20 if register == "Y" else 0x00
+                code_pkg.post_byte |= 0x40 if register == "U" else 0x00
+                code_pkg.post_byte |= 0x80 if register == "PC" else 0x00
 
         if self.mnemonic == "EXG" or self.mnemonic == "TFR":
             registers = operand.operand_string.split(",")
-            instruction_bundle.post_byte = 0x00
+            code_pkg.post_byte = 0x00
             if len(registers) != 2:
                 raise TranslationError("{} requires exactly 2 registers".format(self.mnemonic), statement)
 
@@ -207,37 +191,37 @@ class Instruction(NamedTuple):
             if registers[1] not in REGISTERS:
                 raise TranslationError("unknown register {}".format(registers[1]), statement)
 
-            instruction_bundle.post_byte |= 0x00 if registers[0] == "D" else 0x00
-            instruction_bundle.post_byte |= 0x00 if registers[1] == "D" else 0x00
+            code_pkg.post_byte |= 0x00 if registers[0] == "D" else 0x00
+            code_pkg.post_byte |= 0x00 if registers[1] == "D" else 0x00
 
-            instruction_bundle.post_byte |= 0x10 if registers[0] == "X" else 0x00
-            instruction_bundle.post_byte |= 0x01 if registers[1] == "X" else 0x00
+            code_pkg.post_byte |= 0x10 if registers[0] == "X" else 0x00
+            code_pkg.post_byte |= 0x01 if registers[1] == "X" else 0x00
 
-            instruction_bundle.post_byte |= 0x20 if registers[0] == "Y" else 0x00
-            instruction_bundle.post_byte |= 0x02 if registers[1] == "Y" else 0x00
+            code_pkg.post_byte |= 0x20 if registers[0] == "Y" else 0x00
+            code_pkg.post_byte |= 0x02 if registers[1] == "Y" else 0x00
 
-            instruction_bundle.post_byte |= 0x30 if registers[0] == "U" else 0x00
-            instruction_bundle.post_byte |= 0x03 if registers[1] == "U" else 0x00
+            code_pkg.post_byte |= 0x30 if registers[0] == "U" else 0x00
+            code_pkg.post_byte |= 0x03 if registers[1] == "U" else 0x00
 
-            instruction_bundle.post_byte |= 0x40 if registers[0] == "S" else 0x00
-            instruction_bundle.post_byte |= 0x04 if registers[1] == "S" else 0x00
+            code_pkg.post_byte |= 0x40 if registers[0] == "S" else 0x00
+            code_pkg.post_byte |= 0x04 if registers[1] == "S" else 0x00
 
-            instruction_bundle.post_byte |= 0x50 if registers[0] == "PC" else 0x00
-            instruction_bundle.post_byte |= 0x05 if registers[1] == "PC" else 0x00
+            code_pkg.post_byte |= 0x50 if registers[0] == "PC" else 0x00
+            code_pkg.post_byte |= 0x05 if registers[1] == "PC" else 0x00
 
-            instruction_bundle.post_byte |= 0x80 if registers[0] == "A" else 0x00
-            instruction_bundle.post_byte |= 0x08 if registers[1] == "A" else 0x00
+            code_pkg.post_byte |= 0x80 if registers[0] == "A" else 0x00
+            code_pkg.post_byte |= 0x08 if registers[1] == "A" else 0x00
 
-            instruction_bundle.post_byte |= 0x90 if registers[0] == "B" else 0x00
-            instruction_bundle.post_byte |= 0x09 if registers[1] == "B" else 0x00
+            code_pkg.post_byte |= 0x90 if registers[0] == "B" else 0x00
+            code_pkg.post_byte |= 0x09 if registers[1] == "B" else 0x00
 
-            instruction_bundle.post_byte |= 0xA0 if registers[0] == "CC" else 0x00
-            instruction_bundle.post_byte |= 0x0A if registers[1] == "CC" else 0x00
+            code_pkg.post_byte |= 0xA0 if registers[0] == "CC" else 0x00
+            code_pkg.post_byte |= 0x0A if registers[1] == "CC" else 0x00
 
-            instruction_bundle.post_byte |= 0xB0 if registers[0] == "DP" else 0x00
-            instruction_bundle.post_byte |= 0x0B if registers[1] == "DP" else 0x00
+            code_pkg.post_byte |= 0xB0 if registers[0] == "DP" else 0x00
+            code_pkg.post_byte |= 0x0B if registers[1] == "DP" else 0x00
 
-            if instruction_bundle.post_byte not in [
+            if code_pkg.post_byte not in [
                     0x01, 0x10, 0x02, 0x20, 0x03, 0x30, 0x04, 0x40,
                     0x05, 0x50, 0x12, 0x21, 0x13, 0x31, 0x14, 0x41,
                     0x15, 0x51, 0x23, 0x32, 0x24, 0x42, 0x25, 0x52,
@@ -248,8 +232,8 @@ class Instruction(NamedTuple):
                 raise TranslationError("{} of {} to {} not allowed".format(self.mnemonic, registers[0], registers[1]),
                                        statement)
 
-        instruction_bundle.post_byte = NumericValue(instruction_bundle.post_byte)
-        return instruction_bundle
+        code_pkg.post_byte = NumericValue(code_pkg.post_byte)
+        return code_pkg
 
 
 INSTRUCTIONS = [
@@ -286,7 +270,7 @@ INSTRUCTIONS = [
     Instruction(mnemonic="DEC", mode=Mode(dir=0x0A, dir_sz=2, ind=0x6A, ind_sz=2, ext=0x7A, ext_sz=3)),
     Instruction(mnemonic="EORA", mode=Mode(imm=0x88, imm_sz=2, dir=0x98, dir_sz=2, ind=0xA8, ind_sz=2, ext=0xB8, ext_sz=3)),
     Instruction(mnemonic="EORB", mode=Mode(imm=0xC8, imm_sz=2, dir=0xD8, dir_sz=2, ind=0xE8, ind_sz=2, ext=0xF8, ext_sz=3)),
-    Instruction(mnemonic="EXG", mode=Mode(imm=0x1E, imm_sz=2)),
+    Instruction(mnemonic="EXG", mode=Mode(imm=0x1E, imm_sz=2), is_special=True),
     Instruction(mnemonic="INCA", mode=Mode(inh=0x4C, inh_sz=1)),
     Instruction(mnemonic="INCB", mode=Mode(inh=0x5C, inh_sz=1)),
     Instruction(mnemonic="INC", mode=Mode(dir=0x0C, dir_sz=2, ind=0x6C, ind_sz=2, ext=0x7C, ext_sz=3)),
@@ -315,9 +299,9 @@ INSTRUCTIONS = [
     Instruction(mnemonic="ORA", mode=Mode(imm=0x8A, imm_sz=2, dir=0x9A, dir_sz=2, ind=0xAA, ind_sz=2, ext=0xBA, ext_sz=3)),
     Instruction(mnemonic="ORB", mode=Mode(imm=0xCA, imm_sz=2, dir=0xDA, dir_sz=2, ind=0xEA, ind_sz=2, ext=0xFA, ext_sz=3)),
     Instruction(mnemonic="ORCC", mode=Mode(imm=0x1A, imm_sz=2)),
-    Instruction(mnemonic="PSHS", mode=Mode(imm=0x34, imm_sz=2)),
+    Instruction(mnemonic="PSHS", mode=Mode(imm=0x34, imm_sz=2), is_special=True),
     Instruction(mnemonic="PSHU", mode=Mode(imm=0x36, imm_sz=2)),
-    Instruction(mnemonic="PULS", mode=Mode(imm=0x35, imm_sz=2)),
+    Instruction(mnemonic="PULS", mode=Mode(imm=0x35, imm_sz=2), is_special=True),
     Instruction(mnemonic="PULU", mode=Mode(imm=0x37, imm_sz=2)),
     Instruction(mnemonic="ROLA", mode=Mode(inh=0x49, inh_sz=1)),
     Instruction(mnemonic="ROLB", mode=Mode(inh=0x59, inh_sz=1)),
@@ -340,7 +324,7 @@ INSTRUCTIONS = [
     Instruction(mnemonic="SUBD", mode=Mode(imm=0x83, imm_sz=3, dir=0x93, dir_sz=2, ind=0xA3, ind_sz=2, ext=0xB3, ext_sz=3)),
     Instruction(mnemonic="SWI", mode=Mode(inh=0x3F, imm_sz=1)),
     Instruction(mnemonic="SYNC", mode=Mode(inh=0x13, imm_sz=1)),
-    Instruction(mnemonic="TFR", mode=Mode(imm=0x1F, imm_sz=2)),
+    Instruction(mnemonic="TFR", mode=Mode(imm=0x1F, imm_sz=2), is_special=True),
     Instruction(mnemonic="TSTA", mode=Mode(inh=0x4D, inh_sz=1)),
     Instruction(mnemonic="TSTB", mode=Mode(inh=0x5D, inh_sz=1)),
     Instruction(mnemonic="TST", mode=Mode(dir=0x0D, dir_sz=2, ind=0x6D, ind_sz=2, ext=0x7D, ext_sz=3)),
@@ -400,16 +384,16 @@ INSTRUCTIONS = [
     Instruction(mnemonic="LBVS", mode=Mode(rel=0x1029, rel_sz=4), is_long_branch=True),
 
     # Pseudo operations
-    Instruction(mnemonic="END", pseudo=True),
-    Instruction(mnemonic="ORG", pseudo=True),
-    Instruction(mnemonic="EQU", pseudo=True),
-    Instruction(mnemonic="SET", pseudo=True),
-    Instruction(mnemonic="RMB", pseudo=True),
-    Instruction(mnemonic="FCB", pseudo=True),
-    Instruction(mnemonic="FDB", pseudo=True),
-    Instruction(mnemonic="FCC", pseudo=True),
-    Instruction(mnemonic="SETDP", pseudo=True),
-    Instruction(mnemonic="INCLUDE", pseudo=True)
+    Instruction(mnemonic="END", is_pseudo=True),
+    Instruction(mnemonic="ORG", is_pseudo=True),
+    Instruction(mnemonic="EQU", is_pseudo=True, is_pseudo_define=True),
+    Instruction(mnemonic="SET", is_pseudo=True),
+    Instruction(mnemonic="RMB", is_pseudo=True),
+    Instruction(mnemonic="FCB", is_pseudo=True),
+    Instruction(mnemonic="FDB", is_pseudo=True),
+    Instruction(mnemonic="FCC", is_pseudo=True),
+    Instruction(mnemonic="SETDP", is_pseudo=True),
+    Instruction(mnemonic="INCLUDE", is_pseudo=True, is_include=True)
 ]
 
 # E N D   O F   F I L E #######################################################

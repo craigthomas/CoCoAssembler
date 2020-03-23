@@ -101,7 +101,7 @@ class Program(object):
         if label:
             if label in self.symbol_table:
                 raise TranslationError("Label [" + label + "] redefined", statement)
-            if statement.instruction.is_pseudo_define():
+            if statement.instruction.is_pseudo_define:
                 self.symbol_table[label] = statement.operand.value
             else:
                 self.symbol_table[label] = AddressValue(index)

@@ -6,15 +6,14 @@ A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
-import mock
 import unittest
 
-from cocoasm.instruction import InstructionBundle
+from cocoasm.instruction import CodePackage
 
 # C L A S S E S ###############################################################
 
 
-class TestInstructionBundle(unittest.TestCase):
+class TestCodePackage(unittest.TestCase):
     """
     A test class for the InstructionBundle class.
     """
@@ -25,7 +24,7 @@ class TestInstructionBundle(unittest.TestCase):
         pass
 
     def test_str(self):
-        result = InstructionBundle(op_code=1, address=2, post_byte=3, additional=4)
+        result = CodePackage(op_code=1, address=2, post_byte=3, additional=4)
         self.assertEqual("op_code: 1, address: 2, post_byte: 3, additional: 4, size: 0", str(result))
 
 # M A I N #####################################################################

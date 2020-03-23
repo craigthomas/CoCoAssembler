@@ -11,7 +11,7 @@ import re
 from copy import copy
 
 from cocoasm.exceptions import ParseError, TranslationError
-from cocoasm.instruction import INSTRUCTIONS, InstructionBundle
+from cocoasm.instruction import INSTRUCTIONS, CodePackage
 from cocoasm.operands import Operand, OperandType
 from cocoasm.values import ValueType, NumericValue
 
@@ -57,17 +57,17 @@ class Statement(object):
         self.size = 0
         self.mnemonic = ""
         self.state = None
-        self.instruction_bundle = InstructionBundle()
+        self.code_pkg = CodePackage()
         self.parse_line(line)
 
     def __str__(self):
         op_code_string = ""
-        op_code_string += self.instruction_bundle.op_code.hex()
-        op_code_string += self.instruction_bundle.post_byte.hex()
-        op_code_string += self.instruction_bundle.additional.hex()
+        op_code_string += self.code_pkg.op_code.hex()
+        op_code_string += self.code_pkg.post_byte.hex()
+        op_code_string += self.code_pkg.additional.hex()
 
         return "${} {:.10} {} {} {} ; {} {} {}".format(
-            self.instruction_bundle.address.hex(size=4),
+            self.code_pkg.address.hex(size=4),
             op_code_string.ljust(10, ' '),
             self.label.rjust(10, ' '),
             self.mnemonic.rjust(5, ' '),
@@ -94,7 +94,7 @@ class Statement(object):
 
         :return: the name of the file to include
         """
-        return self.operand.get_operand_string() if self.instruction.is_include() else None
+        return self.operand.get_operand_string() if self.instruction.is_include else None
 
     def parse_line(self, line):
         """
@@ -141,16 +141,16 @@ class Statement(object):
             raise TranslationError("Invalid mnemonic [{}]".format(self.mnemonic), self)
 
     def set_address(self, address):
-        if not self.instruction_bundle.address.is_type(ValueType.NONE):
-            return self.instruction_bundle.address.int
-        self.instruction_bundle.address = NumericValue(address)
-        return self.instruction_bundle.address.int
+        if not self.code_pkg.address.is_type(ValueType.NONE):
+            return self.code_pkg.address.int
+        self.code_pkg.address = NumericValue(address)
+        return self.code_pkg.address.int
 
     def translate_pseudo(self):
-        if self.instruction.is_pseudo():
-            self.instruction_bundle = self.instruction.translate_pseudo(self.operand)
-            if self.instruction_bundle:
-                self.size = self.instruction_bundle.get_size()
+        if self.instruction.is_pseudo:
+            self.code_pkg = self.instruction.translate_pseudo(self.operand)
+            if self.code_pkg:
+                self.size = self.code_pkg.get_size()
 
     def translate(self, symbol_table):
         """
@@ -158,93 +158,80 @@ class Statement(object):
 
         :param symbol_table: the dictionary of symbol table elements
         """
-        if self.instruction.is_pseudo():
+        if self.instruction.is_pseudo:
             return
 
-        if self.instruction.is_special():
-            self.instruction_bundle = self.instruction.translate_special(self.operand, self)
-            self.size = self.instruction_bundle.get_size()
+        if self.instruction.is_special:
+            self.code_pkg = self.instruction.translate_special(self.operand, self)
+            self.size = self.code_pkg.get_size()
             return
 
         self.operand.resolve_symbols(symbol_table)
 
         if self.instruction.is_short_branch or self.instruction.is_long_branch:
-            self.instruction_bundle.op_code = NumericValue(self.instruction.mode.rel)
+            self.code_pkg.op_code = NumericValue(self.instruction.mode.rel)
             if self.operand.value.is_type(ValueType.ADDRESS):
-                self.instruction_bundle.additional = self.operand.value
+                self.code_pkg.additional = self.operand.value
             self.size = self.instruction.mode.rel_sz
             return
 
         if self.operand.is_type(OperandType.INHERENT):
             if not self.instruction.mode.supports_inherent():
                 raise TranslationError("Instruction [{}] requires an operand".format(self.mnemonic), self)
-            self.instruction_bundle.op_code = NumericValue(self.instruction.mode.inh)
+            self.code_pkg.op_code = NumericValue(self.instruction.mode.inh)
             self.size = self.instruction.mode.inh_sz
 
         if self.operand.is_type(OperandType.IMMEDIATE):
             if not self.instruction.mode.supports_immediate():
                 raise TranslationError("Instruction [{}] does not support immediate addressing".format(self.mnemonic),
                                        self)
-            self.instruction_bundle.op_code = NumericValue(self.instruction.mode.imm)
-            self.instruction_bundle.additional = self.operand.value
+            self.code_pkg.op_code = NumericValue(self.instruction.mode.imm)
+            self.code_pkg.additional = self.operand.value
             self.size = self.instruction.mode.imm_sz
 
         if self.operand.is_type(OperandType.INDEXED):
             if not self.instruction.mode.supports_indexed():
                 raise TranslationError("Instruction [{}] does not support indexed addressing".format(self.mnemonic),
                                        self)
-            self.instruction_bundle.op_code = NumericValue(self.instruction.mode.ind)
-            self.instruction_bundle.additional = self.operand.value
+            self.code_pkg.op_code = NumericValue(self.instruction.mode.ind)
+            self.code_pkg.additional = self.operand.value
             # TODO: properly translate what the post-byte code should be
-            self.instruction_bundle.post_byte = NumericValue(0x9F)
+            self.code_pkg.post_byte = NumericValue(0x9F)
             self.size = self.instruction.mode.ind_sz
 
         if self.operand.is_type(OperandType.DIRECT):
             if not self.instruction.mode.supports_direct():
                 raise TranslationError("Instruction [{}] does not support direct addressing".format(self.mnemonic),
                                        self)
-            self.instruction_bundle.op_code = NumericValue(self.instruction.mode.dir)
-            self.instruction_bundle.additional = self.operand.value
+            self.code_pkg.op_code = NumericValue(self.instruction.mode.dir)
+            self.code_pkg.additional = self.operand.value
             self.size = self.instruction.mode.dir_sz
 
         if self.operand.is_type(OperandType.EXTENDED):
             if not self.instruction.mode.supports_extended():
                 raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic),
                                        self)
-            self.instruction_bundle.op_code = NumericValue(self.instruction.mode.ext)
-            self.instruction_bundle.additional = self.operand.value
+            self.code_pkg.op_code = NumericValue(self.instruction.mode.ext)
+            self.code_pkg.additional = self.operand.value
             self.size = self.instruction.mode.ext_sz
 
     def fix_addresses(self, statements, this_index):
-        if self.instruction.is_short_branch:
-            branch_index = self.instruction_bundle.additional.int
+        if self.instruction.is_short_branch or self.instruction.is_long_branch:
+            base_value = 0xFF if self.instruction.is_short_branch else 0xFFFF
+            branch_index = self.code_pkg.additional.int
             length = 0
             if branch_index < this_index:
                 length = 1
                 for statement in statements[branch_index:this_index]:
                     length += statement.size
-                self.instruction_bundle.additional = NumericValue(0xFF - length)
+                self.code_pkg.additional = NumericValue(base_value - length)
             else:
                 for statement in statements[this_index+1:branch_index]:
                     length += statement.size
-                self.instruction_bundle.additional = NumericValue(length)
-            return
-
-        if self.instruction.is_long_branch:
-            branch_index = self.instruction_bundle.additional.int
-            length = 0
-            if branch_index < this_index:
-                length = 1
-                for statement in statements[branch_index:this_index]:
-                    length += statement.size
-                self.instruction_bundle.additional = NumericValue(0xFFFF - length)
-            else:
-                for statement in statements[this_index+1:branch_index]:
-                    length += statement.size
-                self.instruction_bundle.additional = NumericValue(length)
+                self.code_pkg.additional = NumericValue(length)
             return
 
         if self.operand.value.is_type(ValueType.ADDRESS):
-            self.instruction_bundle.additional = statements[self.operand.value.int].instruction_bundle.address
+            self.code_pkg.additional = statements[self.operand.value.int].code_pkg.address
 
 # E N D   O F   F I L E #######################################################
