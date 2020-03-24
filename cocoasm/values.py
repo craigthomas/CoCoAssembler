@@ -50,11 +50,12 @@ class Value(ABC):
     one of several types, being Unknown, Numeric, String, Symbol,
     Address, Expression or a special None type.
     """
-    def __init__(self, value):
+    def __init__(self, value, size_hint=0):
         self.original_string = value
         self.type = ValueType.UNKNOWN
         self.resolved = True
         self.int = 0
+        self.size_hint = size_hint
 
     def __str__(self):
         return self.hex()
@@ -171,8 +172,8 @@ class NumericValue(Value):
     Represents a numeric value that can be retrieved as an integer or hex value
     string.
     """
-    def __init__(self, value):
-        super().__init__(value)
+    def __init__(self, value, size_hint=0):
+        super().__init__(value, size_hint)
         self.type = ValueType.NUMERIC
         if type(value) == int:
             self.int = value
@@ -197,6 +198,8 @@ class NumericValue(Value):
         raise ValueError("[{}] is neither integer or hex value".format(value))
 
     def hex(self, size=0):
+        if self.size_hint != 0:
+            size = self.size_hint
         if size == 0:
             size = self.hex_len()
             size += 1 if size % 2 == 1 else 0

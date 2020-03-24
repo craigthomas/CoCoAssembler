@@ -138,7 +138,7 @@ class Instruction(NamedTuple):
             return CodePackage(additional=operand.value, size=1)
 
         if self.mnemonic == "FDB":
-            return CodePackage(additional=operand.value, size=2)
+            return CodePackage(additional=NumericValue(operand.value.int, size_hint=4), size=2)
 
         if self.mnemonic == "EQU":
             return CodePackage()
