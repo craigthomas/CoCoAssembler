@@ -121,6 +121,7 @@ class Instruction(NamedTuple):
     mode: Mode = Mode()
     is_pseudo: bool = False
     is_pseudo_define: bool = False
+    is_string_define: bool = False
     is_special: bool = False
     is_include: bool = False
     is_short_branch: bool = False
@@ -161,6 +162,7 @@ class Instruction(NamedTuple):
         """
         code_pkg = CodePackage()
         code_pkg.op_code = NumericValue(statement.instruction.mode.imm)
+        code_pkg.size = statement.instruction.mode.imm_sz
 
         if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
             registers = operand.operand_string.split(",")
@@ -391,7 +393,7 @@ INSTRUCTIONS = [
     Instruction(mnemonic="RMB", is_pseudo=True),
     Instruction(mnemonic="FCB", is_pseudo=True),
     Instruction(mnemonic="FDB", is_pseudo=True),
-    Instruction(mnemonic="FCC", is_pseudo=True),
+    Instruction(mnemonic="FCC", is_pseudo=True, is_string_define=True),
     Instruction(mnemonic="SETDP", is_pseudo=True),
     Instruction(mnemonic="INCLUDE", is_pseudo=True, is_include=True)
 ]

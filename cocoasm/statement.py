@@ -116,7 +116,10 @@ class Statement(object):
         if data:
             self.label = data.group("label") or ""
             self.mnemonic = data.group("mnemonic").upper() or ""
-            if self.mnemonic == "FCC":
+            self.instruction = copy(self.match_operation())
+            if not self.instruction:
+                raise ParseError("Invalid mnemonic [{}]".format(self.mnemonic), self)
+            if self.instruction.is_string_define:
                 original_operand = data.group("operands")
                 if data.group("comment"):
                     original_operand = "{} {}".format(data.group("operands"), data.group("comment").strip())
@@ -135,10 +138,10 @@ class Statement(object):
 
         raise ParseError("Could not parse line [{}]".format(line), self)
 
-    def match_mnemonic(self):
-        self.instruction = copy(self.match_operation())
-        if not self.instruction:
-            raise TranslationError("Invalid mnemonic [{}]".format(self.mnemonic), self)
+    # def match_mnemonic(self):
+    #     self.instruction = copy(self.match_operation())
+    #     if not self.instruction:
+    #         raise TranslationError("Invalid mnemonic [{}]".format(self.mnemonic), self)
 
     def set_address(self, address):
         if not self.code_pkg.address.is_type(ValueType.NONE):
@@ -166,7 +169,7 @@ class Statement(object):
             self.size = self.code_pkg.get_size()
             return
 
-        self.operand.resolve_symbols(symbol_table)
+        self.operand = self.operand.resolve_symbols(symbol_table)
 
         if self.instruction.is_short_branch or self.instruction.is_long_branch:
             self.code_pkg.op_code = NumericValue(self.instruction.mode.rel)
@@ -175,45 +178,7 @@ class Statement(object):
             self.size = self.instruction.mode.rel_sz
             return
 
-        if self.operand.is_type(OperandType.INHERENT):
-            if not self.instruction.mode.supports_inherent():
-                raise TranslationError("Instruction [{}] requires an operand".format(self.mnemonic), self)
-            self.code_pkg.op_code = NumericValue(self.instruction.mode.inh)
-            self.size = self.instruction.mode.inh_sz
-
-        if self.operand.is_type(OperandType.IMMEDIATE):
-            if not self.instruction.mode.supports_immediate():
-                raise TranslationError("Instruction [{}] does not support immediate addressing".format(self.mnemonic),
-                                       self)
-            self.code_pkg.op_code = NumericValue(self.instruction.mode.imm)
-            self.code_pkg.additional = self.operand.value
-            self.size = self.instruction.mode.imm_sz
-
-        if self.operand.is_type(OperandType.INDEXED):
-            if not self.instruction.mode.supports_indexed():
-                raise TranslationError("Instruction [{}] does not support indexed addressing".format(self.mnemonic),
-                                       self)
-            self.code_pkg.op_code = NumericValue(self.instruction.mode.ind)
-            self.code_pkg.additional = self.operand.value
-            # TODO: properly translate what the post-byte code should be
-            self.code_pkg.post_byte = NumericValue(0x9F)
-            self.size = self.instruction.mode.ind_sz
-
-        if self.operand.is_type(OperandType.DIRECT):
-            if not self.instruction.mode.supports_direct():
-                raise TranslationError("Instruction [{}] does not support direct addressing".format(self.mnemonic),
-                                       self)
-            self.code_pkg.op_code = NumericValue(self.instruction.mode.dir)
-            self.code_pkg.additional = self.operand.value
-            self.size = self.instruction.mode.dir_sz
-
-        if self.operand.is_type(OperandType.EXTENDED):
-            if not self.instruction.mode.supports_extended():
-                raise TranslationError("Instruction [{}] does not support extended addressing".format(self.mnemonic),
-                                       self)
-            self.code_pkg.op_code = NumericValue(self.instruction.mode.ext)
-            self.code_pkg.additional = self.operand.value
-            self.size = self.instruction.mode.ext_sz
+        self.code_pkg = self.operand.translate(self.instruction)
 
     def fix_addresses(self, statements, this_index):
         if self.instruction.is_short_branch or self.instruction.is_long_branch:

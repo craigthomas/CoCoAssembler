@@ -83,7 +83,7 @@ class Program(object):
         """
         processed_statements = []
         for statement in statements:
-            statement.match_mnemonic()
+            # statement.match_mnemonic()
             include = self.process_mnemonics(self.parse_file(statement.get_include_filename()))
             processed_statements.extend(include if include else [statement])
         return processed_statements
@@ -124,7 +124,7 @@ class Program(object):
         address = 0
         for index, statement in enumerate(self.statements):
             address = statement.set_address(address)
-            address += statement.size
+            address += statement.code_pkg.get_size()
 
         for index, statement in enumerate(self.statements):
             statement.fix_addresses(self.statements, index)
