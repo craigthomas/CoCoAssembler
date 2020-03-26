@@ -62,10 +62,10 @@ class OperandType(Enum):
 
 
 class Operand(ABC):
-    def __init__(self, mnemonic, value=None):
+    def __init__(self, instruction, value=None):
         self.type = OperandType.UNKNOWN
         self.operand_string = ""
-        self.mnemonic = mnemonic
+        self.instruction = instruction
         self.requires_resolution = False
         self.value = value if value else NoneValue(None)
         self.left = NoneValue(None)
@@ -73,44 +73,49 @@ class Operand(ABC):
         self.operation = ""
 
     @classmethod
-    def create_from_str(cls, operand_string, mnemonic):
+    def create_from_str(cls, operand_string, instruction):
         try:
-            return InherentOperand(operand_string, mnemonic)
+            return RelativeOperand(operand_string, instruction)
         except ValueError:
             pass
 
         try:
-            return ImmediateOperand(operand_string, mnemonic)
+            return InherentOperand(operand_string, instruction)
         except ValueError:
             pass
 
         try:
-            return DirectOperand(operand_string, mnemonic)
+            return ImmediateOperand(operand_string, instruction)
         except ValueError:
             pass
 
         try:
-            return ExtendedOperand(operand_string, mnemonic)
+            return DirectOperand(operand_string, instruction)
         except ValueError:
             pass
 
         try:
-            return ExtendedIndirectOperand(operand_string, mnemonic)
+            return ExtendedOperand(operand_string, instruction)
         except ValueError:
             pass
 
         try:
-            return IndexedOperand(operand_string, mnemonic)
+            return ExtendedIndirectOperand(operand_string, instruction)
         except ValueError:
             pass
 
         try:
-            return ExpressionOperand(operand_string, mnemonic)
+            return IndexedOperand(operand_string, instruction)
         except ValueError:
             pass
 
         try:
-            return UnknownOperand(operand_string, mnemonic)
+            return ExpressionOperand(operand_string, instruction)
+        except ValueError:
+            pass
+
+        try:
+            return UnknownOperand(operand_string, instruction)
         except ValueError:
             pass
 
@@ -137,14 +142,14 @@ class Operand(ABC):
         if symbol.is_type(ValueType.ADDRESS):
             self.value = AddressValue(symbol.int)
             if self.type == OperandType.UNKNOWN:
-                return ExtendedOperand(self.operand_string, self.mnemonic, value=self.value)
+                return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
             return self
 
         if symbol.is_type(ValueType.NUMERIC):
             self.value = copy(symbol)
             if self.value.hex_len() == 2:
-                return DirectOperand(self.operand_string, self.mnemonic, value=self.value)
-            return ExtendedOperand(self.operand_string, self.mnemonic, value=self.value)
+                return DirectOperand(self.operand_string, self.instruction, value=self.value)
+            return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
 
     def resolve_expression(self, symbol_table):
         if self.left.is_type(ValueType.SYMBOL):
@@ -165,8 +170,8 @@ class Operand(ABC):
             if self.operation == "/":
                 self.value = NumericValue("{}".format(left / right))
             if self.value.hex_len() == 2:
-                return DirectOperand(self.operand_string, self.mnemonic, value=self.value)
-            return ExtendedOperand(self.operand_string, self.mnemonic, value=self.value)
+                return DirectOperand(self.operand_string, self.instruction, value=self.value)
+            return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
 
         raise ValueError("[{}] unresolved expression".format(self.operand_string))
 
@@ -177,50 +182,61 @@ class Operand(ABC):
         return symbol_table[symbol_label]
 
     @abstractmethod
-    def translate(self, instruction):
+    def translate(self):
         """
         Using information contained within the instruction, translate the operand,
         and return a code package containing the equivalent machine code information.
 
-        :param instruction: the instruction associated with the operand
         :return: a CodePackage containing the translated instruction
         """
 
 
 class UnknownOperand(Operand):
-    def __init__(self, operand_string, mnemonic, value=None):
-        super().__init__(mnemonic)
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
         self.operand_string = operand_string
-        self.value = value if value else Value.create_from_str(operand_string, mnemonic)
+        self.value = value if value else Value.create_from_str(operand_string, instruction)
 
-    def translate(self, instruction):
+    def translate(self):
         return CodePackage(additional=self.value)
 
 
 class RelativeOperand(Operand):
-    def __init__(self, operand_string, mnemonic, value=None):
-        super().__init__(mnemonic)
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
+        self.type = OperandType.RELATIVE
+        if not instruction.is_short_branch and not instruction.is_long_branch:
+            raise ValueError("[{}] is not a branch instruction".format(instruction.mnemonic))
         self.operand_string = operand_string
-        self.value = value if value else Value.create_from_str(operand_string, mnemonic)
+        self.value = value if value else Value.create_from_str(operand_string, instruction)
+
+    def translate(self):
+        code_pkg = CodePackage()
+        code_pkg.op_code = NumericValue(self.instruction.mode.rel)
+        if self.value.is_type(ValueType.ADDRESS):
+            code_pkg.additional = self.value
+        code_pkg.size = self.instruction.mode.rel_sz
+        return code_pkg
+
 
 class InherentOperand(Operand):
-    def __init__(self, operand_string, mnemonic, value=None):
-        super().__init__(mnemonic)
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
         self.type = OperandType.INHERENT
         if value:
             raise ValueError("[{}] is not an inherent value".format(value.ascii()))
         if operand_string:
             raise ValueError("[{}] is not an inherent value".format(operand_string))
 
-    def translate(self, instruction):
-        if not instruction.mode.supports_inherent():
-            raise ValueError("Instruction [{}] requires an operand".format(self.mnemonic))
-        return CodePackage(op_code=NumericValue(instruction.mode.inh), size=instruction.mode.inh_sz)
+    def translate(self):
+        if not self.instruction.mode.supports_inherent():
+            raise ValueError("Instruction [{}] requires an operand".format(self.instruction.mnemonic))
+        return CodePackage(op_code=NumericValue(self.instruction.mode.inh), size=self.instruction.mode.inh_sz)
 
 
 class ImmediateOperand(Operand):
-    def __init__(self, operand_string, mnemonic, value=None):
-        super().__init__(mnemonic)
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
         self.type = OperandType.IMMEDIATE
         self.operand_string = operand_string
         if value:
@@ -229,19 +245,19 @@ class ImmediateOperand(Operand):
         match = IMMEDIATE_REGEX.match(operand_string)
         if not match:
             raise ValueError("[{}] is not an immediate value".format(operand_string))
-        self.value = Value.create_from_str(match.group("value"), mnemonic)
+        self.value = Value.create_from_str(match.group("value"), instruction)
 
-    def translate(self, instruction):
-        if not instruction.mode.supports_immediate():
-            raise ValueError("Instruction [{}] does not support immediate addressing".format(self.mnemonic))
-        return CodePackage(op_code=NumericValue(instruction.mode.imm),
+    def translate(self):
+        if not self.instruction.mode.supports_immediate():
+            raise ValueError("Instruction [{}] does not support immediate addressing".format(self.instruction.mnemonic))
+        return CodePackage(op_code=NumericValue(self.instruction.mode.imm),
                            additional=self.value,
-                           size=instruction.mode.imm_sz)
+                           size=self.instruction.mode.imm_sz)
 
 
 class DirectOperand(Operand):
-    def __init__(self, operand_string, mnemonic, value=None):
-        super().__init__(mnemonic)
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
         self.type = OperandType.DIRECT
         self.operand_string = operand_string
         if value:
@@ -249,23 +265,23 @@ class DirectOperand(Operand):
             return
         match = DIRECT_REGEX.match(self.operand_string)
         if match:
-            self.value = Value.create_from_str(match.group("value")[1:], mnemonic)
+            self.value = Value.create_from_str(match.group("value")[1:], instruction)
         else:
-            self.value = Value.create_from_str(operand_string, mnemonic)
+            self.value = Value.create_from_str(operand_string, instruction)
         if self.value is None or self.value.byte_len() != 1:
             raise ValueError("[{}] is not a direct value".format(operand_string))
 
-    def translate(self, instruction):
-        if not instruction.mode.supports_direct():
-            raise ValueError("Instruction [{}] does not support direct addressing".format(self.mnemonic))
-        return CodePackage(op_code=NumericValue(instruction.mode.dir),
+    def translate(self):
+        if not self.instruction.mode.supports_direct():
+            raise ValueError("Instruction [{}] does not support direct addressing".format(self.instruction.mnemonic))
+        return CodePackage(op_code=NumericValue(self.instruction.mode.dir),
                            additional=self.value,
-                           size=instruction.mode.dir_sz)
+                           size=self.instruction.mode.dir_sz)
 
 
 class ExtendedOperand(Operand):
-    def __init__(self, operand_string, mnemonic, value=None):
-        super().__init__(mnemonic)
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
         self.type = OperandType.EXTENDED
         self.operand_string = operand_string
         if value:
@@ -273,23 +289,23 @@ class ExtendedOperand(Operand):
             return
         match = EXTENDED_REGEX.match(self.operand_string)
         if match:
-            self.value = Value.create_from_str(match.group("value")[1:], mnemonic)
+            self.value = Value.create_from_str(match.group("value")[1:], instruction)
         else:
-            self.value = Value.create_from_str(operand_string, mnemonic)
+            self.value = Value.create_from_str(operand_string, instruction)
         if self.value is None or self.value.byte_len() != 2:
             raise ValueError("[{}] is not an extended value".format(operand_string))
 
-    def translate(self, instruction):
-        if not instruction.mode.supports_extended():
-            raise ValueError("Instruction [{}] does not support extended addressing".format(self.mnemonic))
-        return CodePackage(op_code=NumericValue(instruction.mode.ext),
+    def translate(self):
+        if not self.instruction.mode.supports_extended():
+            raise ValueError("Instruction [{}] does not support extended addressing".format(self.instruction.mnemonic))
+        return CodePackage(op_code=NumericValue(self.instruction.mode.ext),
                            additional=self.value,
-                           size=instruction.mode.ext_sz)
+                           size=self.instruction.mode.ext_sz)
 
 
 class ExtendedIndirectOperand(Operand):
-    def __init__(self, operand_string, mnemonic, value=None):
-        super().__init__(mnemonic)
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
         self.type = OperandType.EXTENDED_INDIRECT
         self.operand_string = operand_string
         if value:
@@ -298,48 +314,48 @@ class ExtendedIndirectOperand(Operand):
         match = EXTENDED_INDIRECT_REGEX.match(self.operand_string)
         if not match:
             raise ValueError("[{}] is not an extended indirect value".format(operand_string))
-        self.value = Value.create_from_str(match.group("value"), mnemonic)
+        self.value = Value.create_from_str(match.group("value"), instruction)
 
-    def translate(self, instruction):
+    def translate(self):
         pass
 
 
 class IndexedOperand(Operand):
-    def __init__(self, operand_string, mnemonic, value=None):
-        super().__init__(mnemonic)
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
         self.type = OperandType.INDEXED
         self.operand_string = operand_string
         if value:
             self.value = value
             return
-        if "," not in operand_string or mnemonic == "FCC":
+        if "," not in operand_string or instruction.mnemonic == "FCC":
             raise ValueError("[{}] is not an indexed value".format(operand_string))
         self.value = NoneValue(operand_string)
 
-    def translate(self, instruction):
-        if not instruction.mode.supports_indexed():
-            raise ValueError("Instruction [{}] does not support indexed addressing".format(self.mnemonic))
+    def translate(self):
+        if not self.instruction.mode.supports_indexed():
+            raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
         # TODO: properly translate what the post-byte code should be
-        return CodePackage(op_code=NumericValue(instruction.mode.ind),
+        return CodePackage(op_code=NumericValue(self.instruction.mode.ind),
                            additional=self.value,
                            post_byte=NumericValue(0x9F),
-                           size=instruction.mode.ind_sz)
+                           size=self.instruction.mode.ind_sz)
 
 
 class ExpressionOperand(Operand):
-    def __init__(self, operand_string, mnemonic, value=None):
-        super().__init__(mnemonic)
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
         self.type = OperandType.EXPRESSION
         self.operand_string = operand_string
         match = EXPRESSION_REGEX.match(operand_string)
         if not match:
             raise ValueError("[{}] is not a valid expression".format(operand_string))
-        self.left = Value.create_from_str(match.group("left"), mnemonic)
-        self.right = Value.create_from_str(match.group("right"), mnemonic)
+        self.left = Value.create_from_str(match.group("left"), instruction)
+        self.right = Value.create_from_str(match.group("right"), instruction)
         self.operation = match.group("operation")
         self.value = NoneValue("")
 
-    def translate(self, instruction):
+    def translate(self):
         return CodePackage()
 
 # E N D   O F   F I L E #######################################################

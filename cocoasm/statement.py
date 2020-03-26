@@ -125,23 +125,18 @@ class Statement(object):
                     original_operand = "{} {}".format(data.group("operands"), data.group("comment").strip())
                 starting_symbol = original_operand[0]
                 ending_location = original_operand.find(starting_symbol, 1)
-                self.operand = Operand.create_from_str(original_operand[0:ending_location + 1], self.mnemonic)
+                self.operand = Operand.create_from_str(original_operand[0:ending_location + 1], self.instruction)
                 self.original_operand = copy(self.operand)
                 self.comment = original_operand[ending_location + 2:].strip() or ""
                 self.is_empty = False
             else:
-                self.operand = Operand.create_from_str(data.group("operands"), self.mnemonic)
+                self.operand = Operand.create_from_str(data.group("operands"), self.instruction)
                 self.original_operand = copy(self.operand)
                 self.comment = data.group("comment").strip() or ""
                 self.is_empty = False
             return
 
         raise ParseError("Could not parse line [{}]".format(line), self)
-
-    # def match_mnemonic(self):
-    #     self.instruction = copy(self.match_operation())
-    #     if not self.instruction:
-    #         raise TranslationError("Invalid mnemonic [{}]".format(self.mnemonic), self)
 
     def set_address(self, address):
         if not self.code_pkg.address.is_type(ValueType.NONE):
@@ -178,22 +173,23 @@ class Statement(object):
             self.size = self.instruction.mode.rel_sz
             return
 
-        self.code_pkg = self.operand.translate(self.instruction)
+        self.code_pkg = self.operand.translate()
 
     def fix_addresses(self, statements, this_index):
-        if self.instruction.is_short_branch or self.instruction.is_long_branch:
+        if self.operand.is_type(OperandType.RELATIVE):
             base_value = 0xFF if self.instruction.is_short_branch else 0xFFFF
             branch_index = self.code_pkg.additional.int
+            size_hint = 1 if self.instruction.is_short_branch else 2
             length = 0
             if branch_index < this_index:
                 length = 1
                 for statement in statements[branch_index:this_index]:
-                    length += statement.size
-                self.code_pkg.additional = NumericValue(base_value - length)
+                    length += statement.code_pkg.size
+                self.code_pkg.additional = NumericValue(base_value - length, size_hint=size_hint)
             else:
                 for statement in statements[this_index+1:branch_index]:
-                    length += statement.size
-                self.code_pkg.additional = NumericValue(length)
+                    length += statement.code_pkg.size
+                self.code_pkg.additional = NumericValue(length, size_hint=size_hint)
             return
 
         if self.operand.value.is_type(ValueType.ADDRESS):

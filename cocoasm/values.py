@@ -102,12 +102,12 @@ class Value(ABC):
         """
 
     @classmethod
-    def create_from_str(cls, value, mnemonic):
+    def create_from_str(cls, value, instruction):
         """
         Parses the value by trying to instantiate various Value classes.
 
         :param value: the string value to parse
-        :param mnemonic: the instruction mnemonic
+        :param instruction: the instruction
         :return: the Value class parsed
         """
         try:
@@ -115,7 +115,7 @@ class Value(ABC):
         except ValueError:
             pass
 
-        if mnemonic == "FCC":
+        if instruction.is_string_define:
             try:
                 return StringValue(value)
             except ValueError:
