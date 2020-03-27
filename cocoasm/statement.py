@@ -10,7 +10,7 @@ import re
 
 from copy import copy
 
-from cocoasm.exceptions import ParseError, TranslationError
+from cocoasm.exceptions import ParseError
 from cocoasm.instruction import INSTRUCTIONS, CodePackage
 from cocoasm.operands import Operand, OperandType
 from cocoasm.values import ValueType, NumericValue
@@ -54,7 +54,6 @@ class Statement(object):
         self.operand = None
         self.original_operand = None
         self.comment = None
-        self.size = 0
         self.mnemonic = ""
         self.state = None
         self.code_pkg = CodePackage()
@@ -147,8 +146,6 @@ class Statement(object):
     def translate_pseudo(self):
         if self.instruction.is_pseudo:
             self.code_pkg = self.instruction.translate_pseudo(self.operand)
-            if self.code_pkg:
-                self.size = self.code_pkg.get_size()
 
     def translate(self, symbol_table):
         """
@@ -161,34 +158,25 @@ class Statement(object):
 
         if self.instruction.is_special:
             self.code_pkg = self.instruction.translate_special(self.operand, self)
-            self.size = self.code_pkg.get_size()
             return
 
         self.operand = self.operand.resolve_symbols(symbol_table)
-
-        if self.instruction.is_short_branch or self.instruction.is_long_branch:
-            self.code_pkg.op_code = NumericValue(self.instruction.mode.rel)
-            if self.operand.value.is_type(ValueType.ADDRESS):
-                self.code_pkg.additional = self.operand.value
-            self.size = self.instruction.mode.rel_sz
-            return
-
         self.code_pkg = self.operand.translate()
 
     def fix_addresses(self, statements, this_index):
         if self.operand.is_type(OperandType.RELATIVE):
             base_value = 0xFF if self.instruction.is_short_branch else 0xFFFF
             branch_index = self.code_pkg.additional.int
-            size_hint = 1 if self.instruction.is_short_branch else 2
+            size_hint = 2 if self.instruction.is_short_branch else 4
             length = 0
             if branch_index < this_index:
                 length = 1
                 for statement in statements[branch_index:this_index]:
-                    length += statement.code_pkg.size
+                    length += statement.code_pkg.get_size()
                 self.code_pkg.additional = NumericValue(base_value - length, size_hint=size_hint)
             else:
                 for statement in statements[this_index+1:branch_index]:
-                    length += statement.code_pkg.size
+                    length += statement.code_pkg.get_size()
                 self.code_pkg.additional = NumericValue(length, size_hint=size_hint)
             return
 

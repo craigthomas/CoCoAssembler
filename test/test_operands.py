@@ -10,6 +10,7 @@ import unittest
 
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
     OperandType
+from cocoasm.instruction import Instruction, Mode
 
 # C L A S S E S ###############################################################
 
@@ -22,18 +23,19 @@ class TestUnknownOperand(unittest.TestCase):
         """
         Common setup routines needed for all unit tests.
         """
-        pass
+        self.instruction = Instruction(mnemonic="ABX", mode=Mode(inh=0x3A, inh_sz=1))
+        self.fcc_instruction = Instruction(mnemonic="FCC", is_pseudo=True, is_string_define=True)
 
     def test_unknown_type_correct(self):
-        result = UnknownOperand("blah", "")
+        result = UnknownOperand("blah", self.instruction)
         self.assertTrue(result.is_type(OperandType.UNKNOWN))
 
     def test_unknown_string_correct(self):
-        result = UnknownOperand("blah", "")
+        result = UnknownOperand("blah", self.fcc_instruction)
         self.assertEqual("blah", result.operand_string)
 
     def test_unknown_value_correct(self):
-        result = UnknownOperand("$FF", "")
+        result = UnknownOperand("$FF", self.instruction)
         self.assertEqual("FF", result.value.hex())
 
 
@@ -69,23 +71,23 @@ class TestImmediateOperand(unittest.TestCase):
         """
         Common setup routines needed for all unit tests.
         """
-        pass
+        self.instruction = Instruction(mnemonic="ABX", mode=Mode(inh=0x3A, inh_sz=1))
 
     def test_immediate_type_correct(self):
-        result = ImmediateOperand("#blah", None)
+        result = ImmediateOperand("#blah", self.instruction)
         self.assertTrue(result.is_type(OperandType.IMMEDIATE))
 
     def test_immediate_string_correct(self):
-        result = ImmediateOperand("#blah", None)
+        result = ImmediateOperand("#blah", self.instruction)
         self.assertEqual("#blah", result.operand_string)
 
     def test_immediate_raises_with_bad_value(self):
         with self.assertRaises(ValueError) as context:
-            ImmediateOperand("blah", None)
+            ImmediateOperand("blah", self.instruction)
         self.assertEqual("[blah] is not an immediate value", str(context.exception))
 
     def test_immediate_value_correct(self):
-        result = ImmediateOperand("#$FF", None)
+        result = ImmediateOperand("#$FF", self.instruction)
         self.assertEqual("FF", result.value.hex())
 
 # M A I N #####################################################################

@@ -10,7 +10,7 @@ import unittest
 
 from cocoasm.values import NumericValue, StringValue, NoneValue, SymbolValue, \
     AddressValue, ValueType, Value
-
+from cocoasm.instruction import Instruction, Mode
 
 # C L A S S E S ###############################################################
 
@@ -23,30 +23,31 @@ class TestValue(unittest.TestCase):
         """
         Common setup routines needed for all unit tests.
         """
-        pass
+        self.instruction = Instruction(mnemonic="ABX", mode=Mode(inh=0x3A, inh_sz=1))
+        self.fcc_instruction = Instruction(mnemonic="FCC", is_pseudo=True, is_string_define=True)
 
     def test_value_create_from_str_numeric_correct(self):
-        result = Value.create_from_str("$DEAD", "")
+        result = Value.create_from_str("$DEAD", self.instruction)
         self.assertTrue(result.is_type(ValueType.NUMERIC))
         self.assertEqual("DEAD", result.hex())
 
     def test_value_create_from_str_string_correct(self):
-        result = Value.create_from_str("'$DEAD'", "FCC")
+        result = Value.create_from_str("'$DEAD'", self.fcc_instruction)
         self.assertTrue(result.is_type(ValueType.STRING))
         self.assertEqual("$DEAD", result.ascii())
 
     def test_value_create_from_str_symbol_correct(self):
-        result = Value.create_from_str("symbol", "")
+        result = Value.create_from_str("symbol", self.instruction)
         self.assertTrue(result.is_type(ValueType.SYMBOL))
 
     def test_value_create_from_str_raises_on_bad_string_value(self):
         with self.assertRaises(ValueError) as context:
-            Value.create_from_str("'bad string", "FCC")
+            Value.create_from_str("'bad string", self.fcc_instruction)
         self.assertEqual("['bad string] is an invalid value", str(context.exception))
 
     def test_value_create_from_str_raises_on_bad_value(self):
         with self.assertRaises(ValueError) as context:
-            Value.create_from_str("invalid!", "")
+            Value.create_from_str("invalid!", self.instruction)
         self.assertEqual("[invalid!] is an invalid value", str(context.exception))
 
 

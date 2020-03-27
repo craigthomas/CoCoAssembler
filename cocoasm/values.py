@@ -207,7 +207,7 @@ class NumericValue(Value):
         return format_specifier.format(self.int)
 
     def hex_len(self):
-        return len(hex(self.int)[2:])
+        return self.size_hint if self.size_hint else len(hex(self.int)[2:])
 
 
 class SymbolValue(Value):
