@@ -65,8 +65,12 @@ class TestNumericValue(unittest.TestCase):
         result = NumericValue("$DEAD")
         self.assertEqual("DEAD", result.hex())
 
-    def test_numeric_recognizes_valid_integer(self):
+    def test_numeric_recognizes_valid_integer_string(self):
         result = NumericValue("1234")
+        self.assertEqual(1234, result.int)
+
+    def test_numeric_recognizes_valid_integer(self):
+        result = NumericValue(1234)
         self.assertEqual(1234, result.int)
 
     def test_numeric_raises_exception_on_long_strings(self):
@@ -74,9 +78,14 @@ class TestNumericValue(unittest.TestCase):
             NumericValue("$DEADBEEF")
         self.assertEqual("hex value length cannot exceed 4 characters", str(context.exception))
 
-    def test_numeric_raises_exception_on_large_integer(self):
+    def test_numeric_raises_exception_on_large_integer_string(self):
         with self.assertRaises(ValueError) as context:
             NumericValue("65536")
+        self.assertEqual("integer value cannot exceed 65535", str(context.exception))
+
+    def test_numeric_raises_exception_on_large_integer(self):
+        with self.assertRaises(ValueError) as context:
+            NumericValue(65536)
         self.assertEqual("integer value cannot exceed 65535", str(context.exception))
 
     def test_numeric_raises_exception_on_invalid_strings(self):
@@ -99,6 +108,10 @@ class TestNumericValue(unittest.TestCase):
     def test_numeric_hex_correctly_calculated(self):
         result = NumericValue("57005")
         self.assertEqual("DEAD", result.hex())
+
+    def test_numeric_hex_correctly_handles_size_hint_on_constructor(self):
+        result = NumericValue("$DEAD", size_hint=6)
+        self.assertEqual("00DEAD", result.hex())
 
     def test_numeric_str_correct(self):
         result = NumericValue("57005")
