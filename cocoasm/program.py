@@ -10,7 +10,6 @@ import sys
 
 from cocoasm.exceptions import TranslationError, ParseError
 from cocoasm.statement import Statement
-from cocoasm.assembler_state import AssemblerState
 from cocoasm.values import AddressValue
 
 # C L A S S E S ###############################################################
@@ -26,7 +25,6 @@ class Program(object):
         self.symbol_table = dict()
         self.statements = []
         self.address = 0x0
-        self.state = AssemblerState()
         self.process(filename)
 
     def process(self, filename):
