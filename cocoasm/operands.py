@@ -100,7 +100,7 @@ class Operand(ABC):
             pass
 
         try:
-            return ExtendedIndirectOperand(operand_string, instruction)
+            return ExtendedIndexedOperand(operand_string, instruction)
         except ValueError:
             pass
 
@@ -303,7 +303,7 @@ class ExtendedOperand(Operand):
                            size=self.instruction.mode.ext_sz)
 
 
-class ExtendedIndirectOperand(Operand):
+class ExtendedIndexedOperand(Operand):
     def __init__(self, operand_string, instruction, value=None):
         super().__init__(instruction)
         self.type = OperandType.EXTENDED_INDIRECT
@@ -313,7 +313,7 @@ class ExtendedIndirectOperand(Operand):
             return
         match = EXTENDED_INDIRECT_REGEX.match(self.operand_string)
         if not match:
-            raise ValueError("[{}] is not an extended indirect value".format(operand_string))
+            raise ValueError("[{}] is not an extended indexed value".format(operand_string))
         self.value = Value.create_from_str(match.group("value"), instruction)
 
     def translate(self):
@@ -325,20 +325,60 @@ class IndexedOperand(Operand):
         super().__init__(instruction)
         self.type = OperandType.INDEXED
         self.operand_string = operand_string
-        if value:
-            self.value = value
-            return
-        if "," not in operand_string or instruction.mnemonic == "FCC":
+        self.right = ""
+        self.left = ""
+        if "," not in operand_string or instruction.is_string_define:
             raise ValueError("[{}] is not an indexed value".format(operand_string))
-        self.value = NoneValue(operand_string)
+        if len(operand_string.split(",")) != 2:
+            raise ValueError("[{}] incorrect number of commas in indexed value".format(operand_string))
+        self.left, self.right = operand_string.split(",")
+
+    def resolve_symbols(self, symbol_table):
+        return self
 
     def translate(self):
         if not self.instruction.mode.supports_indexed():
             raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
-        # TODO: properly translate what the post-byte code should be
+        raw_post_byte = 0x00
+
+        # Determine register (if any)
+        if "X" in self.right:
+            raw_post_byte |= 0x00
+        if "Y" in self.right:
+            raw_post_byte |= 0x20
+        if "U" in self.right:
+            raw_post_byte |= 0x40
+        if "S" in self.right:
+            raw_post_byte |= 0x60
+
+        if self.left == "":
+            raw_post_byte |= 0x80
+            if "-" in self.right or "+" in self.right:
+                if "+" in self.right:
+                    raw_post_byte |= 0x00
+                if "++" in self.right:
+                    raw_post_byte |= 0x01
+                if "-" in self.right:
+                    raw_post_byte |= 0x02
+                if "--" in self.right:
+                    raw_post_byte |= 0x03
+            else:
+                raw_post_byte |= 0x04
+
+        elif self.left == "A" or self.left == "B" or self.left == "D":
+            raw_post_byte |= 0x80
+            if self.left == "A":
+                raw_post_byte |= 0x06
+            if self.left == "B":
+                raw_post_byte |= 0x05
+            if self.left == "D":
+                raw_post_byte |= 0x0B
+
+        else:
+            pass
+
         return CodePackage(op_code=NumericValue(self.instruction.mode.ind),
-                           additional=self.value,
-                           post_byte=NumericValue(0x9F),
+                           post_byte=NumericValue(raw_post_byte),
                            size=self.instruction.mode.ind_sz)
 
 

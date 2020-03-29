@@ -161,6 +161,7 @@ class Statement(object):
             return
 
         self.operand = self.operand.resolve_symbols(symbol_table)
+        print(self)
         self.code_pkg = self.operand.translate()
 
     def fix_addresses(self, statements, this_index):
