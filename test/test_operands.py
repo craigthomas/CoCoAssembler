@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
-    OperandType
+    OperandType, IndexedOperand
 from cocoasm.instruction import Instruction, Mode
 
 # C L A S S E S ###############################################################
@@ -65,7 +65,7 @@ class TestInherentOperand(unittest.TestCase):
 
 class TestImmediateOperand(unittest.TestCase):
     """
-    A test class for the InherentOperand class.
+    A test class for the ImmediateOperand class.
     """
     def setUp(self):
         """
@@ -89,6 +89,115 @@ class TestImmediateOperand(unittest.TestCase):
     def test_immediate_value_correct(self):
         result = ImmediateOperand("#$FF", self.instruction)
         self.assertEqual("FF", result.value.hex())
+
+
+class TestIndexedOperand(unittest.TestCase):
+    """
+    A test class for the IndexedOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="STX", mode=Mode(ind=0xAF, ind_sz=2))
+
+    def test_indexed_type_correct(self):
+        result = IndexedOperand(",X", self.instruction)
+        self.assertTrue(result.is_type(OperandType.INDEXED))
+
+    def test_indexed_string_correct(self):
+        result = IndexedOperand(",X", self.instruction)
+        self.assertEqual(",X", result.operand_string)
+
+    def test_indexed_raises_with_bad_value(self):
+        with self.assertRaises(ValueError) as context:
+            IndexedOperand(",blah,", self.instruction)
+        self.assertEqual("[,blah,] incorrect number of commas in indexed value", str(context.exception))
+
+    def test_indexed_no_offset_correct_values(self):
+        operand = IndexedOperand(",X", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("84", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand(",Y", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("A4", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand(",U", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("C4", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand(",S", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("E4", code_pkg.post_byte.hex())
+
+    def test_indexed_A_offset_correct_values(self):
+        operand = IndexedOperand("A,X", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("86", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("A,Y", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("A6", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("A,U", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("C6", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("A,S", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("E6", code_pkg.post_byte.hex())
+
+    def test_indexed_B_offset_correct_values(self):
+        operand = IndexedOperand("B,X", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("85", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("B,Y", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("A5", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("B,U", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("C5", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("B,S", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("E5", code_pkg.post_byte.hex())
+
+    def test_indexed_D_offset_correct_values(self):
+        operand = IndexedOperand("D,X", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("8B", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("D,Y", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("AB", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("D,U", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("CB", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("D,S", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("EB", code_pkg.post_byte.hex())
+
+    def test_indexed_auto_increments_correct_values(self):
+        operand = IndexedOperand(",X+", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("80", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand(",X++", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("81", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand(",-X", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("82", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand(",--X", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("83", code_pkg.post_byte.hex())
 
 # M A I N #####################################################################
 
