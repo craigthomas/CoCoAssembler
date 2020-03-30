@@ -199,6 +199,45 @@ class TestIndexedOperand(unittest.TestCase):
         code_pkg = operand.translate()
         self.assertEqual("83", code_pkg.post_byte.hex())
 
+    def test_indexed_offset_from_register_with_auto_increment_raises(self):
+        with self.assertRaises(ValueError) as context:
+            operand = IndexedOperand("$1F,X+", self.instruction)
+            operand.translate()
+        self.assertEqual("[$1F,X+] invalid indexed expression", str(context.exception))
+
+    def test_indexed_5_bit_value_correct(self):
+        operand = IndexedOperand("$1F,X", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("1F", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("$1F,Y", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("3F", code_pkg.post_byte.hex())
+
+    def test_indexed_8_bit_value_correct(self):
+        operand = IndexedOperand("$20,X", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("88", code_pkg.post_byte.hex())
+        self.assertEqual("20", code_pkg.additional.hex())
+
+    def test_indexed_16_bit_value_correct(self):
+        operand = IndexedOperand("$2000,X", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("89", code_pkg.post_byte.hex())
+        self.assertEqual("2000", code_pkg.additional.hex())
+
+    def test_indexed_8_bit_value_from_pc_correct(self):
+        operand = IndexedOperand("$20,PC", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("8C", code_pkg.post_byte.hex())
+        self.assertEqual("20", code_pkg.additional.hex())
+
+    def test_indexed_16_bit_value_from_pc_correct(self):
+        operand = IndexedOperand("$2000,PC", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("8D", code_pkg.post_byte.hex())
+        self.assertEqual("2000", code_pkg.additional.hex())
+
 # M A I N #####################################################################
 
 

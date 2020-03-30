@@ -340,6 +340,7 @@ class IndexedOperand(Operand):
         if not self.instruction.mode.supports_indexed():
             raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
         raw_post_byte = 0x00
+        additional = NoneValue()
 
         # Determine register (if any)
         if "X" in self.right:
@@ -375,10 +376,30 @@ class IndexedOperand(Operand):
                 raw_post_byte |= 0x0B
 
         else:
-            pass
+            if "+" in self.right or "-" in self.right:
+                raise ValueError("[{}] invalid indexed expression".format(self.operand_string))
+            numeric = NumericValue(self.left)
+            if numeric.byte_len() == 2:
+                if "PC" in self.right:
+                    raw_post_byte |= 0x8D
+                    additional = numeric
+                else:
+                    raw_post_byte |= 0x89
+                    additional = numeric
+            elif numeric.byte_len() == 1:
+                if "PC" in self.right:
+                    raw_post_byte |= 0x8C
+                    additional = numeric
+                else:
+                    if numeric.int <= 0x1F:
+                        raw_post_byte |= numeric.int
+                    else:
+                        raw_post_byte |= 0x88
+                        additional = numeric
 
         return CodePackage(op_code=NumericValue(self.instruction.mode.ind),
                            post_byte=NumericValue(raw_post_byte),
+                           additional=additional,
                            size=self.instruction.mode.ind_sz)
 
 
