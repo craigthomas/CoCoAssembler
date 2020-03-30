@@ -9,8 +9,9 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
-    OperandType, IndexedOperand
+    OperandType, IndexedOperand, RelativeOperand
 from cocoasm.instruction import Instruction, Mode
+from cocoasm.values import NumericValue
 
 # C L A S S E S ###############################################################
 
@@ -39,6 +40,27 @@ class TestUnknownOperand(unittest.TestCase):
         self.assertEqual("FF", result.value.hex())
 
 
+class TestRelativeOperand(unittest.TestCase):
+    """
+    A test class for the RelativeOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1), is_short_branch=True)
+
+    def test_relative_type_correct(self):
+        result = RelativeOperand("$FF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.RELATIVE))
+
+    def test_relative_raises_if_instruction_not_branch(self):
+        instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1))
+        with self.assertRaises(ValueError) as context:
+            RelativeOperand("$FF", instruction)
+        self.assertEqual("[BEQ] is not a branch instruction", str(context.exception))
+
+
 class TestInherentOperand(unittest.TestCase):
     """
     A test class for the InherentOperand class.
@@ -61,6 +83,19 @@ class TestInherentOperand(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             InherentOperand("$FF", None)
         self.assertEqual("[$FF] is not an inherent value", str(context.exception))
+
+    def test_inherent_raises_with_value_passthrough(self):
+        value = NumericValue("$FF")
+        with self.assertRaises(ValueError) as context:
+            InherentOperand(None, None, value=value)
+        self.assertEqual("[$FF] is not an inherent value", str(context.exception))
+
+    def test_inherent_raises_with_bad_instruction_on_translate(self):
+        instruction = Instruction(mnemonic="STX", mode=Mode(imm=0xAF, imm_sz=1))
+        with self.assertRaises(ValueError) as context:
+            result = InherentOperand(None, instruction)
+            result.translate()
+        self.assertEqual("Instruction [STX] requires an operand", str(context.exception))
 
 
 class TestImmediateOperand(unittest.TestCase):
@@ -90,6 +125,17 @@ class TestImmediateOperand(unittest.TestCase):
         result = ImmediateOperand("#$FF", self.instruction)
         self.assertEqual("FF", result.value.hex())
 
+    def test_immediate_value_passthrough_correct(self):
+        result = ImmediateOperand("#$FF", self.instruction, value="test")
+        self.assertEqual("test", result.value)
+
+    def test_immediate_raises_with_bad_instruction_on_translate(self):
+        instruction = Instruction(mnemonic="STX", mode=Mode(inh=0xAF, inh_sz=1))
+        with self.assertRaises(ValueError) as context:
+            result = ImmediateOperand("#$FF", instruction)
+            result.translate()
+        self.assertEqual("Instruction [STX] does not support immediate addressing", str(context.exception))
+
 
 class TestIndexedOperand(unittest.TestCase):
     """
@@ -113,6 +159,18 @@ class TestIndexedOperand(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             IndexedOperand(",blah,", self.instruction)
         self.assertEqual("[,blah,] incorrect number of commas in indexed value", str(context.exception))
+
+    def test_indexed_raises_with_no_commas(self):
+        with self.assertRaises(ValueError) as context:
+            IndexedOperand("blah", self.instruction)
+        self.assertEqual("[blah] is not an indexed value", str(context.exception))
+
+    def test_indexed_raises_with_instruction_that_does_not_support_indexed(self):
+        instruction = Instruction(mnemonic="STX", mode=Mode(inh=0x1F, inh_sz=1))
+        with self.assertRaises(ValueError) as context:
+            operand = IndexedOperand(",X", instruction)
+            operand.translate()
+        self.assertEqual("Instruction [STX] does not support indexed addressing", str(context.exception))
 
     def test_indexed_no_offset_correct_values(self):
         operand = IndexedOperand(",X", self.instruction)
