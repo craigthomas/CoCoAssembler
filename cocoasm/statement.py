@@ -161,18 +161,17 @@ class Statement(object):
             return
 
         self.operand = self.operand.resolve_symbols(symbol_table)
-        print(self)
         self.code_pkg = self.operand.translate()
 
     def fix_addresses(self, statements, this_index):
         if self.operand.is_type(OperandType.RELATIVE):
-            base_value = 0xFF if self.instruction.is_short_branch else 0xFFFF
+            base_value = 0x101 if self.instruction.is_short_branch else 0x10001
             branch_index = self.code_pkg.additional.int
             size_hint = 2 if self.instruction.is_short_branch else 4
             length = 0
             if branch_index < this_index:
                 length = 1
-                for statement in statements[branch_index:this_index]:
+                for statement in statements[branch_index:this_index+1]:
                     length += statement.code_pkg.get_size()
                 self.code_pkg.additional = NumericValue(base_value - length, size_hint=size_hint)
             else:
