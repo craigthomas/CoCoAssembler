@@ -334,6 +334,11 @@ class IndexedOperand(Operand):
         self.left, self.right = operand_string.split(",")
 
     def resolve_symbols(self, symbol_table):
+        if self.left != "":
+            if self.left != "A" and self.left != "B" and self.left != "D":
+                self.left = Value.create_from_str(self.left, self.instruction)
+                if self.left.is_type(ValueType.SYMBOL):
+                    self.left = self.get_symbol(self.left.ascii(), symbol_table)
         return self
 
     def translate(self):
@@ -378,7 +383,9 @@ class IndexedOperand(Operand):
         else:
             if "+" in self.right or "-" in self.right:
                 raise ValueError("[{}] invalid indexed expression".format(self.operand_string))
-            numeric = NumericValue(self.left)
+            if self.left.is_type(ValueType.ADDRESS):
+                raise ValueError("[{}] cannot translate address in left hand side".format(self.operand_string))
+            numeric = self.left
             if numeric.byte_len() == 2:
                 if "PC" in self.right:
                     raw_post_byte |= 0x8D
