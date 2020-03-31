@@ -383,6 +383,8 @@ class IndexedOperand(Operand):
         else:
             if "+" in self.right or "-" in self.right:
                 raise ValueError("[{}] invalid indexed expression".format(self.operand_string))
+            if type(self.left) == str:
+                self.left = NumericValue(self.left)
             if self.left.is_type(ValueType.ADDRESS):
                 raise ValueError("[{}] cannot translate address in left hand side".format(self.operand_string))
             numeric = self.left
