@@ -39,6 +39,14 @@ class TestUnknownOperand(unittest.TestCase):
         result = UnknownOperand("$FF", self.instruction)
         self.assertEqual("FF", result.value.hex())
 
+    def test_unknown_translate_result_correct(self):
+        operand = UnknownOperand(None, self.instruction, value="FF")
+        result = operand.translate()
+        self.assertEqual(0, result.op_code.int)
+        self.assertEqual("FF", result.additional)
+        self.assertEqual(0, result.post_byte.int)
+        self.assertEqual(0, result.size)
+
 
 class TestRelativeOperand(unittest.TestCase):
     """
@@ -69,25 +77,25 @@ class TestInherentOperand(unittest.TestCase):
         """
         Common setup routines needed for all unit tests.
         """
-        pass
+        self.instruction = Instruction(mnemonic="STX", mode=Mode(inh=0xAF, inh_sz=1))
 
     def test_inherent_type_correct(self):
-        result = InherentOperand(None, None)
+        result = InherentOperand(None, self.instruction)
         self.assertTrue(result.is_type(OperandType.INHERENT))
 
     def test_inherent_string_correct(self):
-        result = InherentOperand(None, None)
+        result = InherentOperand(None, self.instruction)
         self.assertEqual("", result.operand_string)
 
     def test_inherent_raises_with_value(self):
         with self.assertRaises(ValueError) as context:
-            InherentOperand("$FF", None)
+            InherentOperand("$FF", self.instruction)
         self.assertEqual("[$FF] is not an inherent value", str(context.exception))
 
     def test_inherent_raises_with_value_passthrough(self):
         value = NumericValue("$FF")
         with self.assertRaises(ValueError) as context:
-            InherentOperand(None, None, value=value)
+            InherentOperand(None, self.instruction, value=value)
         self.assertEqual("[$FF] is not an inherent value", str(context.exception))
 
     def test_inherent_raises_with_bad_instruction_on_translate(self):
@@ -96,6 +104,14 @@ class TestInherentOperand(unittest.TestCase):
             result = InherentOperand(None, instruction)
             result.translate()
         self.assertEqual("Instruction [STX] requires an operand", str(context.exception))
+
+    def test_inherent_translate_result_correct(self):
+        operand = InherentOperand(None, self.instruction)
+        result = operand.translate()
+        self.assertEqual(0xAF, result.op_code.int)
+        self.assertEqual(0, result.additional.int)
+        self.assertEqual(0, result.post_byte.int)
+        self.assertEqual(1, result.size)
 
 
 class TestImmediateOperand(unittest.TestCase):
@@ -106,7 +122,7 @@ class TestImmediateOperand(unittest.TestCase):
         """
         Common setup routines needed for all unit tests.
         """
-        self.instruction = Instruction(mnemonic="ABX", mode=Mode(inh=0x3A, inh_sz=1))
+        self.instruction = Instruction(mnemonic="ABX", mode=Mode(imm=0x3A, imm_sz=1))
 
     def test_immediate_type_correct(self):
         result = ImmediateOperand("#blah", self.instruction)
@@ -135,6 +151,14 @@ class TestImmediateOperand(unittest.TestCase):
             result = ImmediateOperand("#$FF", instruction)
             result.translate()
         self.assertEqual("Instruction [STX] does not support immediate addressing", str(context.exception))
+
+    def test_immediate_translate_result_correct(self):
+        operand = ImmediateOperand("#$FF", self.instruction)
+        result = operand.translate()
+        self.assertEqual(0x3A, result.op_code.int)
+        self.assertEqual(0xFF, result.additional.int)
+        self.assertEqual(0, result.post_byte.int)
+        self.assertEqual(1, result.size)
 
 
 class TestIndexedOperand(unittest.TestCase):
