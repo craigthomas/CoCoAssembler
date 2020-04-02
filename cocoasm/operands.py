@@ -317,8 +317,10 @@ class ExtendedIndexedOperand(Operand):
         self.value = match.group("value")
         if len(self.value.split(",")) == 1:
             self.value = Value.create_from_str(self.value, self.instruction)
-        else:
+        elif len(self.value.split(",")) == 2:
             self.left, self.right = match.group("value").split(",")
+        else:
+            raise ValueError("[{}] incorrect number of commas in extended indexed value".format(operand_string))
 
     def resolve_symbols(self, symbol_table):
         if self.value:
@@ -337,7 +339,14 @@ class ExtendedIndexedOperand(Operand):
         if not self.instruction.mode.supports_indexed():
             raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
 
-        if self.value.is_type(ValueType.ADDRESS):
+        if not type(self.value) == str and self.value.is_type(ValueType.ADDRESS):
+            return CodePackage(
+                op_code=NumericValue(self.instruction.mode.ind),
+                post_byte=NumericValue(0x9F),
+                additional=self.value,
+                size=self.instruction.mode.ind_sz)
+
+        if not type(self.value) == str and self.value.is_type(ValueType.NUMERIC):
             return CodePackage(
                 op_code=NumericValue(self.instruction.mode.ind),
                 post_byte=NumericValue(0x9F),

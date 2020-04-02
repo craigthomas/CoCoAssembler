@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
-    OperandType, IndexedOperand, RelativeOperand
+    OperandType, IndexedOperand, RelativeOperand, ExtendedIndexedOperand
 from cocoasm.instruction import Instruction, Mode
 from cocoasm.values import NumericValue
 
@@ -318,6 +318,177 @@ class TestIndexedOperand(unittest.TestCase):
         operand = IndexedOperand("$2000,PC", self.instruction)
         code_pkg = operand.translate()
         self.assertEqual("8D", code_pkg.post_byte.hex())
+        self.assertEqual("2000", code_pkg.additional.hex())
+
+
+class TestExtendedIndexedOperand(unittest.TestCase):
+    """
+    A test class for the ExtendedIndexedOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="STX", mode=Mode(ind=0xAF, ind_sz=2))
+
+    def test_extended_indexed_type_correct(self):
+        result = ExtendedIndexedOperand("[,X]", self.instruction)
+        self.assertTrue(result.is_type(OperandType.EXTENDED_INDIRECT))
+
+    def test_extended_indexed_string_correct(self):
+        result = ExtendedIndexedOperand("[,X]", self.instruction)
+        self.assertEqual("[,X]", result.operand_string)
+
+    def test_extended_indexed_raises_with_bad_value(self):
+        with self.assertRaises(ValueError) as context:
+            ExtendedIndexedOperand("[,blah,]", self.instruction)
+        self.assertEqual("[[,blah,]] incorrect number of commas in extended indexed value", str(context.exception))
+
+    def test_extended_indexed_raises_with_no_surrounding_braces(self):
+        with self.assertRaises(ValueError) as context:
+            ExtendedIndexedOperand("blah", self.instruction)
+        self.assertEqual("[blah] is not an extended indexed value", str(context.exception))
+
+    def test_extended_indexed_raises_with_instruction_that_does_not_support_indexed(self):
+        instruction = Instruction(mnemonic="STX", mode=Mode(inh=0x1F, inh_sz=1))
+        with self.assertRaises(ValueError) as context:
+            operand = ExtendedIndexedOperand("[,X]", instruction)
+            operand.translate()
+        self.assertEqual("Instruction [STX] does not support indexed addressing", str(context.exception))
+
+    def test_extended_indexed_no_offset_correct_values(self):
+        operand = ExtendedIndexedOperand("[,X]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("94", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[,Y]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("B4", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[,U]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("D4", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[,S]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("F4", code_pkg.post_byte.hex())
+
+    def test_extended_indexed_A_offset_correct_values(self):
+        operand = ExtendedIndexedOperand("[A,X]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("96", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[A,Y]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("B6", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[A,U]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("D6", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[A,S]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("F6", code_pkg.post_byte.hex())
+
+    def test_extended_indexed_B_offset_correct_values(self):
+        operand = ExtendedIndexedOperand("[B,X]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("95", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[B,Y]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("B5", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[B,U]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("D5", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[B,S]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("F5", code_pkg.post_byte.hex())
+
+    def test_extended_indexed_D_offset_correct_values(self):
+        operand = ExtendedIndexedOperand("[D,X]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("9B", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[D,Y]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("BB", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[D,U]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("DB", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[D,S]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("FB", code_pkg.post_byte.hex())
+
+    def test_extended_indexed_auto_single_increments_not_allowed(self):
+        with self.assertRaises(ValueError) as context:
+            operand = ExtendedIndexedOperand("[,X+]", self.instruction)
+            operand.translate()
+        self.assertEqual("[X+] not allowed as an extended indirect value", str(context.exception))
+
+        with self.assertRaises(ValueError) as context:
+            operand = ExtendedIndexedOperand("[,-X]", self.instruction)
+            operand.translate()
+        self.assertEqual("[-X] not allowed as an extended indirect value", str(context.exception))
+
+    def test_extended_indexed_auto_increments_correct_values(self):
+        operand = ExtendedIndexedOperand("[,X++]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("91", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[,--X]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("93", code_pkg.post_byte.hex())
+
+    def test_extended_indexed_offset_from_register_with_auto_increment_raises(self):
+        with self.assertRaises(ValueError) as context:
+            operand = ExtendedIndexedOperand("[$1F,X++]", self.instruction)
+            operand.translate()
+        self.assertEqual("[[$1F,X++]] invalid indexed expression", str(context.exception))
+
+    def test_extended_indexed_5_bit_value_correct(self):
+        operand = ExtendedIndexedOperand("[$1F,X]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("98", code_pkg.post_byte.hex())
+        self.assertEqual("1F", code_pkg.additional.hex())
+
+        operand = ExtendedIndexedOperand("[$1F,Y]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("B8", code_pkg.post_byte.hex())
+        self.assertEqual("1F", code_pkg.additional.hex())
+
+    def test_extended_indexed_8_bit_value_correct(self):
+        operand = ExtendedIndexedOperand("[$20,X]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("98", code_pkg.post_byte.hex())
+        self.assertEqual("20", code_pkg.additional.hex())
+
+    def test_extended_indexed_16_bit_value_offset_correct(self):
+        operand = ExtendedIndexedOperand("[$2000,X]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("99", code_pkg.post_byte.hex())
+        self.assertEqual("2000", code_pkg.additional.hex())
+
+    def test_extended_indexed_8_bit_value_from_pc_correct(self):
+        operand = ExtendedIndexedOperand("[$20,PC]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("9C", code_pkg.post_byte.hex())
+        self.assertEqual("20", code_pkg.additional.hex())
+
+    def test_extended_indexed_16_bit_value_from_pc_correct(self):
+        operand = ExtendedIndexedOperand("[$2000,PC]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("9D", code_pkg.post_byte.hex())
+        self.assertEqual("2000", code_pkg.additional.hex())
+
+    def test_extended_indexed_16_bit_value_correct(self):
+        operand = ExtendedIndexedOperand("[$2000]", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("9F", code_pkg.post_byte.hex())
         self.assertEqual("2000", code_pkg.additional.hex())
 
 # M A I N #####################################################################
