@@ -107,11 +107,24 @@ compatible with EDTASM+ assembler mnemonics).
  
 ### Mnemonics
 
+| Mnemonic | Description | Example |
+| -------- | ----------- | ------- |
+| `ABX`    | Adds accumulator `B` to value in register `X` and stores in `X`.           | `ABX`                  |
+| `ADCA`   | Adds accumulator `A`, memory value `M`, and carry bit and stores in `A`.   | `ADCA $FFEE`           |
+| `ADCB`   | Adds accumulator `B`, memory value `M`, and carry bit and stores in `B`.   | `ADCB $FFEF`           |
+| `ADDA`   | Adds accumulator `A` with memory value `M` and stores in `A`.              | `ADDA #$03`            |
+| `ADDB`   | Adds accumulator `B` with memory value `M` and stores in `B`.              | `ADDB #$90`            |
+| `ADDD`   | Adds accumulator `D` (`A:B`) with memory value `M:M+1` and stores in `D`.  | `ADDD #$2000`          |
+
 ### Pseudo Operations
 
 | Mnemonic | Description | Example |
 | -------- | ----------- | ------- |
-| `FCC`    | Defines a string constant value enclosed in a matching pair of delimiters. | `"hello"` or `zworldz` |
+| `FCB`    | Defines a single byte constant value.                                      | `FCB $1C`              |
+| `FCC`    | Defines a string constant value enclosed in a matching pair of delimiters. | `FCC "hello"`          |
+| `FDB`    | Defines a two byte constant value.                                         | `FDB $2000`            |
+| `END`    | Defines the end of the program.                                            | `END`                  |
+| `EQU`    | Defines a symbol with a set value.                                         | `SCRMEM EQU $1000`     |
 | `INCLUDE`| Includes another assembly source file at this location.                    | `INCLUDE globals.asm`  |
 | `ORG`    | Defines where in memory the program should originate at.                   | `ORG $0E00`            |
 | `SETDP`  | Sets the direct page value for the assembler (see notes below).            | `SETDP $0E00`          |
