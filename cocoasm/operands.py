@@ -308,22 +308,22 @@ class ExtendedIndexedOperand(Operand):
         super().__init__(instruction)
         self.type = OperandType.EXTENDED_INDIRECT
         self.operand_string = operand_string
-        if value:
+        if value is not None:
             self.value = value
             return
         match = EXTENDED_INDIRECT_REGEX.match(self.operand_string)
         if not match:
             raise ValueError("[{}] is not an extended indexed value".format(operand_string))
-        self.value = match.group("value")
-        if len(self.value.split(",")) == 1:
-            self.value = Value.create_from_str(self.value, self.instruction)
-        elif len(self.value.split(",")) == 2:
-            self.left, self.right = match.group("value").split(",")
+        parsed_value = match.group("value")
+        if "," not in parsed_value:
+            self.value = Value.create_from_str(parsed_value, self.instruction)
+        elif len(parsed_value.split(",")) == 2:
+            self.left, self.right = parsed_value.split(",")
         else:
             raise ValueError("[{}] incorrect number of commas in extended indexed value".format(operand_string))
 
     def resolve_symbols(self, symbol_table):
-        if self.value:
+        if not self.value.is_type(ValueType.NONE):
             self.value = self.get_symbol(self.value.ascii(), symbol_table)
             return self
 

@@ -320,6 +320,41 @@ class TestIndexedOperand(unittest.TestCase):
         self.assertEqual("8D", code_pkg.post_byte.hex())
         self.assertEqual("2000", code_pkg.additional.hex())
 
+    def test_indexed_resolve_left_side_empty_correct(self):
+        operand = IndexedOperand(",X", self.instruction)
+        operand = operand.resolve_symbols({})
+        code_pkg = operand.translate()
+        self.assertEqual("84", code_pkg.post_byte.hex())
+
+    def test_indexed_resolve_left_side_A_B_D_correct(self):
+        operand = IndexedOperand("A,X", self.instruction)
+        operand = operand.resolve_symbols({})
+        code_pkg = operand.translate()
+        self.assertEqual("86", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("B,X", self.instruction)
+        operand = operand.resolve_symbols({})
+        code_pkg = operand.translate()
+        self.assertEqual("85", code_pkg.post_byte.hex())
+
+        operand = IndexedOperand("D,X", self.instruction)
+        operand = operand.resolve_symbols({})
+        code_pkg = operand.translate()
+        self.assertEqual("8B", code_pkg.post_byte.hex())
+
+    def test_indexed_resolve_left_side_not_symbol_correct(self):
+        operand = IndexedOperand("$1F,X", self.instruction)
+        operand = operand.resolve_symbols({})
+        code_pkg = operand.translate()
+        self.assertEqual("1F", code_pkg.post_byte.hex())
+
+    def test_indexed_resolve_left_side_symbol_correct(self):
+        symbol_table = {'blah': NumericValue("$1F")}
+        operand = IndexedOperand("blah,X", self.instruction)
+        operand = operand.resolve_symbols(symbol_table)
+        code_pkg = operand.translate()
+        self.assertEqual("1F", code_pkg.post_byte.hex())
+
 
 class TestExtendedIndexedOperand(unittest.TestCase):
     """
@@ -490,6 +525,43 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         code_pkg = operand.translate()
         self.assertEqual("9F", code_pkg.post_byte.hex())
         self.assertEqual("2000", code_pkg.additional.hex())
+
+    def test_extended_resolve_left_side_empty_correct(self):
+        operand = ExtendedIndexedOperand("[,X]", self.instruction)
+        operand = operand.resolve_symbols({})
+        code_pkg = operand.translate()
+        self.assertEqual("94", code_pkg.post_byte.hex())
+
+    def test_extended_resolve_left_side_A_B_D_correct(self):
+        operand = ExtendedIndexedOperand("[A,X]", self.instruction)
+        operand = operand.resolve_symbols({})
+        code_pkg = operand.translate()
+        self.assertEqual("96", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[B,X]", self.instruction)
+        operand = operand.resolve_symbols({})
+        code_pkg = operand.translate()
+        self.assertEqual("95", code_pkg.post_byte.hex())
+
+        operand = ExtendedIndexedOperand("[D,X]", self.instruction)
+        operand = operand.resolve_symbols({})
+        code_pkg = operand.translate()
+        self.assertEqual("9B", code_pkg.post_byte.hex())
+
+    def test_extended_resolve_left_side_not_symbol_correct(self):
+        operand = ExtendedIndexedOperand("[$1F,X]", self.instruction)
+        operand = operand.resolve_symbols({})
+        code_pkg = operand.translate()
+        self.assertEqual("98", code_pkg.post_byte.hex())
+        self.assertEqual("1F", code_pkg.additional.hex())
+
+    def test_extended_resolve_left_side_symbol_correct(self):
+        symbol_table = {'blah': NumericValue("$1F")}
+        operand = ExtendedIndexedOperand("[blah,X]", self.instruction)
+        operand = operand.resolve_symbols(symbol_table)
+        code_pkg = operand.translate()
+        self.assertEqual("98", code_pkg.post_byte.hex())
+        self.assertEqual("1F", code_pkg.additional.hex())
 
 # M A I N #####################################################################
 
