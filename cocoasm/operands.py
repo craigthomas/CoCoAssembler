@@ -119,7 +119,7 @@ class Operand(ABC):
         except ValueError:
             pass
 
-        raise ValueError("unknown operand type: {}".format(operand_string))
+        raise ValueError("[{}] unknown operand type".format(operand_string))
 
     def is_type(self, operand_type):
         """
