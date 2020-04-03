@@ -10,9 +10,9 @@ import unittest
 
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
     OperandType, IndexedOperand, RelativeOperand, ExtendedIndexedOperand, \
-    Operand
+    Operand, ExtendedOperand
 from cocoasm.instruction import Instruction, Mode
-from cocoasm.values import NumericValue
+from cocoasm.values import NumericValue, AddressValue
 
 # C L A S S E S ###############################################################
 
@@ -602,7 +602,7 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         code_pkg = operand.translate()
         self.assertEqual("94", code_pkg.post_byte.hex())
 
-    def test_extended_resolve_left_side_A_B_D_correct(self):
+    def test_extended_indexed_resolve_left_side_A_B_D_correct(self):
         operand = ExtendedIndexedOperand("[A,X]", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
@@ -618,20 +618,63 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         code_pkg = operand.translate()
         self.assertEqual("9B", code_pkg.post_byte.hex())
 
-    def test_extended_resolve_left_side_not_symbol_correct(self):
+    def test_extended_indexed_resolve_left_side_not_symbol_correct(self):
         operand = ExtendedIndexedOperand("[$1F,X]", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("98", code_pkg.post_byte.hex())
         self.assertEqual("1F", code_pkg.additional.hex())
 
-    def test_extended_resolve_left_side_symbol_correct(self):
+    def test_extended_indexed_resolve_left_side_symbol_correct(self):
         symbol_table = {'blah': NumericValue("$1F")}
         operand = ExtendedIndexedOperand("[blah,X]", self.instruction)
         operand = operand.resolve_symbols(symbol_table)
         code_pkg = operand.translate()
         self.assertEqual("98", code_pkg.post_byte.hex())
         self.assertEqual("1F", code_pkg.additional.hex())
+
+    def test_extended_indexed_value_passthrough_correct(self):
+        operand = ExtendedIndexedOperand("", self.instruction, value="FFFF")
+        self.assertEqual("FFFF", operand.value)
+
+    def test_extended_indexed_translate_value_passthrough_correct(self):
+        operand = ExtendedIndexedOperand("", self.instruction, value=AddressValue(9))
+        code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
+        self.assertEqual("9F", code_pkg.post_byte.hex())
+        self.assertEqual("09", code_pkg.additional.hex())
+
+
+class TestExtendedOperand(unittest.TestCase):
+    """
+    A test class for the ExtendedOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3))
+
+    def test_extended_type_correct(self):
+        result = ExtendedOperand("$FFFF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.EXTENDED))
+
+    def test_extended_translate_raises_if_instruction_not_extended(self):
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(rel=0x3A, rel_sz=1))
+        with self.assertRaises(ValueError) as context:
+            operand = ExtendedOperand("$FFFF", instruction)
+            operand.translate()
+        self.assertEqual("Instruction [SUBA] does not support extended addressing", str(context.exception))
+
+    def test_extended_translates_correct(self):
+        operand = ExtendedOperand("$FFFF", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("B0", code_pkg.op_code.hex())
+        self.assertEqual("FFFF", code_pkg.additional.hex())
+
+    def test_extended_value_passthrough_correct(self):
+        operand = ExtendedOperand("", self.instruction, value="FFFF")
+        self.assertEqual("FFFF", operand.value)
 
 # M A I N #####################################################################
 
