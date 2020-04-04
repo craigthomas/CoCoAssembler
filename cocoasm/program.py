@@ -10,8 +10,7 @@ import sys
 
 from cocoasm.exceptions import TranslationError, ParseError
 from cocoasm.statement import Statement
-from cocoasm.assembler_state import AssemblerState
-from cocoasm.symbol import Symbol
+from cocoasm.values import AddressValue, ValueType
 
 # C L A S S E S ###############################################################
 
@@ -26,7 +25,6 @@ class Program(object):
         self.symbol_table = dict()
         self.statements = []
         self.address = 0x0
-        self.state = AssemblerState()
         self.process(filename)
 
     def process(self, filename):
@@ -66,7 +64,7 @@ class Program(object):
         with open(filename) as infile:
             for line in infile:
                 statement = Statement(line)
-                if not statement.is_empty() and not statement.is_comment_only():
+                if not statement.is_empty and not statement.is_comment_only:
                     statements.append(statement)
 
         return statements
@@ -83,7 +81,6 @@ class Program(object):
         """
         processed_statements = []
         for statement in statements:
-            statement.match_mnemonic()
             include = self.process_mnemonics(self.parse_file(statement.get_include_filename()))
             processed_statements.extend(include if include else [statement])
         return processed_statements
@@ -97,11 +94,14 @@ class Program(object):
         :param index: the index into the list of statements where the label occurs
         :param statement: the statement with the label
         """
-        label = statement.get_label()
+        label = statement.label
         if label:
             if label in self.symbol_table:
                 raise TranslationError("Label [" + label + "] redefined", statement)
-            self.symbol_table[label] = Symbol(label, index)
+            if statement.instruction.is_pseudo_define:
+                self.symbol_table[label] = statement.operand.value
+            else:
+                self.symbol_table[label] = AddressValue(index)
 
     def translate_statements(self):
         """
@@ -113,7 +113,7 @@ class Program(object):
             self.save_symbol(index, statement)
 
         for index, statement in enumerate(self.statements):
-            statement.translate_pseudo(self.symbol_table)
+            statement.translate_pseudo()
 
         for index, statement in enumerate(self.statements):
             statement.translate(self.symbol_table)
@@ -121,10 +121,15 @@ class Program(object):
         address = 0
         for index, statement in enumerate(self.statements):
             address = statement.set_address(address)
-            address += statement.get_size()
+            address += statement.code_pkg.size
 
         for index, statement in enumerate(self.statements):
             statement.fix_addresses(self.statements, index)
+
+        # Update the symbol table with the proper addresses
+        for symbol, value in self.symbol_table.items():
+            if value.is_type(ValueType.ADDRESS):
+                self.symbol_table[symbol] = self.statements[value.int].code_pkg.address
 
     def save_binary_file(self, filename):
         """
@@ -135,9 +140,19 @@ class Program(object):
         """
         machine_codes = []
         for statement in self.statements:
-            if not statement.is_empty() and not statement.comment_only:
-                for index in range(0, len(statement.op_code), 2):
-                    machine_codes.append(int(statement.op_code[index:index + 2], 16))
+            if not statement.is_empty and not statement.is_comment_only:
+                for index in range(0, statement.code_pkg.op_code.hex_len(), 2):
+                    op_code = statement.code_pkg.op_code.hex()
+                    hex_byte = "{}{}".format(op_code[index], op_code[index+1])
+                    machine_codes.append(int(hex_byte, 16))
+                for index in range(0, statement.code_pkg.post_byte.hex_len(), 2):
+                    post_byte = statement.code_pkg.post_byte.hex()
+                    hex_byte = "{}{}".format(post_byte[index], post_byte[index + 1])
+                    machine_codes.append(int(hex_byte, 16))
+                for index in range(0, statement.code_pkg.additional.hex_len(), 2):
+                    additional = statement.code_pkg.additional.hex()
+                    hex_byte = "{}{}".format(additional[index], additional[index + 1])
+                    machine_codes.append(int(hex_byte, 16))
         with open(filename, "wb") as outfile:
             outfile.write(bytearray(machine_codes))
 
@@ -147,7 +162,7 @@ class Program(object):
         """
         print("-- Symbol Table --")
         for symbol, value in self.symbol_table.items():
-            print(value)
+            print("${} {}".format(value.hex().ljust(4, ' '), symbol))
 
     def print_statements(self):
         """

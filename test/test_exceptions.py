@@ -6,17 +6,16 @@ A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
-import mock
 import unittest
 
-from cocoasm.instruction import InstructionBundle
+from cocoasm.exceptions import TranslationError, ParseError
 
 # C L A S S E S ###############################################################
 
 
-class TestInstructionBundle(unittest.TestCase):
+class TestTranslationError(unittest.TestCase):
     """
-    A test class for the InstructionBundle class.
+    A test class for the TranslationError class.
     """
     def setUp(self):
         """
@@ -24,9 +23,24 @@ class TestInstructionBundle(unittest.TestCase):
         """
         pass
 
-    def test_str(self):
-        result = InstructionBundle(op_code=1, address=2, post_byte=3, additional=4)
-        self.assertEqual("op_code: 1, address: 2, post_byte: 3, additional: 4", str(result))
+    def test_str_representation_correct(self):
+        result = TranslationError("test", "statement")
+        self.assertEqual("'test'", str(result))
+
+
+class TestParseError(unittest.TestCase):
+    """
+    A test class for the ParseError class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        pass
+
+    def test_str_representation_correct(self):
+        result = ParseError("test", "statement")
+        self.assertEqual("'test'", str(result))
 
 # M A I N #####################################################################
 
