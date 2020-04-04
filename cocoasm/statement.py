@@ -65,15 +65,13 @@ class Statement(object):
         op_code_string += self.code_pkg.post_byte.hex()
         op_code_string += self.code_pkg.additional.hex()
 
-        return "${} {:.10} {} {} {} ; {} {} {}".format(
+        return "${} {:.10} {} {} {} ; {}".format(
             self.code_pkg.address.hex(size=4),
             op_code_string.ljust(10, ' '),
             self.label.rjust(10, ' '),
             self.mnemonic.rjust(5, ' '),
             self.original_operand.operand_string.ljust(30, ' '),
             self.comment.ljust(40, ' '),
-            self.operand.type,
-            self.operand.value.type
         )
 
     def match_operation(self):

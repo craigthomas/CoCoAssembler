@@ -126,7 +126,7 @@ class TestRelativeOperand(unittest.TestCase):
         """
         Common setup routines needed for all unit tests.
         """
-        self.instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1), is_short_branch=True)
+        self.instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=2), is_short_branch=True)
 
     def test_relative_type_correct(self):
         result = RelativeOperand("$FF", self.instruction)
