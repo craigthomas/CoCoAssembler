@@ -121,7 +121,7 @@ class Program(object):
         address = 0
         for index, statement in enumerate(self.statements):
             address = statement.set_address(address)
-            address += statement.code_pkg.get_size()
+            address += statement.code_pkg.size
 
         for index, statement in enumerate(self.statements):
             statement.fix_addresses(self.statements, index)

@@ -308,6 +308,8 @@ class ExtendedIndexedOperand(Operand):
         super().__init__(instruction)
         self.type = OperandType.EXTENDED_INDIRECT
         self.operand_string = operand_string
+        self.left = None
+        self.right = None
         if value is not None:
             self.value = value
             return
@@ -323,11 +325,11 @@ class ExtendedIndexedOperand(Operand):
             raise ValueError("[{}] incorrect number of commas in extended indexed value".format(operand_string))
 
     def resolve_symbols(self, symbol_table):
-        if not self.value.is_type(ValueType.NONE):
+        if not self.value.is_type(ValueType.NONE) and self.value.is_type(ValueType.SYMBOL):
             self.value = self.get_symbol(self.value.ascii(), symbol_table)
             return self
 
-        if self.left != "":
+        if self.left and self.left != "":
             if self.left != "A" and self.left != "B" and self.left != "D":
                 self.left = Value.create_from_str(self.left, self.instruction)
                 if self.left.is_type(ValueType.SYMBOL):
@@ -335,23 +337,25 @@ class ExtendedIndexedOperand(Operand):
         return self
 
     def translate(self):
-        # TODO: need to adjust the size of the instruction based on the indexed addressing type
         if not self.instruction.mode.supports_indexed():
             raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
+        size = self.instruction.mode.ind_sz
 
         if not type(self.value) == str and self.value.is_type(ValueType.ADDRESS):
+            size += 2
             return CodePackage(
                 op_code=NumericValue(self.instruction.mode.ind),
                 post_byte=NumericValue(0x9F),
                 additional=self.value,
-                size=self.instruction.mode.ind_sz)
+                size=size)
 
         if not type(self.value) == str and self.value.is_type(ValueType.NUMERIC):
+            size += 2
             return CodePackage(
                 op_code=NumericValue(self.instruction.mode.ind),
                 post_byte=NumericValue(0x9F),
                 additional=self.value,
-                size=self.instruction.mode.ind_sz)
+                size=size)
 
         raw_post_byte = 0x80
         additional = NoneValue()
@@ -395,6 +399,7 @@ class ExtendedIndexedOperand(Operand):
                 raise ValueError("[{}] cannot translate address in left hand side".format(self.operand_string))
             numeric = self.left
             if numeric.byte_len() == 2:
+                size += 2
                 if "PC" in self.right:
                     raw_post_byte |= 0x9D
                     additional = numeric
@@ -402,6 +407,7 @@ class ExtendedIndexedOperand(Operand):
                     raw_post_byte |= 0x99
                     additional = numeric
             elif numeric.byte_len() == 1:
+                size += 1
                 if "PC" in self.right:
                     raw_post_byte |= 0x9C
                     additional = numeric
@@ -412,11 +418,11 @@ class ExtendedIndexedOperand(Operand):
         return CodePackage(op_code=NumericValue(self.instruction.mode.ind),
                            post_byte=NumericValue(raw_post_byte),
                            additional=additional,
-                           size=self.instruction.mode.ind_sz)
+                           size=size)
 
 
 class IndexedOperand(Operand):
-    def __init__(self, operand_string, instruction, value=None):
+    def __init__(self, operand_string, instruction):
         super().__init__(instruction)
         self.type = OperandType.INDEXED
         self.operand_string = operand_string
@@ -440,6 +446,7 @@ class IndexedOperand(Operand):
         if not self.instruction.mode.supports_indexed():
             raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
         raw_post_byte = 0x00
+        size = self.instruction.mode.ind_sz
         additional = NoneValue()
 
         # Determine register (if any)
@@ -484,6 +491,7 @@ class IndexedOperand(Operand):
                 raise ValueError("[{}] cannot translate address in left hand side".format(self.operand_string))
             numeric = self.left
             if numeric.byte_len() == 2:
+                size += 2
                 if "PC" in self.right:
                     raw_post_byte |= 0x8D
                     additional = numeric
@@ -494,17 +502,19 @@ class IndexedOperand(Operand):
                 if "PC" in self.right:
                     raw_post_byte |= 0x8C
                     additional = numeric
+                    size += 1
                 else:
                     if numeric.int <= 0x1F:
                         raw_post_byte |= numeric.int
                     else:
                         raw_post_byte |= 0x88
                         additional = numeric
+                        size += 1
 
         return CodePackage(op_code=NumericValue(self.instruction.mode.ind),
                            post_byte=NumericValue(raw_post_byte),
                            additional=additional,
-                           size=self.instruction.mode.ind_sz)
+                           size=size)
 
 
 class ExpressionOperand(Operand):

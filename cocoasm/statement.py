@@ -172,11 +172,11 @@ class Statement(object):
             if branch_index < this_index:
                 length = 1
                 for statement in statements[branch_index:this_index+1]:
-                    length += statement.code_pkg.get_size()
+                    length += statement.code_pkg.size
                 self.code_pkg.additional = NumericValue(base_value - length, size_hint=size_hint)
             else:
                 for statement in statements[this_index+1:branch_index]:
-                    length += statement.code_pkg.get_size()
+                    length += statement.code_pkg.size
                 self.code_pkg.additional = NumericValue(length, size_hint=size_hint)
             return
 

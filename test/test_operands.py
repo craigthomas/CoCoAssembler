@@ -178,9 +178,7 @@ class TestInherentOperand(unittest.TestCase):
     def test_inherent_translate_result_correct(self):
         operand = InherentOperand(None, self.instruction)
         result = operand.translate()
-        self.assertEqual(0xAF, result.op_code.int)
-        self.assertEqual(0, result.additional.int)
-        self.assertEqual(0, result.post_byte.int)
+        self.assertEqual("AF", result.op_code.hex())
         self.assertEqual(1, result.size)
 
 
@@ -192,7 +190,7 @@ class TestImmediateOperand(unittest.TestCase):
         """
         Common setup routines needed for all unit tests.
         """
-        self.instruction = Instruction(mnemonic="ABX", mode=Mode(imm=0x3A, imm_sz=1))
+        self.instruction = Instruction(mnemonic="ABX", mode=Mode(imm=0x3A, imm_sz=2))
 
     def test_immediate_type_correct(self):
         result = ImmediateOperand("#blah", self.instruction)
@@ -225,10 +223,9 @@ class TestImmediateOperand(unittest.TestCase):
     def test_immediate_translate_result_correct(self):
         operand = ImmediateOperand("#$FF", self.instruction)
         result = operand.translate()
-        self.assertEqual(0x3A, result.op_code.int)
-        self.assertEqual(0xFF, result.additional.int)
-        self.assertEqual(0, result.post_byte.int)
-        self.assertEqual(1, result.size)
+        self.assertEqual("3A", result.op_code.hex())
+        self.assertEqual("FF", result.additional.hex())
+        self.assertEqual(2, result.size)
 
 
 class TestIndexedOperand(unittest.TestCase):
@@ -269,87 +266,127 @@ class TestIndexedOperand(unittest.TestCase):
     def test_indexed_no_offset_correct_values(self):
         operand = IndexedOperand(",X", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("84", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand(",Y", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("A4", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand(",U", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("C4", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand(",S", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("E4", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_indexed_A_offset_correct_values(self):
         operand = IndexedOperand("A,X", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("86", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("A,Y", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("A6", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("A,U", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("C6", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("A,S", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("E6", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_indexed_B_offset_correct_values(self):
         operand = IndexedOperand("B,X", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("85", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("B,Y", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("A5", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("B,U", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("C5", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("B,S", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("E5", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_indexed_D_offset_correct_values(self):
         operand = IndexedOperand("D,X", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("8B", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("D,Y", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("AB", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("D,U", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("CB", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("D,S", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("EB", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_indexed_auto_increments_correct_values(self):
         operand = IndexedOperand(",X+", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("80", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand(",X++", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("81", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand(",-X", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("82", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand(",--X", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("83", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_indexed_offset_from_register_with_auto_increment_raises(self):
         with self.assertRaises(ValueError) as context:
@@ -360,63 +397,85 @@ class TestIndexedOperand(unittest.TestCase):
     def test_indexed_5_bit_value_correct(self):
         operand = IndexedOperand("$1F,X", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("1F", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("$1F,Y", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("3F", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_indexed_8_bit_value_correct(self):
         operand = IndexedOperand("$20,X", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("88", code_pkg.post_byte.hex())
         self.assertEqual("20", code_pkg.additional.hex())
+        self.assertEqual(3, code_pkg.size)
 
     def test_indexed_16_bit_value_correct(self):
         operand = IndexedOperand("$2000,X", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("89", code_pkg.post_byte.hex())
         self.assertEqual("2000", code_pkg.additional.hex())
+        self.assertEqual(4, code_pkg.size)
 
     def test_indexed_8_bit_value_from_pc_correct(self):
         operand = IndexedOperand("$20,PC", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("8C", code_pkg.post_byte.hex())
         self.assertEqual("20", code_pkg.additional.hex())
+        self.assertEqual(3, code_pkg.size)
 
     def test_indexed_16_bit_value_from_pc_correct(self):
         operand = IndexedOperand("$2000,PC", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("8D", code_pkg.post_byte.hex())
         self.assertEqual("2000", code_pkg.additional.hex())
+        self.assertEqual(4, code_pkg.size)
 
     def test_indexed_resolve_left_side_empty_correct(self):
         operand = IndexedOperand(",X", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("84", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_indexed_resolve_left_side_A_B_D_correct(self):
         operand = IndexedOperand("A,X", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("86", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("B,X", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("85", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("D,X", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("8B", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_indexed_resolve_left_side_not_symbol_correct(self):
         operand = IndexedOperand("$1F,X", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("1F", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_indexed_resolve_left_side_symbol_correct(self):
         symbol_table = {'blah': NumericValue("$1F")}
@@ -464,70 +523,102 @@ class TestExtendedIndexedOperand(unittest.TestCase):
     def test_extended_indexed_no_offset_correct_values(self):
         operand = ExtendedIndexedOperand("[,X]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("94", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[,Y]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("B4", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[,U]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("D4", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[,S]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("F4", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_extended_indexed_A_offset_correct_values(self):
         operand = ExtendedIndexedOperand("[A,X]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("96", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[A,Y]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("B6", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[A,U]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("D6", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[A,S]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("F6", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_extended_indexed_B_offset_correct_values(self):
         operand = ExtendedIndexedOperand("[B,X]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("95", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[B,Y]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("B5", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[B,U]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("D5", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[B,S]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("F5", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_extended_indexed_D_offset_correct_values(self):
         operand = ExtendedIndexedOperand("[D,X]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("9B", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[D,Y]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("BB", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[D,U]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("DB", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[D,S]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("FB", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_extended_indexed_auto_single_increments_not_allowed(self):
         with self.assertRaises(ValueError) as context:
@@ -543,11 +634,15 @@ class TestExtendedIndexedOperand(unittest.TestCase):
     def test_extended_indexed_auto_increments_correct_values(self):
         operand = ExtendedIndexedOperand("[,X++]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("91", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[,--X]", self.instruction)
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("93", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_extended_indexed_offset_from_register_with_auto_increment_raises(self):
         with self.assertRaises(ValueError) as context:
@@ -560,63 +655,76 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         code_pkg = operand.translate()
         self.assertEqual("98", code_pkg.post_byte.hex())
         self.assertEqual("1F", code_pkg.additional.hex())
+        self.assertEqual(3, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[$1F,Y]", self.instruction)
         code_pkg = operand.translate()
         self.assertEqual("B8", code_pkg.post_byte.hex())
         self.assertEqual("1F", code_pkg.additional.hex())
+        self.assertEqual(3, code_pkg.size)
 
     def test_extended_indexed_8_bit_value_correct(self):
         operand = ExtendedIndexedOperand("[$20,X]", self.instruction)
         code_pkg = operand.translate()
         self.assertEqual("98", code_pkg.post_byte.hex())
         self.assertEqual("20", code_pkg.additional.hex())
+        self.assertEqual(3, code_pkg.size)
 
     def test_extended_indexed_16_bit_value_offset_correct(self):
         operand = ExtendedIndexedOperand("[$2000,X]", self.instruction)
         code_pkg = operand.translate()
         self.assertEqual("99", code_pkg.post_byte.hex())
         self.assertEqual("2000", code_pkg.additional.hex())
+        self.assertEqual(4, code_pkg.size)
 
     def test_extended_indexed_8_bit_value_from_pc_correct(self):
         operand = ExtendedIndexedOperand("[$20,PC]", self.instruction)
         code_pkg = operand.translate()
         self.assertEqual("9C", code_pkg.post_byte.hex())
         self.assertEqual("20", code_pkg.additional.hex())
+        self.assertEqual(3, code_pkg.size)
 
     def test_extended_indexed_16_bit_value_from_pc_correct(self):
         operand = ExtendedIndexedOperand("[$2000,PC]", self.instruction)
         code_pkg = operand.translate()
         self.assertEqual("9D", code_pkg.post_byte.hex())
         self.assertEqual("2000", code_pkg.additional.hex())
+        self.assertEqual(4, code_pkg.size)
 
     def test_extended_indexed_16_bit_value_correct(self):
         operand = ExtendedIndexedOperand("[$2000]", self.instruction)
+        operand.resolve_symbols({})
         code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("9F", code_pkg.post_byte.hex())
         self.assertEqual("2000", code_pkg.additional.hex())
+        self.assertEqual(4, code_pkg.size)
 
     def test_extended_resolve_left_side_empty_correct(self):
         operand = ExtendedIndexedOperand("[,X]", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("94", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_extended_indexed_resolve_left_side_A_B_D_correct(self):
         operand = ExtendedIndexedOperand("[A,X]", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("96", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[B,X]", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("95", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
         operand = ExtendedIndexedOperand("[D,X]", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("9B", code_pkg.post_byte.hex())
+        self.assertEqual(2, code_pkg.size)
 
     def test_extended_indexed_resolve_left_side_not_symbol_correct(self):
         operand = ExtendedIndexedOperand("[$1F,X]", self.instruction)
@@ -624,6 +732,7 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         code_pkg = operand.translate()
         self.assertEqual("98", code_pkg.post_byte.hex())
         self.assertEqual("1F", code_pkg.additional.hex())
+        self.assertEqual(3, code_pkg.size)
 
     def test_extended_indexed_resolve_left_side_symbol_correct(self):
         symbol_table = {'blah': NumericValue("$1F")}
@@ -632,17 +741,19 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         code_pkg = operand.translate()
         self.assertEqual("98", code_pkg.post_byte.hex())
         self.assertEqual("1F", code_pkg.additional.hex())
+        self.assertEqual(3, code_pkg.size)
 
     def test_extended_indexed_value_passthrough_correct(self):
         operand = ExtendedIndexedOperand("", self.instruction, value="FFFF")
         self.assertEqual("FFFF", operand.value)
 
     def test_extended_indexed_translate_value_passthrough_correct(self):
-        operand = ExtendedIndexedOperand("", self.instruction, value=AddressValue(9))
+        operand = ExtendedIndexedOperand("", self.instruction, value=AddressValue(0x900))
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("9F", code_pkg.post_byte.hex())
-        self.assertEqual("09", code_pkg.additional.hex())
+        self.assertEqual("0900", code_pkg.additional.hex())
+        self.assertEqual(4, code_pkg.size)
 
 
 class TestExtendedOperand(unittest.TestCase):

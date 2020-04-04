@@ -38,10 +38,6 @@ class CodePackage(object):
             self.op_code, self.address, self.post_byte, self.additional, self.size
         )
 
-    def get_size(self):
-        return self.size if self.size != 0 else \
-            self.op_code.byte_len() + self.additional.byte_len() + self.post_byte.byte_len()
-
 
 class Mode(NamedTuple):
     """
