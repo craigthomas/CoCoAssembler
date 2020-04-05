@@ -9,6 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import argparse
 
 from cocoasm.program import Program
+from fileutil.virtualfiles import BinaryFile
 
 # F U N C T I O N S ###########################################################
 
@@ -30,7 +31,7 @@ def parse_arguments():
         help="print out the assembled statements when finished"
     )
     parser.add_argument(
-        "--output", metavar="FILE", help="stores the assembled program in FILE")
+        "--bin_file", metavar="FILE", help="stores the assembled program in a binary FILE")
     return parser.parse_args()
 
 
@@ -48,10 +49,16 @@ def main(args):
     if args.print:
         program.print_statements()
 
-    if args.output:
-        program.save_binary_file(args.output)
+    if args.bin_file:
+        binary_file = BinaryFile()
+        binary_file.open_host_file(args.bin_file)
+        binary_file.save_file(None, program.get_binary_array())
+        binary_file.close_host_file()
+
+# M A I N #####################################################################
 
 
-main(parse_arguments())
+if __name__ == '__main__':
+    main(parse_arguments())
 
 # E N D   O F   F I L E #######################################################
