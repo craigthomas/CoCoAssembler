@@ -12,13 +12,13 @@
 3. [License](#license)
 4. [Installing](#installing)
 5. [Usage](#usage)
-  1. [Input File Format](#input-file-format)
-  2. [Print Symbol Table](#print-symbol-table)
-  3. [Print Assembled Statements](#print-assembled-statements)
-  4. [Save to Binary File](#save-to-binary-file)
+   1. [Input File Format](#input-file-format)
+   2. [Print Symbol Table](#print-symbol-table)
+   3. [Print Assembled Statements](#print-assembled-statements)
+   4. [Save to Binary File](#save-to-binary-file)
 6. [Mnemonic Table](#mnemonic-table)
-  1. [Mnemonics](#mnemonics)
-  2. [Pseudo Operations](#pseudo-operations)
+   1. [Mnemonics](#mnemonics)
+   2. [Pseudo Operations](#pseudo-operations)
 
 ## What is it?
 
