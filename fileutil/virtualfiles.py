@@ -17,7 +17,31 @@ class CoCoFile(object):
 
 class VirtualFile(ABC):
     def __init__(self):
-        pass
+        self.host_file = None
+
+    def open_host_file(self, filename):
+        """
+        Opens the file on the host drive for reading.
+
+        :param filename: the name of the file to open
+        """
+        self.host_file = open(filename, "wb")
+
+    def close_host_file(self):
+        """
+        Closes the file on the host drive.
+        """
+        if self.host_file:
+            self.host_file.close()
+            self.host_file = None
+
+    def is_host_file_open(self):
+        """
+        Returns True if a host file is open, False otherwise.
+
+        :return: True if the host file is open, False otherwise
+        """
+        return self.host_file is not None
 
     @abstractmethod
     def list_files(self):
@@ -28,26 +52,12 @@ class VirtualFile(ABC):
         """
 
     @abstractmethod
-    def open_host_file(self, filename):
-        """
-        Opens the file on the host drive for reading.
-
-        :param filename: the name of the file to open
-        """
-
-    @abstractmethod
     def save_file(self, name, raw_bytes):
         """
         Saves the specified file to the virtual image.
 
         :param name: the name of the program
         :param raw_bytes: the raw bytes of the file
-        """
-
-    @abstractmethod
-    def close_host_file(self):
-        """
-        Closes the file on the host drive.
         """
 
 
@@ -65,15 +75,8 @@ class BinaryFile(VirtualFile):
     def list_files(self):
         return []
 
-    def open_host_file(self, filename):
-        self.outfile = open(filename, "wb")
-
     def save_file(self, name, raw_bytes):
-        self.outfile.write(bytearray(raw_bytes))
-
-    def close_host_file(self):
-        if self.outfile:
-            self.outfile.close()
+        self.host_file.write(bytearray(raw_bytes))
 
 
 class CassetteFile(VirtualFile):
@@ -83,13 +86,7 @@ class CassetteFile(VirtualFile):
     def list_files(self):
         pass
 
-    def open_host_file(self, filename):
-        pass
-
     def save_file(self, name, raw_bytes):
-        pass
-
-    def close_host_file(self):
         pass
 
 
@@ -100,13 +97,7 @@ class DiskFile(VirtualFile):
     def list_files(self):
         pass
 
-    def open_host_file(self, filename):
-        pass
-
     def save_file(self, name, raw_bytes):
-        pass
-
-    def close_host_file(self):
         pass
 
 # E N D   O F   F I L E #######################################################

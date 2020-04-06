@@ -22,7 +22,9 @@ def parse_arguments():
         description="Assembler for the Tandy Color Computer 1, 2, and 3. See README.md for more "
         "information, and LICENSE for terms of use."
     )
-    parser.add_argument("filename", help="the input file")
+    parser.add_argument(
+        "filename", help="the assembly language input file"
+    )
     parser.add_argument(
         "--symbols", action="store_true", help="print out the symbol table"
     )
@@ -31,7 +33,14 @@ def parse_arguments():
         help="print out the assembled statements when finished"
     )
     parser.add_argument(
-        "--bin_file", metavar="FILE", help="stores the assembled program in a binary FILE")
+        "--bin_file", metavar="BIN_FILE", help="stores the assembled program in a binary BIN_FILE"
+    )
+    parser.add_argument(
+        "--cas_file", metavar="CAS_FILE", help="stores the assembled program in a cassette image CAS_FILE"
+    )
+    parser.add_argument(
+        "--dsk_file", metavar="DSK_FILE", help="stores the assembled program in a disk image DSK_FILE"
+    )
     return parser.parse_args()
 
 
