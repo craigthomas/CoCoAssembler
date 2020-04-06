@@ -131,12 +131,12 @@ class Program(object):
             if value.is_type(ValueType.ADDRESS):
                 self.symbol_table[symbol] = self.statements[value.int].code_pkg.address
 
-    def save_binary_file(self, filename):
+    def get_binary_array(self):
         """
-        Writes out the assembled statements to the specified file
-        name.
+        Returns an array containing the machine code statements for the
+        assembled program.
 
-        :param filename: the name of the file to save statements
+        :return: returns the assembled program bytes
         """
         machine_codes = []
         for statement in self.statements:
@@ -153,8 +153,7 @@ class Program(object):
                     additional = statement.code_pkg.additional.hex()
                     hex_byte = "{}{}".format(additional[index], additional[index + 1])
                     machine_codes.append(int(hex_byte, 16))
-        with open(filename, "wb") as outfile:
-            outfile.write(bytearray(machine_codes))
+        return machine_codes
 
     def print_symbol_table(self):
         """

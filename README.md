@@ -12,11 +12,21 @@
 3. [License](#license)
 4. [Installing](#installing)
 5. [Usage](#usage)
+  1. [Input File Format](#input-file-format)
+  2. [Print Symbol Table](#print-symbol-table)
+  3. [Print Assembled Statements](#print-assembled-statements)
+  4. [Save to Binary File](#save-to-binary-file)
+6. [Mnemonic Table](#mnemonic-table)
+  1. [Mnemonics](#mnemonics)
+  2. [Pseudo Operations](#pseudo-operations)
 
 ## What is it?
 
 This project is an assembler for the Tandy Color Computer 1, 2 and 3 written in Python 3.6. 
 It is intended to be statement compatible with any code written for the EDTASM+ assembler.
+The assembler is capable of taking EDTASM+ assembly language code and translating it into
+machine code for the Color Computer 1, 2, and 3. Current support is for 6809 CPU instructions,
+but future enhancements will add 6309 instructions.
 
 ## Requirements
 
@@ -48,12 +58,20 @@ Next, you will need to install the required packages for the file:
 
 To run the assembler:
 
-    python assembler.py input_file --output output_file
+    python assembler.py input_file
 
 This will assemble the instructions found in file `input_file` and will generate
-the associated Color Computer machine instructions in binary format in `output_file`.
+the associated Color Computer machine instructions in binary format. You will need
+to save the assembled contents to a file to be useful. There are several switches
+that are available:
 
-### Input Format
+* `--print` - prints out the assembled statements
+* `--symbols` - prints out the symbol table
+* `--bin_file` - save assembled contents to a binary file
+* `--cas_file` - save assembled contents to a cassette file
+* `--dsk_file` - save assembled contents to a virtual disk file
+
+### Input File Format
 
 The input file needs to follow the format below:
 
@@ -69,7 +87,7 @@ Where:
 An example file:
 
     # A comment line that contains nothing
-
+    
 
 ### Print Symbol Table
 
@@ -83,7 +101,7 @@ Which will have the following output:
     -- Symbol Table --
 
 
-### Print Assembled Statements
+#### Print Assembled Statements
 
 To print out the assembled version of the program, use the `--print` switch:
 
@@ -99,6 +117,18 @@ statement (truncated to 10 hex characters), the third column is the user-supplie
 label for the statement, the forth column is the mnemonic, the fifth
 column is the register values of other numeric or label data the operation will
 work on, and the fifth column is the comment string.
+
+
+### Save to Binary File
+
+To save the assembled contents to a binary file, use the `--bin_file` switch:
+
+    python assembler.py test.asm --bin_file test.bin
+    
+The assembled program will be saved to the file `test.bin`. Note that this file
+may not be useful on its own, as it does not have any meta information about
+where the file should be loaded in memory. If the file `test.bin` exists, it will
+be erased and overwritten.
 
 ## Mnemonic Table
 

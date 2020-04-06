@@ -9,6 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import argparse
 
 from cocoasm.program import Program
+from fileutil.virtualfiles import BinaryFile
 
 # F U N C T I O N S ###########################################################
 
@@ -21,7 +22,9 @@ def parse_arguments():
         description="Assembler for the Tandy Color Computer 1, 2, and 3. See README.md for more "
         "information, and LICENSE for terms of use."
     )
-    parser.add_argument("filename", help="the input file")
+    parser.add_argument(
+        "filename", help="the assembly language input file"
+    )
     parser.add_argument(
         "--symbols", action="store_true", help="print out the symbol table"
     )
@@ -30,7 +33,14 @@ def parse_arguments():
         help="print out the assembled statements when finished"
     )
     parser.add_argument(
-        "--output", metavar="FILE", help="stores the assembled program in FILE")
+        "--bin_file", metavar="BIN_FILE", help="stores the assembled program in a binary BIN_FILE"
+    )
+    parser.add_argument(
+        "--cas_file", metavar="CAS_FILE", help="stores the assembled program in a cassette image CAS_FILE"
+    )
+    parser.add_argument(
+        "--dsk_file", metavar="DSK_FILE", help="stores the assembled program in a disk image DSK_FILE"
+    )
     return parser.parse_args()
 
 
@@ -48,10 +58,16 @@ def main(args):
     if args.print:
         program.print_statements()
 
-    if args.output:
-        program.save_binary_file(args.output)
+    if args.bin_file:
+        binary_file = BinaryFile()
+        binary_file.open_host_file(args.bin_file)
+        binary_file.save_file(None, program.get_binary_array())
+        binary_file.close_host_file()
+
+# M A I N #####################################################################
 
 
-main(parse_arguments())
+if __name__ == '__main__':
+    main(parse_arguments())
 
 # E N D   O F   F I L E #######################################################
