@@ -85,6 +85,18 @@ class Value(ABC):
         """
         return self.type == value_type
 
+    def high_byte(self):
+        if self.hex_len() < 2:
+            return 0x00
+        return int(self.hex()[0:2], 16)
+
+    def low_byte(self):
+        if self.hex_len() < 1:
+            return 0x00
+        if self.hex_len() < 2:
+            return int(self.hex()[0:2], 16)
+        return int(self.hex()[2:], 16)
+
     @abstractmethod
     def hex(self, size=0):
         """

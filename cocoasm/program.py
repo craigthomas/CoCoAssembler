@@ -10,7 +10,7 @@ import sys
 
 from cocoasm.exceptions import TranslationError, ParseError
 from cocoasm.statement import Statement
-from cocoasm.values import AddressValue, ValueType
+from cocoasm.values import AddressValue, ValueType, NoneValue
 
 # C L A S S E S ###############################################################
 
@@ -25,6 +25,7 @@ class Program(object):
         self.symbol_table = dict()
         self.statements = []
         self.address = 0x0
+        self.origin = NoneValue()
         self.process(filename)
 
     def process(self, filename):
@@ -130,6 +131,11 @@ class Program(object):
         for symbol, value in self.symbol_table.items():
             if value.is_type(ValueType.ADDRESS):
                 self.symbol_table[symbol] = self.statements[value.int].code_pkg.address
+
+        # Find the origin of the project
+        for statement in self.statements:
+            if statement.instruction.is_origin:
+                self.origin = statement.code_pkg.address
 
     def get_binary_array(self):
         """

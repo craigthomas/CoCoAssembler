@@ -122,6 +122,7 @@ class Instruction(NamedTuple):
     is_include: bool = False
     is_short_branch: bool = False
     is_long_branch: bool = False
+    is_origin: bool = False
     func: Callable[..., str] = None
 
     def translate_pseudo(self, operand):
@@ -383,7 +384,7 @@ INSTRUCTIONS = [
 
     # Pseudo operations
     Instruction(mnemonic="END", is_pseudo=True),
-    Instruction(mnemonic="ORG", is_pseudo=True),
+    Instruction(mnemonic="ORG", is_pseudo=True, is_origin=True),
     Instruction(mnemonic="EQU", is_pseudo=True, is_pseudo_define=True),
     Instruction(mnemonic="SET", is_pseudo=True),
     Instruction(mnemonic="RMB", is_pseudo=True),
