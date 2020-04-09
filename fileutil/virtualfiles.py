@@ -96,6 +96,16 @@ class BinaryFile(VirtualFile):
 
 
 class CassetteFile(VirtualFile):
+    """
+    A CassetteFile contains a series of blocks that are separated by leaders
+    and gaps. There are three different types of blocks:
+
+      header block - contains the filename, loading address, and execution address
+      data block - contains the raw data for the file, may be multiple blocks
+      EOF block - contains an EOF signature
+
+    CassetteFile may contain more than one file on it.
+    """
     def __init__(self, load_addr, exec_addr):
         super().__init__()
         self.load_addr = load_addr
@@ -181,7 +191,8 @@ class CassetteFile(VirtualFile):
     def append_name(name, buffer):
         """
         Appends the name of the file to the cassette header block. The name may only
-        be 8 characters long. It is left padded by $00 values.
+        be 8 characters long. It is left padded by $00 values. The buffer is modified
+        in-place.
 
         :param name: the name of the file as saved to the cassette
         :param buffer: the buffer to write to
@@ -197,6 +208,14 @@ class CassetteFile(VirtualFile):
 
     @staticmethod
     def append_data_blocks(buffer, raw_bytes):
+        """
+        Appends one or more data blocks to the buffer. Will continue to add
+        data blocks to the buffer until the raw_bytes buffer is empty. The
+        buffer is modified in-place.
+
+        :param buffer: the buffer to append to
+        :param raw_bytes: the raw bytes of data to add to the data block
+        """
         if len(raw_bytes) == 0:
             return
 
@@ -227,18 +246,21 @@ class CassetteFile(VirtualFile):
                 checksum += raw_bytes[index]
             buffer.append(checksum & 0xFF)
             buffer.append(0x55)
-            CassetteFile.append_data_blocks(buffer, raw_bytes[256:])
+            CassetteFile.append_data_blocks(buffer, raw_bytes[255:])
 
     @staticmethod
     def append_eof(buffer):
         """
         Appends an EOF block to a buffer. The block is 6 bytes long:
+
           byte 1 = $55 (fixed value)
           byte 2 = $3C (fixed value)
           byte 3 = $FF (block type, $FF = EOF block)
           byte 4 = $00 (length of block)
           byte 5 = $XX (checksum - addition of bytes 3 and 4)
           byte 6 = $55 (fixed value)
+
+        The buffer is modified in-place.
 
         :param buffer: the buffer to write the EOF block to
         """
