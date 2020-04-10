@@ -21,12 +21,12 @@ class Program(object):
     contains a list of statements. Additionally, a Program keeps track of all
     the user-defined symbols in the program.
     """
-    def __init__(self, filename):
+    def __init__(self):
         self.symbol_table = dict()
         self.statements = []
         self.address = 0x0
         self.origin = NoneValue()
-        self.process(filename)
+        self.name = None
 
     def process(self, filename):
         """
@@ -132,10 +132,12 @@ class Program(object):
             if value.is_type(ValueType.ADDRESS):
                 self.symbol_table[symbol] = self.statements[value.int].code_pkg.address
 
-        # Find the origin of the project
+        # Find the origin and name of the project
         for statement in self.statements:
             if statement.instruction.is_origin:
                 self.origin = statement.code_pkg.address
+            if statement.instruction.is_name:
+                self.name = statement.operand.operand_string
 
     def get_binary_array(self):
         """

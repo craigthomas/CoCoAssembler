@@ -53,7 +53,9 @@ def main(args):
 
     :param args: the command-line arguments
     """
-    program = Program(args.filename)
+    program = Program()
+    program.process(args.filename)
+    name = program.name or args.name
 
     if args.symbols:
         program.print_symbol_table()
@@ -68,12 +70,12 @@ def main(args):
         binary_file.close_host_file()
 
     if args.cas_file:
-        if not args.name:
-            print("No --name for the program specified, not creating cassette file")
+        if not name:
+            print("No name for the program specified, not creating cassette file")
             return
         binary_file = CassetteFile(program.origin, program.origin)
         binary_file.open_host_file(args.cas_file)
-        binary_file.save_file(args.name, program.get_binary_array())
+        binary_file.save_file(name, program.get_binary_array())
         binary_file.close_host_file()
 
 # M A I N #####################################################################

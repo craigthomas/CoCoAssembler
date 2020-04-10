@@ -135,14 +135,16 @@ it will be erased and overwritten.
 
 ### Save to Cassette File
 
-To save the assembled contents to a cassette file, use the `--cas_file` switch, 
-along with the `--name` switch:
+To save the assembled contents to a cassette file, use the `--cas_file` switch:
 
-    python assembler.py test.asm --cas_file test.cas --name myprog
+    python assembler.py test.asm --cas_file test.cas
     
 This will assemble the program and save it to a cassette file called `test.cas`.
-In turn, the program name on the cassette file will be `myprog`. _NOTE_: if the
-file `test.cas` exists, it will be erased and overwritten.
+The source code must include the `NAM` mnemonic to name the program (e.g. 
+`NAM myprog`), or the `--name` switch must be used on the command line (e.g.
+`--name myprog`). The program name on the cassette file will be `myprog`. 
+
+**NOTE**: if the file `test.cas` exists, it will be erased and overwritten.
 
     
 ## Mnemonic Table
@@ -192,6 +194,7 @@ symbols are:
 | `END`    | Defines the end of the program.                                            | `END`                  |
 | `EQU`    | Defines a symbol with a set value.                                         | `SCRMEM EQU $1000`     |
 | `INCLUDE`| Includes another assembly source file at this location.                    | `INCLUDE globals.asm`  |
+| `NAM`    | Sets the name for the program when assembled to disk or cassette.          | `NAM myprog`           |
 | `ORG`    | Defines where in memory the program should originate at.                   | `ORG $0E00`            |
 | `SETDP`  | Sets the direct page value for the assembler (see notes below).            | `SETDP $0E00`          |
 

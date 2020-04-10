@@ -123,6 +123,7 @@ class Instruction(NamedTuple):
     is_short_branch: bool = False
     is_long_branch: bool = False
     is_origin: bool = False
+    is_name: bool = False
     func: Callable[..., str] = None
 
     def translate_pseudo(self, operand):
@@ -148,6 +149,9 @@ class Instruction(NamedTuple):
             return CodePackage(additional=operand.value, size=operand.value.byte_len())
 
         if self.mnemonic == "END":
+            return CodePackage()
+
+        if self.mnemonic == "NAM":
             return CodePackage()
 
     def translate_special(self, operand, statement):
@@ -392,7 +396,8 @@ INSTRUCTIONS = [
     Instruction(mnemonic="FDB", is_pseudo=True),
     Instruction(mnemonic="FCC", is_pseudo=True, is_string_define=True),
     Instruction(mnemonic="SETDP", is_pseudo=True),
-    Instruction(mnemonic="INCLUDE", is_pseudo=True, is_include=True)
+    Instruction(mnemonic="INCLUDE", is_pseudo=True, is_include=True),
+    Instruction(mnemonic="NAM", is_pseudo=True, is_name=True)
 ]
 
 # E N D   O F   F I L E #######################################################
