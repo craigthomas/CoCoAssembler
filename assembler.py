@@ -1,5 +1,5 @@
 """
-Copyright (C) 2019 Craig Thomas
+Copyright (C) 2019-2020 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -41,6 +41,9 @@ def parse_arguments():
     parser.add_argument(
         "--dsk_file", metavar="DSK_FILE", help="stores the assembled program in a disk image DSK_FILE"
     )
+    parser.add_argument(
+        "--name", help="the name of the file to be created on the cassette or disk image"
+    )
     return parser.parse_args()
 
 
@@ -65,9 +68,12 @@ def main(args):
         binary_file.close_host_file()
 
     if args.cas_file:
+        if not args.name:
+            print("No --name for the program specified, not creating cassette file")
+            return
         binary_file = CassetteFile(program.origin, program.origin)
         binary_file.open_host_file(args.cas_file)
-        binary_file.save_file("test", program.get_binary_array())
+        binary_file.save_file(args.name, program.get_binary_array())
         binary_file.close_host_file()
 
 # M A I N #####################################################################

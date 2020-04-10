@@ -16,6 +16,7 @@
    2. [Print Symbol Table](#print-symbol-table)
    3. [Print Assembled Statements](#print-assembled-statements)
    4. [Save to Binary File](#save-to-binary-file)
+   5. [Save to Cassette File](#save-to-cassette-file)
 6. [Mnemonic Table](#mnemonic-table)
    1. [Mnemonics](#mnemonics)
    2. [Pseudo Operations](#pseudo-operations)
@@ -70,6 +71,7 @@ that are available:
 * `--bin_file` - save assembled contents to a binary file
 * `--cas_file` - save assembled contents to a cassette file
 * `--dsk_file` - save assembled contents to a virtual disk file
+* `--name` - saves the program with the specified name on a cassette or virtual disk file
 
 ### Input File Format
 
@@ -127,24 +129,58 @@ To save the assembled contents to a binary file, use the `--bin_file` switch:
     
 The assembled program will be saved to the file `test.bin`. Note that this file
 may not be useful on its own, as it does not have any meta information about
-where the file should be loaded in memory. If the file `test.bin` exists, it will
-be erased and overwritten.
+where the file should be loaded in memory. _NOTE_: If the file `test.bin` exists, 
+it will be erased and overwritten.
 
+
+### Save to Cassette File
+
+To save the assembled contents to a cassette file, use the `--cas_file` switch, 
+along with the `--name` switch:
+
+    python assembler.py test.asm --cas_file test.cas --name myprog
+    
+This will assemble the program and save it to a cassette file called `test.cas`.
+In turn, the program name on the cassette file will be `myprog`. _NOTE_: if the
+file `test.cas` exists, it will be erased and overwritten.
+
+    
 ## Mnemonic Table
 
 Below are the mnemonics that are accepted by the assembler (these mnemonics are 
-compatible with EDTASM+ assembler mnemonics).
+compatible with EDTASM+ assembler mnemonics). For the mnemonics below, special 
+symbols are:
+
+* `A` - 8-bit accumulator register.
+* `B` - 8-bit accumulator register.
+* `CC` - 8-bit condition code register.
+* `D` - 16-bit accumulator register comprised of A and B, with A being high byte, and B being low byte.
+* `M` - a memory location with a value between 0 and 65535.
+* `S` - 16-bit system stack register.
+* `U` - 16-bit user stack register.
+* `X` - 16-bit index register.
+* `Y` - 16-bit index register.
  
 ### Mnemonics
 
 | Mnemonic | Description | Example |
 | -------- | ----------- | ------- |
-| `ABX`    | Adds accumulator `B` to value in register `X` and stores in `X`.           | `ABX`                  |
-| `ADCA`   | Adds accumulator `A`, memory value `M`, and carry bit and stores in `A`.   | `ADCA $FFEE`           |
-| `ADCB`   | Adds accumulator `B`, memory value `M`, and carry bit and stores in `B`.   | `ADCB $FFEF`           |
-| `ADDA`   | Adds accumulator `A` with memory value `M` and stores in `A`.              | `ADDA #$03`            |
-| `ADDB`   | Adds accumulator `B` with memory value `M` and stores in `B`.              | `ADDB #$90`            |
-| `ADDD`   | Adds accumulator `D` (`A:B`) with memory value `M:M+1` and stores in `D`.  | `ADDD #$2000`          |
+| `ABX`    | Adds contents of `B` to value in register `X` and stores in `X`.           | `ABX`                  |
+| `ADCA`   | Adds contents of `A`, memory value `M`, and carry bit and stores in `A`.   | `ADCA $FFEE`           |
+| `ADCB`   | Adds contents of `B`, memory value `M`, and carry bit and stores in `B`.   | `ADCB $FFEF`           |
+| `ADDA`   | Adds contents of `A` with memory value `M` and stores in `A`.              | `ADDA #$03`            |
+| `ADDB`   | Adds contents of `B` with memory value `M` and stores in `B`.              | `ADDB #$90`            |
+| `ADDD`   | Adds contents of `D` (`A:B`) with memory value `M:M+1` and stores in `D`.  | `ADDD #$2000`          |
+| `ANDA`   | Performs a logical AND on `A` with memory value `M` and stores in `A`.     | `ANDA #$05`            |
+| `ANDB`   | Performs a logical AND on `B` with memory value `M` and stores in `B`.     | `ANDB $FFEE`           |
+| `ANDCC`  | Performs a logical AND on `CC` with immediate value `M` and stores in `CC`.| `ANDCC #01`            |
+| `ASLA`   | Shifts bits in `A` left (0 placed in bit 0, bit 7 goes to carry in `CC`).  | `ASLA`                 |
+| `ASLB`   | Shifts bits in `B` left (0 placed in bit 0, bit 7 goes to carry in `CC`).  | `ASLB`                 |
+| `ASL`    | Shifts bits in `M` left (0 placed in bit 0, bit 7 goes to carry in `CC`).  | `ASL $0E00`            |
+| `ASRA`   | Shifts bits in `A` right (bit 0 goes to carry in `CC`, bit 7 remains same).| `ASRA`                 |
+| `ASRB`   | Shifts bits in `B` right (bit 0 goes to carry in `CC`, bit 7 remains same).| `ASRB`                 |
+| `ASR`    | Shifts bits in `M` right (bit 0 goes to carry in `CC`, bit 7 remains same).| `ASR $0E00`            |
+
 
 ### Pseudo Operations
 
