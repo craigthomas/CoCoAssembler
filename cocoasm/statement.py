@@ -154,10 +154,6 @@ class Statement(object):
         if self.instruction.is_pseudo:
             return
 
-        if self.instruction.is_special:
-            self.code_pkg = self.instruction.translate_special(self.operand, self)
-            return
-
         self.operand = self.operand.resolve_symbols(symbol_table)
         self.code_pkg = self.operand.translate()
 

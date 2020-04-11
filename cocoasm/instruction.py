@@ -19,9 +19,6 @@ IVLD = -1
 # Illegal addressing mode
 ILLEGAL_MODE = -1
 
-# Recognized register names
-REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
-
 
 # C L A S S E S ###############################################################
 
@@ -154,89 +151,7 @@ class Instruction(NamedTuple):
         if self.mnemonic == "NAM":
             return CodePackage()
 
-    def translate_special(self, operand, statement):
-        """
-        Translates special non-pseudo operations.
 
-        :param operand: the operand to process
-        :param statement: the statement that this operation came from
-        """
-        code_pkg = CodePackage()
-        code_pkg.op_code = NumericValue(statement.instruction.mode.imm)
-        code_pkg.size = statement.instruction.mode.imm_sz
-
-        if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
-            registers = operand.operand_string.split(",")
-            code_pkg.post_byte = 0x00
-            for register in registers:
-                if register not in REGISTERS:
-                    raise ValueError("unknown register {}".format(register))
-
-                code_pkg.post_byte |= 0x06 if register == "D" else 0x00
-                code_pkg.post_byte |= 0x01 if register == "CC" else 0x00
-                code_pkg.post_byte |= 0x02 if register == "A" else 0x00
-                code_pkg.post_byte |= 0x04 if register == "B" else 0x00
-                code_pkg.post_byte |= 0x08 if register == "DP" else 0x00
-                code_pkg.post_byte |= 0x10 if register == "X" else 0x00
-                code_pkg.post_byte |= 0x20 if register == "Y" else 0x00
-                code_pkg.post_byte |= 0x40 if register == "U" else 0x00
-                code_pkg.post_byte |= 0x80 if register == "PC" else 0x00
-
-        if self.mnemonic == "EXG" or self.mnemonic == "TFR":
-            registers = operand.operand_string.split(",")
-            code_pkg.post_byte = 0x00
-            if len(registers) != 2:
-                raise TranslationError("{} requires exactly 2 registers".format(self.mnemonic), statement)
-
-            if registers[0] not in REGISTERS:
-                raise TranslationError("unknown register {}".format(registers[0]), statement)
-
-            if registers[1] not in REGISTERS:
-                raise TranslationError("unknown register {}".format(registers[1]), statement)
-
-            code_pkg.post_byte |= 0x00 if registers[0] == "D" else 0x00
-            code_pkg.post_byte |= 0x00 if registers[1] == "D" else 0x00
-
-            code_pkg.post_byte |= 0x10 if registers[0] == "X" else 0x00
-            code_pkg.post_byte |= 0x01 if registers[1] == "X" else 0x00
-
-            code_pkg.post_byte |= 0x20 if registers[0] == "Y" else 0x00
-            code_pkg.post_byte |= 0x02 if registers[1] == "Y" else 0x00
-
-            code_pkg.post_byte |= 0x30 if registers[0] == "U" else 0x00
-            code_pkg.post_byte |= 0x03 if registers[1] == "U" else 0x00
-
-            code_pkg.post_byte |= 0x40 if registers[0] == "S" else 0x00
-            code_pkg.post_byte |= 0x04 if registers[1] == "S" else 0x00
-
-            code_pkg.post_byte |= 0x50 if registers[0] == "PC" else 0x00
-            code_pkg.post_byte |= 0x05 if registers[1] == "PC" else 0x00
-
-            code_pkg.post_byte |= 0x80 if registers[0] == "A" else 0x00
-            code_pkg.post_byte |= 0x08 if registers[1] == "A" else 0x00
-
-            code_pkg.post_byte |= 0x90 if registers[0] == "B" else 0x00
-            code_pkg.post_byte |= 0x09 if registers[1] == "B" else 0x00
-
-            code_pkg.post_byte |= 0xA0 if registers[0] == "CC" else 0x00
-            code_pkg.post_byte |= 0x0A if registers[1] == "CC" else 0x00
-
-            code_pkg.post_byte |= 0xB0 if registers[0] == "DP" else 0x00
-            code_pkg.post_byte |= 0x0B if registers[1] == "DP" else 0x00
-
-            if code_pkg.post_byte not in [
-                    0x01, 0x10, 0x02, 0x20, 0x03, 0x30, 0x04, 0x40,
-                    0x05, 0x50, 0x12, 0x21, 0x13, 0x31, 0x14, 0x41,
-                    0x15, 0x51, 0x23, 0x32, 0x24, 0x42, 0x25, 0x52,
-                    0x34, 0x43, 0x35, 0x53, 0x45, 0x54, 0x89, 0x98,
-                    0x8A, 0xA8, 0x8B, 0xB8, 0x9A, 0xA9, 0x9B, 0xB9,
-                    0xAB, 0xBA, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
-                    0x88, 0x99, 0xAA, 0xBB]:
-                raise TranslationError("{} of {} to {} not allowed".format(self.mnemonic, registers[0], registers[1]),
-                                       statement)
-
-        code_pkg.post_byte = NumericValue(code_pkg.post_byte)
-        return code_pkg
 
 
 INSTRUCTIONS = [
