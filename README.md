@@ -125,7 +125,7 @@ Which will have the following output:
     $0E11 MESSAGE
     $0E1E FINISH
     
-The column of output is the hex value of the symbol, the second columns is the symbol name
+The first column of output is the hex value of the symbol, the second columns is the symbol name
 itself.
 
 
