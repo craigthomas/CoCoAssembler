@@ -195,7 +195,13 @@ class UnknownOperand(Operand):
     def __init__(self, operand_string, instruction, value=None):
         super().__init__(instruction)
         self.operand_string = operand_string
-        self.value = value if value else Value.create_from_str(operand_string, instruction)
+        if value:
+            self.value = value
+        else:
+            try:
+                self.value = Value.create_from_str(operand_string, instruction)
+            except ValueError:
+                self.value = NoneValue()
 
     def translate(self):
         return CodePackage(additional=self.value)
@@ -246,6 +252,15 @@ class ImmediateOperand(Operand):
         if not match:
             raise ValueError("[{}] is not an immediate value".format(operand_string))
         self.value = Value.create_from_str(match.group("value"), instruction)
+
+    def resolve_symbols(self, symbol_table):
+        if not self.value.is_type(ValueType.SYMBOL):
+            return self
+
+        symbol = self.get_symbol(self.value.ascii(), symbol_table)
+        self.value = copy(symbol)
+
+        return self
 
     def translate(self):
         if not self.instruction.mode.supports_immediate():
