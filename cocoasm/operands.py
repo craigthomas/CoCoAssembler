@@ -78,6 +78,11 @@ class Operand(ABC):
     @classmethod
     def create_from_str(cls, operand_string, instruction):
         try:
+            return PseudoOperand(operand_string, instruction)
+        except ValueError:
+            pass
+
+        try:
             return SpecialOperand(operand_string, instruction)
         except ValueError:
             pass
@@ -213,6 +218,33 @@ class UnknownOperand(Operand):
 
     def translate(self):
         return CodePackage(additional=self.value)
+
+
+class PseudoOperand(Operand):
+    def __init__(self, operand_string, instruction):
+        super().__init__(instruction)
+        self.operand_string = operand_string
+        if not instruction.is_pseudo:
+            raise ValueError("[{}] is not a pseudo instruction")
+        self.value = Value.create_from_str(operand_string, instruction)
+
+    def resolve_symbols(self, symbol_table):
+        return self
+
+    def translate(self):
+        if self.instruction.mnemonic == "FCB":
+            return CodePackage(additional=self.value, size=1)
+
+        if self.instruction.mnemonic == "FDB":
+            return CodePackage(additional=NumericValue(self.value.int, size_hint=4), size=2)
+
+        if self.instruction.mnemonic == "ORG":
+            return CodePackage(address=self.value)
+
+        if self.instruction.mnemonic == "FCC":
+            return CodePackage(additional=self.value, size=self.value.byte_len())
+
+        return CodePackage()
 
 
 class SpecialOperand(Operand):

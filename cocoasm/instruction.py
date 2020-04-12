@@ -8,8 +8,7 @@ A Color Computer Assembler - see the README.md file for details.
 
 from typing import NamedTuple, Callable
 
-from cocoasm.exceptions import TranslationError
-from cocoasm.values import NumericValue, NoneValue
+from cocoasm.values import NoneValue
 
 # C O N S T A N T S ###########################################################
 
@@ -121,37 +120,6 @@ class Instruction(NamedTuple):
     is_long_branch: bool = False
     is_origin: bool = False
     is_name: bool = False
-    func: Callable[..., str] = None
-
-    def translate_pseudo(self, operand):
-        """
-        Translates a pseudo operation.
-
-        :param operand: the operand value of the pseudo operation
-        :return: returns the value of the pseudo operation
-        """
-        if self.mnemonic == "FCB":
-            return CodePackage(additional=operand.value, size=1)
-
-        if self.mnemonic == "FDB":
-            return CodePackage(additional=NumericValue(operand.value.int, size_hint=4), size=2)
-
-        if self.mnemonic == "EQU":
-            return CodePackage()
-
-        if self.mnemonic == "ORG":
-            return CodePackage(address=operand.value)
-
-        if self.mnemonic == "FCC":
-            return CodePackage(additional=operand.value, size=operand.value.byte_len())
-
-        if self.mnemonic == "END":
-            return CodePackage()
-
-        if self.mnemonic == "NAM":
-            return CodePackage()
-
-
 
 
 INSTRUCTIONS = [
