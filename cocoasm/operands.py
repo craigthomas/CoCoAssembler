@@ -373,7 +373,7 @@ class InherentOperand(Operand):
             raise ValueError("[{}] is not an inherent value".format(operand_string))
 
     def translate(self):
-        if not self.instruction.mode.supports_inherent():
+        if not self.instruction.mode.inh:
             raise ValueError("Instruction [{}] requires an operand".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.inh), size=self.instruction.mode.inh_sz)
 
@@ -401,7 +401,7 @@ class ImmediateOperand(Operand):
         return self
 
     def translate(self):
-        if not self.instruction.mode.supports_immediate():
+        if not self.instruction.mode.imm:
             raise ValueError("Instruction [{}] does not support immediate addressing".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.imm),
                            additional=self.value,
@@ -425,7 +425,7 @@ class DirectOperand(Operand):
             raise ValueError("[{}] is not a direct value".format(operand_string))
 
     def translate(self):
-        if not self.instruction.mode.supports_direct():
+        if not self.instruction.mode.dir:
             raise ValueError("Instruction [{}] does not support direct addressing".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.dir),
                            additional=self.value,
@@ -449,7 +449,7 @@ class ExtendedOperand(Operand):
             raise ValueError("[{}] is not an extended value".format(operand_string))
 
     def translate(self):
-        if not self.instruction.mode.supports_extended():
+        if not self.instruction.mode.ext:
             raise ValueError("Instruction [{}] does not support extended addressing".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.ext),
                            additional=self.value,
@@ -490,7 +490,7 @@ class ExtendedIndexedOperand(Operand):
         return self
 
     def translate(self):
-        if not self.instruction.mode.supports_indexed():
+        if not self.instruction.mode.ind:
             raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
         size = self.instruction.mode.ind_sz
 
@@ -596,7 +596,7 @@ class IndexedOperand(Operand):
         return self
 
     def translate(self):
-        if not self.instruction.mode.supports_indexed():
+        if not self.instruction.mode.ind:
             raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
         raw_post_byte = 0x00
         size = self.instruction.mode.ind_sz

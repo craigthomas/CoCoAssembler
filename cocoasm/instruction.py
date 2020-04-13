@@ -6,17 +6,9 @@ A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
-from typing import NamedTuple, Callable
+from typing import NamedTuple
 
 from cocoasm.values import NoneValue
-
-# C O N S T A N T S ###########################################################
-
-# Invalid operation
-IVLD = -1
-
-# Illegal addressing mode
-ILLEGAL_MODE = -1
 
 
 # C L A S S E S ###############################################################
@@ -29,11 +21,6 @@ class CodePackage(object):
         self.additional = additional
         self.size = size
 
-    def __str__(self):
-        return "op_code: {}, address: {}, post_byte: {}, additional: {}, size: {}".format(
-            self.op_code, self.address, self.post_byte, self.additional, self.size
-        )
-
 
 class Mode(NamedTuple):
     """
@@ -42,61 +29,18 @@ class Mode(NamedTuple):
     Indexed (ind), Extended (ext), and Relative (rel). Each instruction may have
     one or more addressing modes (see Instruction class).
     """
-    inh: int = IVLD
+    inh: int = None
     inh_sz: int = 0
-    imm: int = IVLD
+    imm: int = None
     imm_sz: int = 0
-    dir: int = IVLD
+    dir: int = None
     dir_sz: int = 0
-    ind: int = IVLD
+    ind: int = None
     ind_sz: int = 0
-    ext: int = IVLD
+    ext: int = None
     ext_sz: int = 0
-    rel: int = IVLD
+    rel: int = None
     rel_sz: int = 0
-
-    def supports_inherent(self):
-        """
-        Returns whether the addressing mode is an inherent mode.
-        :return: True if the mode is inherent, false otherwise
-        """
-        return self.inh is not IVLD
-
-    def supports_immediate(self):
-        """
-        Returns whether the addressing mode is immediate.
-        :return: True if the mode is immediate, false otherwise
-        """
-        return self.imm is not IVLD
-
-    def supports_direct(self):
-        """
-        Returns whether the addressing mode is direct.
-        :return: True if the mode is direct, false otherwise
-        """
-        return self.dir is not IVLD
-
-    def supports_indexed(self):
-        """
-        Returns whether the addressing mode is indexed.
-        :return: True if the mode is indexed, false otherwise
-        """
-        return self.ind is not IVLD
-
-    def supports_extended(self):
-        """
-        Returns whether the addressing mode is extended.
-        :return: True if the mode is extended, false otherwise
-        """
-        return self.ext is not IVLD
-
-    def supports_relative(self):
-        """
-        Returns whether the addressing mode is relative.
-
-        :return: True if the mode is relative, false otherwise
-        """
-        return self.rel is not IVLD
 
 
 class Instruction(NamedTuple):
@@ -106,8 +50,8 @@ class Instruction(NamedTuple):
     understandable code for the operation, a set of addressing modes
     that the operation supports, whether the mnemonic is a pseudo 
     operation (i.e. only used by the assembler for special directives),
-    is a branch instruction, and a function to assist with operation
-    translation by the assembler.
+    is a branch instruction, as well as other attributes used for
+    translation and parsing.
     """
     mnemonic: str = ""
     mode: Mode = Mode()

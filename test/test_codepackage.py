@@ -21,11 +21,7 @@ class TestCodePackage(unittest.TestCase):
         """
         Common setup routines needed for all unit tests.
         """
-        pass
 
-    def test_str(self):
-        result = CodePackage(op_code=1, address=2, post_byte=3, additional=4)
-        self.assertEqual("op_code: 1, address: 2, post_byte: 3, additional: 4, size: 0", str(result))
 
 # M A I N #####################################################################
 
