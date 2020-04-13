@@ -121,6 +121,10 @@ class TestNumericValue(unittest.TestCase):
         result = NumericValue("57005")
         self.assertTrue(result.is_type(ValueType.NUMERIC))
 
+    def test_numeric_hex_len_is_correct(self):
+        result = NumericValue("$01")
+        self.assertEqual(2, result.hex_len())
+
 
 class TestStringValue(unittest.TestCase):
     """

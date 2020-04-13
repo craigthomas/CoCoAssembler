@@ -47,8 +47,6 @@ class TestBaseOperand(unittest.TestCase):
         operand = Operand.create_from_str("#$01", instruction)
         self.assertTrue(operand.is_type(OperandType.IMMEDIATE))
 
-    # TODO: fix this problem
-    @unittest.skip
     def test_base_operand_create_from_str_returns_direct(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(dir=0x09, dir_sz=2))
         operand = Operand.create_from_str("$01", instruction)
