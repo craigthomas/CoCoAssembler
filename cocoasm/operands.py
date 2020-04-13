@@ -42,6 +42,11 @@ EXPRESSION_REGEX = re.compile(
     r"^(?P<left>[\d\w]+)(?P<operation>[+\-/*])(?P<right>[\d\w]+)$"
 )
 
+# Pattern to recognize invalid characters in an UnknownOperand
+UNKNOWN_REGEX = re.compile(
+    r","
+)
+
 # Recognized register names
 REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
 
@@ -210,11 +215,13 @@ class UnknownOperand(Operand):
         self.operand_string = operand_string
         if value:
             self.value = value
-        else:
-            try:
-                self.value = Value.create_from_str(operand_string, instruction)
-            except ValueError:
-                self.value = NoneValue()
+            return
+        if UNKNOWN_REGEX.search(operand_string):
+            raise ValueError("[{}] invalid operand".format(operand_string))
+        try:
+            self.value = Value.create_from_str(operand_string, instruction)
+        except ValueError:
+            self.value = NoneValue()
 
     def translate(self):
         return CodePackage(additional=self.value)
