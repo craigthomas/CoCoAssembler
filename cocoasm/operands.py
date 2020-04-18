@@ -67,6 +67,8 @@ class OperandType(Enum):
     RELATIVE = 7
     SYMBOL = 8
     EXPRESSION = 9
+    PSEUDO = 10
+    SPECIAL = 11
 
 
 class Operand(ABC):
@@ -231,8 +233,9 @@ class PseudoOperand(Operand):
     def __init__(self, operand_string, instruction):
         super().__init__(instruction)
         self.operand_string = operand_string
+        self.type = OperandType.PSEUDO
         if not instruction.is_pseudo:
-            raise ValueError("[{}] is not a pseudo instruction")
+            raise ValueError("[{}] is not a pseudo instruction".format(instruction.mnemonic))
         self.value = Value.create_from_str(operand_string, instruction)
 
     def resolve_symbols(self, symbol_table):
@@ -258,8 +261,9 @@ class SpecialOperand(Operand):
     def __init__(self, operand_string, instruction):
         super().__init__(instruction)
         self.operand_string = operand_string
+        self.type = OperandType.SPECIAL
         if not instruction.is_special:
-            raise ValueError("[{}] is not a special instruction")
+            raise ValueError("[{}] is not a special instruction".format(instruction.mnemonic))
 
     def resolve_symbols(self, symbol_table):
         return self
@@ -268,13 +272,16 @@ class SpecialOperand(Operand):
         code_pkg = CodePackage()
         code_pkg.op_code = NumericValue(self.instruction.mode.imm)
         code_pkg.size = self.instruction.mode.imm_sz
+        code_pkg.post_byte = 0x00
 
         if self.instruction.mnemonic == "PSHS" or self.instruction.mnemonic == "PULS":
+            if not self.operand_string:
+                raise ValueError("one or more registers must be specified")
+
             registers = self.operand_string.split(",")
-            code_pkg.post_byte = 0x00
             for register in registers:
                 if register not in REGISTERS:
-                    raise ValueError("unknown register {}".format(register))
+                    raise ValueError("[{}] unknown register".format(register))
 
                 code_pkg.post_byte |= 0x06 if register == "D" else 0x00
                 code_pkg.post_byte |= 0x01 if register == "CC" else 0x00
@@ -288,7 +295,6 @@ class SpecialOperand(Operand):
 
         if self.instruction.mnemonic == "EXG" or self.instruction.mnemonic == "TFR":
             registers = self.operand_string.split(",")
-            code_pkg.post_byte = 0x00
             if len(registers) != 2:
                 raise ValueError("{} requires exactly 2 registers".format(self.instruction.mnemonic))
 

@@ -10,7 +10,7 @@ import unittest
 
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
     OperandType, IndexedOperand, RelativeOperand, ExtendedIndexedOperand, \
-    Operand, ExtendedOperand
+    Operand, ExtendedOperand, PseudoOperand, SpecialOperand
 from cocoasm.instruction import Instruction, Mode
 from cocoasm.values import NumericValue, AddressValue
 
@@ -135,6 +135,144 @@ class TestRelativeOperand(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             RelativeOperand("$FF", instruction)
         self.assertEqual("[BEQ] is not a branch instruction", str(context.exception))
+
+
+class TestPseudoOperand(unittest.TestCase):
+    """
+    A test class for the PseudoOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="PSU", mode=Mode(rel=0x3A, rel_sz=2), is_pseudo=True)
+
+    def test_pseudo_type_correct(self):
+        result = PseudoOperand("$FF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.PSEUDO))
+
+    def test_pseudo_raises_if_instruction_not_pseudo(self):
+        instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1))
+        with self.assertRaises(ValueError) as context:
+            PseudoOperand("$FF", instruction)
+        self.assertEqual("[BEQ] is not a pseudo instruction", str(context.exception))
+
+    def test_pseudo_translate_returns_empty_code_package_on_non_defined_instruction(self):
+        instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1))
+        with self.assertRaises(ValueError) as context:
+            PseudoOperand("$FF", instruction)
+        self.assertEqual("[BEQ] is not a pseudo instruction", str(context.exception))
+
+    def test_pseudo_translate_fcb(self):
+        instruction = Instruction(mnemonic="FCB", is_pseudo=True)
+        operand = PseudoOperand("$FF", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("FF", code_pkg.additional.hex())
+
+    def test_pseudo_translate_fdb(self):
+        instruction = Instruction(mnemonic="FDB", is_pseudo=True)
+        operand = PseudoOperand("$FFCC", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("FFCC", code_pkg.additional.hex())
+
+    def test_pseudo_translate_org(self):
+        instruction = Instruction(mnemonic="ORG", is_pseudo=True)
+        operand = PseudoOperand("$FFCC", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("FFCC", code_pkg.address.hex())
+
+    def test_pseudo_translate_fcc(self):
+        instruction = Instruction(mnemonic="FCC", is_pseudo=True, is_string_define=True)
+        operand = PseudoOperand('"hello"', instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("68656C6C6F", code_pkg.additional.hex())
+
+
+class TestSpecialOperand(unittest.TestCase):
+    """
+    A test class for the SpecialOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="PSHS", mode=Mode(rel=0x3A, rel_sz=2), is_special=True)
+
+    def test_special_type_correct(self):
+        result = SpecialOperand("$FF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.SPECIAL))
+
+    def test_special_raises_if_instruction_not_special(self):
+        instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1))
+        with self.assertRaises(ValueError) as context:
+            SpecialOperand("$FF", instruction)
+        self.assertEqual("[BEQ] is not a special instruction", str(context.exception))
+
+    def test_special_code_pkg_result_not_tfr_exg_pshs_puls(self):
+        instruction = Instruction(mnemonic="BLAH", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("$FF", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("3A", code_pkg.op_code.hex())
+        self.assertEqual(1, code_pkg.size)
+        self.assertEqual("00", code_pkg.post_byte.hex())
+
+    def test_special_pshs_raises_with_bad_register(self):
+        instruction = Instruction(mnemonic="PSHS", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("not_a_register", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[not_a_register] unknown register", str(context.exception))
+
+    def test_special_pshs_raises_with_no_register(self):
+        instruction = Instruction(mnemonic="PSHS", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("one or more registers must be specified", str(context.exception))
+
+    def test_special_pshs_correct_with_register_values(self):
+        instruction = Instruction(mnemonic="PSHS", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("D", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("06", code_pkg.post_byte.hex())
+
+        operand = SpecialOperand("CC", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("01", code_pkg.post_byte.hex())
+
+        operand = SpecialOperand("A", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("02", code_pkg.post_byte.hex())
+
+        operand = SpecialOperand("B", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("04", code_pkg.post_byte.hex())
+
+        operand = SpecialOperand("DP", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("08", code_pkg.post_byte.hex())
+
+        operand = SpecialOperand("X", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("10", code_pkg.post_byte.hex())
+
+        operand = SpecialOperand("Y", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("20", code_pkg.post_byte.hex())
+
+        operand = SpecialOperand("U", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("40", code_pkg.post_byte.hex())
+
+        operand = SpecialOperand("PC", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("80", code_pkg.post_byte.hex())
+
+    def test_special_pshs_correct_with_multiple_register_values(self):
+        instruction = Instruction(mnemonic="PSHS", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("CC,D,X,Y", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("37", code_pkg.post_byte.hex())
 
 
 class TestInherentOperand(unittest.TestCase):
