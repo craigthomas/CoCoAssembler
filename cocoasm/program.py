@@ -114,9 +114,6 @@ class Program(object):
             self.save_symbol(index, statement)
 
         for index, statement in enumerate(self.statements):
-            statement.translate_pseudo()
-
-        for index, statement in enumerate(self.statements):
             statement.translate(self.symbol_table)
 
         address = 0

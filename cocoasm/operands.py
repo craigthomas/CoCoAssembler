@@ -42,6 +42,14 @@ EXPRESSION_REGEX = re.compile(
     r"^(?P<left>[\d\w]+)(?P<operation>[+\-/*])(?P<right>[\d\w]+)$"
 )
 
+# Pattern to recognize invalid characters in an UnknownOperand
+UNKNOWN_REGEX = re.compile(
+    r","
+)
+
+# Recognized register names
+REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
+
 # C L A S S E S ###############################################################
 
 
@@ -59,6 +67,8 @@ class OperandType(Enum):
     RELATIVE = 7
     SYMBOL = 8
     EXPRESSION = 9
+    PSEUDO = 10
+    SPECIAL = 11
 
 
 class Operand(ABC):
@@ -74,6 +84,16 @@ class Operand(ABC):
 
     @classmethod
     def create_from_str(cls, operand_string, instruction):
+        try:
+            return PseudoOperand(operand_string, instruction)
+        except ValueError:
+            pass
+
+        try:
+            return SpecialOperand(operand_string, instruction)
+        except ValueError:
+            pass
+
         try:
             return RelativeOperand(operand_string, instruction)
         except ValueError:
@@ -195,10 +215,140 @@ class UnknownOperand(Operand):
     def __init__(self, operand_string, instruction, value=None):
         super().__init__(instruction)
         self.operand_string = operand_string
-        self.value = value if value else Value.create_from_str(operand_string, instruction)
+        if value:
+            self.value = value
+            return
+        if UNKNOWN_REGEX.search(operand_string):
+            raise ValueError("[{}] invalid operand".format(operand_string))
+        try:
+            self.value = Value.create_from_str(operand_string, instruction)
+        except ValueError:
+            self.value = NoneValue()
 
     def translate(self):
         return CodePackage(additional=self.value)
+
+
+class PseudoOperand(Operand):
+    def __init__(self, operand_string, instruction):
+        super().__init__(instruction)
+        self.operand_string = operand_string
+        self.type = OperandType.PSEUDO
+        if not instruction.is_pseudo:
+            raise ValueError("[{}] is not a pseudo instruction".format(instruction.mnemonic))
+        self.value = Value.create_from_str(operand_string, instruction)
+
+    def resolve_symbols(self, symbol_table):
+        return self
+
+    def translate(self):
+        if self.instruction.mnemonic == "FCB":
+            return CodePackage(additional=self.value, size=1)
+
+        if self.instruction.mnemonic == "FDB":
+            return CodePackage(additional=NumericValue(self.value.int, size_hint=4), size=2)
+
+        if self.instruction.mnemonic == "ORG":
+            return CodePackage(address=self.value)
+
+        if self.instruction.mnemonic == "FCC":
+            return CodePackage(additional=self.value, size=self.value.byte_len())
+
+        return CodePackage()
+
+
+class SpecialOperand(Operand):
+    def __init__(self, operand_string, instruction):
+        super().__init__(instruction)
+        self.operand_string = operand_string
+        self.type = OperandType.SPECIAL
+        if not instruction.is_special:
+            raise ValueError("[{}] is not a special instruction".format(instruction.mnemonic))
+
+    def resolve_symbols(self, symbol_table):
+        return self
+
+    def translate(self):
+        code_pkg = CodePackage()
+        code_pkg.op_code = NumericValue(self.instruction.mode.imm)
+        code_pkg.size = self.instruction.mode.imm_sz
+        code_pkg.post_byte = 0x00
+
+        if self.instruction.mnemonic == "PSHS" or self.instruction.mnemonic == "PULS":
+            if not self.operand_string:
+                raise ValueError("one or more registers must be specified")
+
+            registers = self.operand_string.split(",")
+            for register in registers:
+                if register not in REGISTERS:
+                    raise ValueError("[{}] unknown register".format(register))
+
+                code_pkg.post_byte |= 0x06 if register == "D" else 0x00
+                code_pkg.post_byte |= 0x01 if register == "CC" else 0x00
+                code_pkg.post_byte |= 0x02 if register == "A" else 0x00
+                code_pkg.post_byte |= 0x04 if register == "B" else 0x00
+                code_pkg.post_byte |= 0x08 if register == "DP" else 0x00
+                code_pkg.post_byte |= 0x10 if register == "X" else 0x00
+                code_pkg.post_byte |= 0x20 if register == "Y" else 0x00
+                code_pkg.post_byte |= 0x40 if register == "U" else 0x00
+                code_pkg.post_byte |= 0x80 if register == "PC" else 0x00
+
+        if self.instruction.mnemonic == "EXG" or self.instruction.mnemonic == "TFR":
+            registers = self.operand_string.split(",")
+            if len(registers) != 2:
+                raise ValueError("{} requires exactly 2 registers".format(self.instruction.mnemonic))
+
+            if registers[0] not in REGISTERS:
+                raise ValueError("unknown register {}".format(registers[0]))
+
+            if registers[1] not in REGISTERS:
+                raise ValueError("unknown register {}".format(registers[1]))
+
+            code_pkg.post_byte |= 0x00 if registers[0] == "D" else 0x00
+            code_pkg.post_byte |= 0x00 if registers[1] == "D" else 0x00
+
+            code_pkg.post_byte |= 0x10 if registers[0] == "X" else 0x00
+            code_pkg.post_byte |= 0x01 if registers[1] == "X" else 0x00
+
+            code_pkg.post_byte |= 0x20 if registers[0] == "Y" else 0x00
+            code_pkg.post_byte |= 0x02 if registers[1] == "Y" else 0x00
+
+            code_pkg.post_byte |= 0x30 if registers[0] == "U" else 0x00
+            code_pkg.post_byte |= 0x03 if registers[1] == "U" else 0x00
+
+            code_pkg.post_byte |= 0x40 if registers[0] == "S" else 0x00
+            code_pkg.post_byte |= 0x04 if registers[1] == "S" else 0x00
+
+            code_pkg.post_byte |= 0x50 if registers[0] == "PC" else 0x00
+            code_pkg.post_byte |= 0x05 if registers[1] == "PC" else 0x00
+
+            code_pkg.post_byte |= 0x80 if registers[0] == "A" else 0x00
+            code_pkg.post_byte |= 0x08 if registers[1] == "A" else 0x00
+
+            code_pkg.post_byte |= 0x90 if registers[0] == "B" else 0x00
+            code_pkg.post_byte |= 0x09 if registers[1] == "B" else 0x00
+
+            code_pkg.post_byte |= 0xA0 if registers[0] == "CC" else 0x00
+            code_pkg.post_byte |= 0x0A if registers[1] == "CC" else 0x00
+
+            code_pkg.post_byte |= 0xB0 if registers[0] == "DP" else 0x00
+            code_pkg.post_byte |= 0x0B if registers[1] == "DP" else 0x00
+
+            if code_pkg.post_byte not in \
+                    [
+                        0x01, 0x10, 0x02, 0x20, 0x03, 0x30, 0x04, 0x40,
+                        0x05, 0x50, 0x12, 0x21, 0x13, 0x31, 0x14, 0x41,
+                        0x15, 0x51, 0x23, 0x32, 0x24, 0x42, 0x25, 0x52,
+                        0x34, 0x43, 0x35, 0x53, 0x45, 0x54, 0x89, 0x98,
+                        0x8A, 0xA8, 0x8B, 0xB8, 0x9A, 0xA9, 0x9B, 0xB9,
+                        0xAB, 0xBA, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
+                        0x88, 0x99, 0xAA, 0xBB
+                    ]:
+                raise ValueError(
+                    "{} of {} to {} not allowed".format(self.instruction.mnemonic, registers[0], registers[1]))
+
+        code_pkg.post_byte = NumericValue(code_pkg.post_byte)
+        return code_pkg
 
 
 class RelativeOperand(Operand):
@@ -229,7 +379,7 @@ class InherentOperand(Operand):
             raise ValueError("[{}] is not an inherent value".format(operand_string))
 
     def translate(self):
-        if not self.instruction.mode.supports_inherent():
+        if not self.instruction.mode.inh:
             raise ValueError("Instruction [{}] requires an operand".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.inh), size=self.instruction.mode.inh_sz)
 
@@ -247,8 +397,17 @@ class ImmediateOperand(Operand):
             raise ValueError("[{}] is not an immediate value".format(operand_string))
         self.value = Value.create_from_str(match.group("value"), instruction)
 
+    def resolve_symbols(self, symbol_table):
+        if not self.value.is_type(ValueType.SYMBOL):
+            return self
+
+        symbol = self.get_symbol(self.value.ascii(), symbol_table)
+        self.value = copy(symbol)
+
+        return self
+
     def translate(self):
-        if not self.instruction.mode.supports_immediate():
+        if not self.instruction.mode.imm:
             raise ValueError("Instruction [{}] does not support immediate addressing".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.imm),
                            additional=self.value,
@@ -272,7 +431,7 @@ class DirectOperand(Operand):
             raise ValueError("[{}] is not a direct value".format(operand_string))
 
     def translate(self):
-        if not self.instruction.mode.supports_direct():
+        if not self.instruction.mode.dir:
             raise ValueError("Instruction [{}] does not support direct addressing".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.dir),
                            additional=self.value,
@@ -296,7 +455,7 @@ class ExtendedOperand(Operand):
             raise ValueError("[{}] is not an extended value".format(operand_string))
 
     def translate(self):
-        if not self.instruction.mode.supports_extended():
+        if not self.instruction.mode.ext:
             raise ValueError("Instruction [{}] does not support extended addressing".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.ext),
                            additional=self.value,
@@ -337,7 +496,7 @@ class ExtendedIndexedOperand(Operand):
         return self
 
     def translate(self):
-        if not self.instruction.mode.supports_indexed():
+        if not self.instruction.mode.ind:
             raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
         size = self.instruction.mode.ind_sz
 
@@ -443,7 +602,7 @@ class IndexedOperand(Operand):
         return self
 
     def translate(self):
-        if not self.instruction.mode.supports_indexed():
+        if not self.instruction.mode.ind:
             raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
         raw_post_byte = 0x00
         size = self.instruction.mode.ind_sz

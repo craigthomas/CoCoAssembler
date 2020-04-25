@@ -141,23 +141,12 @@ class Statement(object):
         self.code_pkg.address = NumericValue(address)
         return self.code_pkg.address.int
 
-    def translate_pseudo(self):
-        if self.instruction.is_pseudo:
-            self.code_pkg = self.instruction.translate_pseudo(self.operand)
-
     def translate(self, symbol_table):
         """
         Translate the mnemonic into an actual operation.
 
         :param symbol_table: the dictionary of symbol table elements
         """
-        if self.instruction.is_pseudo:
-            return
-
-        if self.instruction.is_special:
-            self.code_pkg = self.instruction.translate_special(self.operand, self)
-            return
-
         self.operand = self.operand.resolve_symbols(symbol_table)
         self.code_pkg = self.operand.translate()
 

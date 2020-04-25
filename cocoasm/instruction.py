@@ -6,21 +6,9 @@ A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
-from typing import NamedTuple, Callable
+from typing import NamedTuple
 
-from cocoasm.exceptions import TranslationError
-from cocoasm.values import NumericValue, NoneValue
-
-# C O N S T A N T S ###########################################################
-
-# Invalid operation
-IVLD = -1
-
-# Illegal addressing mode
-ILLEGAL_MODE = -1
-
-# Recognized register names
-REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
+from cocoasm.values import NoneValue
 
 
 # C L A S S E S ###############################################################
@@ -33,11 +21,6 @@ class CodePackage(object):
         self.additional = additional
         self.size = size
 
-    def __str__(self):
-        return "op_code: {}, address: {}, post_byte: {}, additional: {}, size: {}".format(
-            self.op_code, self.address, self.post_byte, self.additional, self.size
-        )
-
 
 class Mode(NamedTuple):
     """
@@ -46,61 +29,18 @@ class Mode(NamedTuple):
     Indexed (ind), Extended (ext), and Relative (rel). Each instruction may have
     one or more addressing modes (see Instruction class).
     """
-    inh: int = IVLD
+    inh: int = None
     inh_sz: int = 0
-    imm: int = IVLD
+    imm: int = None
     imm_sz: int = 0
-    dir: int = IVLD
+    dir: int = None
     dir_sz: int = 0
-    ind: int = IVLD
+    ind: int = None
     ind_sz: int = 0
-    ext: int = IVLD
+    ext: int = None
     ext_sz: int = 0
-    rel: int = IVLD
+    rel: int = None
     rel_sz: int = 0
-
-    def supports_inherent(self):
-        """
-        Returns whether the addressing mode is an inherent mode.
-        :return: True if the mode is inherent, false otherwise
-        """
-        return self.inh is not IVLD
-
-    def supports_immediate(self):
-        """
-        Returns whether the addressing mode is immediate.
-        :return: True if the mode is immediate, false otherwise
-        """
-        return self.imm is not IVLD
-
-    def supports_direct(self):
-        """
-        Returns whether the addressing mode is direct.
-        :return: True if the mode is direct, false otherwise
-        """
-        return self.dir is not IVLD
-
-    def supports_indexed(self):
-        """
-        Returns whether the addressing mode is indexed.
-        :return: True if the mode is indexed, false otherwise
-        """
-        return self.ind is not IVLD
-
-    def supports_extended(self):
-        """
-        Returns whether the addressing mode is extended.
-        :return: True if the mode is extended, false otherwise
-        """
-        return self.ext is not IVLD
-
-    def supports_relative(self):
-        """
-        Returns whether the addressing mode is relative.
-
-        :return: True if the mode is relative, false otherwise
-        """
-        return self.rel is not IVLD
 
 
 class Instruction(NamedTuple):
@@ -110,8 +50,8 @@ class Instruction(NamedTuple):
     understandable code for the operation, a set of addressing modes
     that the operation supports, whether the mnemonic is a pseudo 
     operation (i.e. only used by the assembler for special directives),
-    is a branch instruction, and a function to assist with operation
-    translation by the assembler.
+    is a branch instruction, as well as other attributes used for
+    translation and parsing.
     """
     mnemonic: str = ""
     mode: Mode = Mode()
@@ -124,119 +64,6 @@ class Instruction(NamedTuple):
     is_long_branch: bool = False
     is_origin: bool = False
     is_name: bool = False
-    func: Callable[..., str] = None
-
-    def translate_pseudo(self, operand):
-        """
-        Translates a pseudo operation.
-
-        :param operand: the operand value of the pseudo operation
-        :return: returns the value of the pseudo operation
-        """
-        if self.mnemonic == "FCB":
-            return CodePackage(additional=operand.value, size=1)
-
-        if self.mnemonic == "FDB":
-            return CodePackage(additional=NumericValue(operand.value.int, size_hint=4), size=2)
-
-        if self.mnemonic == "EQU":
-            return CodePackage()
-
-        if self.mnemonic == "ORG":
-            return CodePackage(address=operand.value)
-
-        if self.mnemonic == "FCC":
-            return CodePackage(additional=operand.value, size=operand.value.byte_len())
-
-        if self.mnemonic == "END":
-            return CodePackage()
-
-        if self.mnemonic == "NAM":
-            return CodePackage()
-
-    def translate_special(self, operand, statement):
-        """
-        Translates special non-pseudo operations.
-
-        :param operand: the operand to process
-        :param statement: the statement that this operation came from
-        """
-        code_pkg = CodePackage()
-        code_pkg.op_code = NumericValue(statement.instruction.mode.imm)
-        code_pkg.size = statement.instruction.mode.imm_sz
-
-        if self.mnemonic == "PSHS" or self.mnemonic == "PULS":
-            registers = operand.operand_string.split(",")
-            code_pkg.post_byte = 0x00
-            for register in registers:
-                if register not in REGISTERS:
-                    raise ValueError("unknown register {}".format(register))
-
-                code_pkg.post_byte |= 0x06 if register == "D" else 0x00
-                code_pkg.post_byte |= 0x01 if register == "CC" else 0x00
-                code_pkg.post_byte |= 0x02 if register == "A" else 0x00
-                code_pkg.post_byte |= 0x04 if register == "B" else 0x00
-                code_pkg.post_byte |= 0x08 if register == "DP" else 0x00
-                code_pkg.post_byte |= 0x10 if register == "X" else 0x00
-                code_pkg.post_byte |= 0x20 if register == "Y" else 0x00
-                code_pkg.post_byte |= 0x40 if register == "U" else 0x00
-                code_pkg.post_byte |= 0x80 if register == "PC" else 0x00
-
-        if self.mnemonic == "EXG" or self.mnemonic == "TFR":
-            registers = operand.operand_string.split(",")
-            code_pkg.post_byte = 0x00
-            if len(registers) != 2:
-                raise TranslationError("{} requires exactly 2 registers".format(self.mnemonic), statement)
-
-            if registers[0] not in REGISTERS:
-                raise TranslationError("unknown register {}".format(registers[0]), statement)
-
-            if registers[1] not in REGISTERS:
-                raise TranslationError("unknown register {}".format(registers[1]), statement)
-
-            code_pkg.post_byte |= 0x00 if registers[0] == "D" else 0x00
-            code_pkg.post_byte |= 0x00 if registers[1] == "D" else 0x00
-
-            code_pkg.post_byte |= 0x10 if registers[0] == "X" else 0x00
-            code_pkg.post_byte |= 0x01 if registers[1] == "X" else 0x00
-
-            code_pkg.post_byte |= 0x20 if registers[0] == "Y" else 0x00
-            code_pkg.post_byte |= 0x02 if registers[1] == "Y" else 0x00
-
-            code_pkg.post_byte |= 0x30 if registers[0] == "U" else 0x00
-            code_pkg.post_byte |= 0x03 if registers[1] == "U" else 0x00
-
-            code_pkg.post_byte |= 0x40 if registers[0] == "S" else 0x00
-            code_pkg.post_byte |= 0x04 if registers[1] == "S" else 0x00
-
-            code_pkg.post_byte |= 0x50 if registers[0] == "PC" else 0x00
-            code_pkg.post_byte |= 0x05 if registers[1] == "PC" else 0x00
-
-            code_pkg.post_byte |= 0x80 if registers[0] == "A" else 0x00
-            code_pkg.post_byte |= 0x08 if registers[1] == "A" else 0x00
-
-            code_pkg.post_byte |= 0x90 if registers[0] == "B" else 0x00
-            code_pkg.post_byte |= 0x09 if registers[1] == "B" else 0x00
-
-            code_pkg.post_byte |= 0xA0 if registers[0] == "CC" else 0x00
-            code_pkg.post_byte |= 0x0A if registers[1] == "CC" else 0x00
-
-            code_pkg.post_byte |= 0xB0 if registers[0] == "DP" else 0x00
-            code_pkg.post_byte |= 0x0B if registers[1] == "DP" else 0x00
-
-            if code_pkg.post_byte not in [
-                    0x01, 0x10, 0x02, 0x20, 0x03, 0x30, 0x04, 0x40,
-                    0x05, 0x50, 0x12, 0x21, 0x13, 0x31, 0x14, 0x41,
-                    0x15, 0x51, 0x23, 0x32, 0x24, 0x42, 0x25, 0x52,
-                    0x34, 0x43, 0x35, 0x53, 0x45, 0x54, 0x89, 0x98,
-                    0x8A, 0xA8, 0x8B, 0xB8, 0x9A, 0xA9, 0x9B, 0xB9,
-                    0xAB, 0xBA, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
-                    0x88, 0x99, 0xAA, 0xBB]:
-                raise TranslationError("{} of {} to {} not allowed".format(self.mnemonic, registers[0], registers[1]),
-                                       statement)
-
-        code_pkg.post_byte = NumericValue(code_pkg.post_byte)
-        return code_pkg
 
 
 INSTRUCTIONS = [
