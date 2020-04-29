@@ -6,6 +6,8 @@ A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
+import os
+
 from abc import ABC, abstractmethod
 from enum import IntEnum
 
@@ -34,14 +36,26 @@ class VirtualFile(ABC):
         self.host_file = None
         self.load_addr = NoneValue()
         self.exec_addr = NoneValue()
+        self.append_mode = False
+        self.filename = None
 
-    def open_host_file(self, filename):
+    def open_host_file(self, filename, append=False):
         """
         Opens the file on the host drive for reading.
 
         :param filename: the name of the file to open
+        :param append: whether to append to an existing file
         """
-        self.host_file = open(filename, "wb")
+        if not append and os.path.exists(filename):
+            raise ValueError("[{}] already exists, use --append to add to this file".format(filename))
+
+        if not append:
+            self.host_file = open(filename, "wb")
+        else:
+            self.host_file = open(filename, "ab")
+            self.append_mode = True
+
+        self.filename = filename
 
     def close_host_file(self):
         """
@@ -92,6 +106,8 @@ class BinaryFile(VirtualFile):
         return []
 
     def save_file(self, name, raw_bytes):
+        if self.append_mode:
+            raise ValueError("[{}] cannot append to binary file".format(self.filename))
         self.host_file.write(bytearray(raw_bytes))
 
 
@@ -203,7 +219,8 @@ class CassetteFile(VirtualFile):
                 buffer.append(ord(name[index]))
                 checksum += ord(name[index])
             else:
-                buffer.append(0x00)
+                buffer.append(0x20)
+                checksum += 0x20
         return checksum
 
     @staticmethod
