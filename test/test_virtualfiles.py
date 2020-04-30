@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.values import NumericValue
-from fileutil.virtualfiles import BinaryFile, CassetteFile, CassetteFileType, \
+from cocoasm.virtualfiles import BinaryFile, CassetteFile, CassetteFileType, \
     CassetteDataType
 
 # C L A S S E S ###############################################################

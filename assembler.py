@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import argparse
 
 from cocoasm.program import Program
-from fileutil.virtualfiles import BinaryFile, CassetteFile
+from cocoasm.virtualfiles import BinaryFile, CassetteFile
 
 # F U N C T I O N S ###########################################################
 
