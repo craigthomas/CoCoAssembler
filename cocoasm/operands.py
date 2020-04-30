@@ -39,7 +39,7 @@ EXTENDED_INDIRECT_REGEX = re.compile(
 
 # Patten to recognize an expression
 EXPRESSION_REGEX = re.compile(
-    r"^(?P<left>[\d\w]+)(?P<operation>[+\-/*])(?P<right>[\d\w]+)$"
+    r"^(?P<left>[$]*[\d\w]+)(?P<operation>[+\-/*])(?P<right>[$]*[\d\w]+)$"
 )
 
 # Pattern to recognize invalid characters in an UnknownOperand
@@ -296,13 +296,13 @@ class SpecialOperand(Operand):
         if self.instruction.mnemonic == "EXG" or self.instruction.mnemonic == "TFR":
             registers = self.operand_string.split(",")
             if len(registers) != 2:
-                raise ValueError("{} requires exactly 2 registers".format(self.instruction.mnemonic))
+                raise ValueError("[{}] requires exactly 2 registers".format(self.instruction.mnemonic))
 
             if registers[0] not in REGISTERS:
-                raise ValueError("unknown register {}".format(registers[0]))
+                raise ValueError("[{}] unknown register".format(registers[0]))
 
             if registers[1] not in REGISTERS:
-                raise ValueError("unknown register {}".format(registers[1]))
+                raise ValueError("[{}] unknown register".format(registers[1]))
 
             code_pkg.post_byte |= 0x00 if registers[0] == "D" else 0x00
             code_pkg.post_byte |= 0x00 if registers[1] == "D" else 0x00
@@ -345,7 +345,7 @@ class SpecialOperand(Operand):
                         0x88, 0x99, 0xAA, 0xBB
                     ]:
                 raise ValueError(
-                    "{} of {} to {} not allowed".format(self.instruction.mnemonic, registers[0], registers[1]))
+                    "[{}] of [{}] to [{}] not allowed".format(self.instruction.mnemonic, registers[0], registers[1]))
 
         code_pkg.post_byte = NumericValue(code_pkg.post_byte)
         return code_pkg

@@ -10,7 +10,7 @@ import unittest
 
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
     OperandType, IndexedOperand, RelativeOperand, ExtendedIndexedOperand, \
-    Operand, ExtendedOperand, PseudoOperand, SpecialOperand
+    Operand, ExtendedOperand, PseudoOperand, SpecialOperand, ExpressionOperand
 from cocoasm.instruction import Instruction, Mode
 from cocoasm.values import NumericValue, AddressValue
 
@@ -135,6 +135,48 @@ class TestRelativeOperand(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             RelativeOperand("$FF", instruction)
         self.assertEqual("[BEQ] is not a branch instruction", str(context.exception))
+
+    def test_relative_translate_correct(self):
+        instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1), is_short_branch=True)
+        operand = RelativeOperand("$FF", instruction)
+        operand.value = AddressValue(0xFFEE)
+        result = operand.translate()
+        self.assertEqual("3A", result.op_code.hex())
+        self.assertEqual(1, result.size)
+        self.assertEqual("FFEE", result.additional.hex())
+
+
+class TestExpressionOperand(unittest.TestCase):
+    """
+    A test class for the ExpressionOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="LDA", mode=Mode(imm=0x86, imm_sz=2))
+
+    def test_expression_translate_returns_blank_code_package(self):
+        operand = ExpressionOperand("A+B", self.instruction)
+        result = operand.translate()
+        self.assertEqual("", result.op_code.hex())
+        self.assertEqual("", result.additional.hex())
+        self.assertEqual("", result.post_byte.hex())
+        self.assertEqual(0, result.size)
+
+    def test_expression_translate_returns_blank_code_package(self):
+        operand = ExpressionOperand("A+B", self.instruction)
+        result = operand.translate()
+        self.assertEqual("", result.op_code.hex())
+        self.assertEqual("", result.additional.hex())
+        self.assertEqual("", result.post_byte.hex())
+        self.assertEqual(0, result.size)
+
+    def test_expression_parsed_correct(self):
+        operand = ExpressionOperand("$0F+$F0", self.instruction)
+        self.assertEqual("0F", operand.left.hex())
+        self.assertEqual("F0", operand.right.hex())
+        self.assertEqual("+", operand.operation)
 
 
 class TestPseudoOperand(unittest.TestCase):
@@ -273,6 +315,99 @@ class TestSpecialOperand(unittest.TestCase):
         operand = SpecialOperand("CC,D,X,Y", instruction)
         code_pkg = operand.translate()
         self.assertEqual("37", code_pkg.post_byte.hex())
+
+    def test_special_exg_raises_with_one_register(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[EXG] requires exactly 2 registers", str(context.exception))
+
+    def test_special_exg_raises_with_three_registers(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A,B,X", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[EXG] requires exactly 2 registers", str(context.exception))
+
+    def test_special_exg_raises_with_bad_register_first_reg(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("not_a_register,A", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[not_a_register] unknown register", str(context.exception))
+
+    def test_special_exg_raises_with_bad_register_second_reg(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A,not_a_register", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[not_a_register] unknown register", str(context.exception))
+
+    def test_special_exg_raises_with_A_to_D(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A,D", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[EXG] of [A] to [D] not allowed", str(context.exception))
+
+    def test_special_exg_works_self_to_self(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A,A", instruction)
+        result = operand.translate()
+        self.assertEqual("88", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("B,B", instruction)
+        result = operand.translate()
+        self.assertEqual("99", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("CC,CC", instruction)
+        result = operand.translate()
+        self.assertEqual("AA", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("DP,DP", instruction)
+        result = operand.translate()
+        self.assertEqual("BB", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("D,D", instruction)
+        result = operand.translate()
+        self.assertEqual("00", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("X,X", instruction)
+        result = operand.translate()
+        self.assertEqual("11", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("Y,Y", instruction)
+        result = operand.translate()
+        self.assertEqual("22", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("U,U", instruction)
+        result = operand.translate()
+        self.assertEqual("33", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("S,S", instruction)
+        result = operand.translate()
+        self.assertEqual("44", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("PC,PC", instruction)
+        result = operand.translate()
+        self.assertEqual("55", result.post_byte.hex())
+
+    def test_special_resolve_symbols_returns_same(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A,A", instruction)
+        result = operand.resolve_symbols({})
+        self.assertEqual(operand.operand_string, result.operand_string)
+        self.assertEqual(operand.type, result.type)
 
 
 class TestInherentOperand(unittest.TestCase):
