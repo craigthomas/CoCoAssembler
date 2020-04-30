@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.values import NumericValue
-from fileutil.virtualfiles import BinaryFile, CassetteFile, CassetteFileType, \
+from cocoasm.virtualfiles import BinaryFile, CassetteFile, CassetteFileType, \
     CassetteDataType
 
 # C L A S S E S ###############################################################
@@ -84,11 +84,11 @@ class TestCassetteFile(unittest.TestCase):
 
     def test_append_name_less_than_8_characters_correct(self):
         name = "test"
-        expected = [0x74, 0x65, 0x73, 0x74, 0x00, 0x00, 0x00, 0x00]
+        expected = [0x74, 0x65, 0x73, 0x74, 0x20, 0x20, 0x20, 0x20]
         buffer = []
         checksum = CassetteFile.append_name(name, buffer)
         self.assertEqual(expected, buffer)
-        self.assertEqual(448, checksum)
+        self.assertEqual(576, checksum)
 
     def test_append_header_correct(self):
         name = "testfile"

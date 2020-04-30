@@ -20,6 +20,11 @@
 6. [Mnemonic Table](#mnemonic-table)
    1. [Mnemonics](#mnemonics)
    2. [Pseudo Operations](#pseudo-operations)
+7. [Operands](#operands)
+8. [Addresing Modes](#addressing-modes)
+9. [Common Examples](#common-examples)
+   1. [Appending to a Cassette](#appending-to-a-cassette)
+10. [Further Documentation](#further-documentation)
 
 ## What is it?
 
@@ -197,7 +202,17 @@ The source code must include the `NAM` mnemonic to name the program (e.g.
 `NAM myprog`), or the `--name` switch must be used on the command line (e.g.
 `--name myprog`). The program name on the cassette file will be `myprog`. 
 
-**NOTE**: if the file `test.cas` exists, it will be erased and overwritten.
+**NOTE**: if the file `test.cas` exists, assembly will stop and the file will
+not be overwritten. If you wish to add the program to `test.cas`, you must 
+specify the `--append` flag during compilation:
+
+    python assembler.py test.asm --cas_file test.cas --append
+    
+This will add the file to the `test.cas` file as an additional binary within
+the cassette. To load from the cassette file using BASIC's `CLOADM` command
+would be done as follows
+
+    CLOADM"MYPROG"
 
     
 ## Mnemonic Table
@@ -263,6 +278,14 @@ change the direct page register.
 
 ### Addressing Modes
 
+### Common Examples
+
+#### Appending to a Cassette
+
+To assemble a program called `myprog.asm` and add it to an existing cassette file:
+
+    python assembler.py myprog.asm --cas_file my_cassette.cas --append
+    
 ## Further Documentation
 
 The best documentation is in the code itself. Please feel free to examine the

@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import argparse
 
 from cocoasm.program import Program
-from fileutil.virtualfiles import BinaryFile, CassetteFile
+from cocoasm.virtualfiles import BinaryFile, CassetteFile
 
 # F U N C T I O N S ###########################################################
 
@@ -44,6 +44,9 @@ def parse_arguments():
     parser.add_argument(
         "--name", help="the name of the file to be created on the cassette or disk image"
     )
+    parser.add_argument(
+        "--append", action="store_true", help="appends to an existing cassette or disk file if it exists"
+    )
     return parser.parse_args()
 
 
@@ -73,10 +76,14 @@ def main(args):
         if not name:
             print("No name for the program specified, not creating cassette file")
             return
-        binary_file = CassetteFile(program.origin, program.origin)
-        binary_file.open_host_file(args.cas_file)
-        binary_file.save_file(name, program.get_binary_array())
-        binary_file.close_host_file()
+        try:
+            binary_file = CassetteFile(program.origin, program.origin)
+            binary_file.open_host_file(args.cas_file, append=args.append)
+            binary_file.save_file(name, program.get_binary_array())
+            binary_file.close_host_file()
+        except ValueError as error:
+            print("Unable to save cassette file:")
+            print(error)
 
 # M A I N #####################################################################
 
