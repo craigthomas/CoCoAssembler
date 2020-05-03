@@ -10,9 +10,10 @@ import unittest
 
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
     OperandType, IndexedOperand, RelativeOperand, ExtendedIndexedOperand, \
-    Operand, ExtendedOperand, PseudoOperand, SpecialOperand, ExpressionOperand
+    Operand, ExtendedOperand, PseudoOperand, SpecialOperand, ExpressionOperand, \
+    DirectOperand
 from cocoasm.instruction import Instruction, Mode
-from cocoasm.values import NumericValue, AddressValue
+from cocoasm.values import NumericValue, AddressValue, NoneValue, ValueType
 
 # C L A S S E S ###############################################################
 
@@ -115,6 +116,10 @@ class TestUnknownOperand(unittest.TestCase):
         self.assertEqual(0, result.post_byte.int)
         self.assertEqual(0, result.size)
 
+    def test_unknown_value_set_to_none_on_bad_operand(self):
+        operand = UnknownOperand("\\bad", self.instruction)
+        self.assertEqual(ValueType.NONE, operand.value.type)
+
 
 class TestRelativeOperand(unittest.TestCase):
     """
@@ -177,6 +182,59 @@ class TestExpressionOperand(unittest.TestCase):
         self.assertEqual("0F", operand.left.hex())
         self.assertEqual("F0", operand.right.hex())
         self.assertEqual("+", operand.operation)
+
+    def test_expression_resolve_expression_plus(self):
+        operand = ExpressionOperand("$01+$02", self.instruction)
+        operand.resolve_expression({})
+        self.assertEqual("03", operand.value.hex())
+
+    def test_expression_resolve_expression_minus(self):
+        operand = ExpressionOperand("$03-$02", self.instruction)
+        operand.resolve_expression({})
+        self.assertEqual("01", operand.value.hex())
+
+    def test_expression_resolve_expression_multiply(self):
+        operand = ExpressionOperand("$02*$02", self.instruction)
+        operand.resolve_expression({})
+        self.assertEqual("04", operand.value.hex())
+
+    def test_expression_resolve_expression_divide(self):
+        operand = ExpressionOperand("$04/$02", self.instruction)
+        operand.resolve_expression({})
+        self.assertEqual("02", operand.value.hex())
+
+    def test_expression_resolve_expression_direct_size(self):
+        operand = ExpressionOperand("$01+$02", self.instruction)
+        operand = operand.resolve_expression({})
+        self.assertEqual(OperandType.DIRECT, operand.type)
+
+    def test_expression_resolve_expression_extended_size(self):
+        operand = ExpressionOperand("$01+$FF", self.instruction)
+        operand = operand.resolve_expression({})
+        self.assertEqual(OperandType.EXTENDED, operand.type)
+
+    def test_expression_resolve_expression_left_resolves(self):
+        symbol_table = {
+            "BLAH": NumericValue(2)
+        }
+        operand = ExpressionOperand("BLAH+$01", self.instruction)
+        operand = operand.resolve_expression(symbol_table=symbol_table)
+        self.assertEqual("03", operand.value.hex())
+
+    def test_expression_resolve_expression_right_resolves(self):
+        symbol_table = {
+            "BLAH": NumericValue(2)
+        }
+        operand = ExpressionOperand("$02+BLAH", self.instruction)
+        operand = operand.resolve_expression(symbol_table=symbol_table)
+        self.assertEqual("04", operand.value.hex())
+
+    def test_expression_resolve_expression_none_type_raises(self):
+        operand = ExpressionOperand("$02+$02", self.instruction)
+        operand.left = NoneValue()
+        with self.assertRaises(ValueError) as context:
+            operand.resolve_expression({})
+        self.assertEqual("[$02+$02] unresolved expression", str(context.exception))
 
 
 class TestPseudoOperand(unittest.TestCase):
@@ -497,6 +555,19 @@ class TestImmediateOperand(unittest.TestCase):
         self.assertEqual("3A", result.op_code.hex())
         self.assertEqual("FF", result.additional.hex())
         self.assertEqual(2, result.size)
+
+    def test_immediate_resolve_symbols_not_symbol(self):
+        operand = ImmediateOperand("#$FF", self.instruction)
+        result = operand.resolve_symbols({})
+        self.assertEqual(ValueType.NUMERIC, result.value.type)
+
+    def test_immediate_resolve_symbols_correct(self):
+        symbol_table = {
+            "BLAH": NumericValue(2)
+        }
+        operand = ImmediateOperand("#BLAH", self.instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual("02", result.value.hex())
 
 
 class TestIndexedOperand(unittest.TestCase):
@@ -1027,6 +1098,37 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         self.assertEqual(4, code_pkg.size)
 
 
+class TestDirectOperand(unittest.TestCase):
+    """
+    A test class for the DirectOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="SUBA", mode=Mode(dir=0xB0, dir_sz=3))
+
+    def test_direct_type_correct(self):
+        result = DirectOperand("$FF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.DIRECT))
+        self.assertEqual("FF", result.value.hex())
+
+    def test_direct_value_passthrough_correct(self):
+        result = DirectOperand("$FF", self.instruction, value=NumericValue("$FE"))
+        self.assertTrue(result.is_type(OperandType.DIRECT))
+        self.assertEqual("FE", result.value.hex())
+
+    def test_direct_raises_if_value_not_direct_length(self):
+        with self.assertRaises(ValueError) as context:
+            DirectOperand("$FFFF", self.instruction)
+        self.assertEqual("[$FFFF] is not a direct value", str(context.exception))
+
+    def test_direct_force_direct_mode_correct(self):
+        result = DirectOperand("<$FF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.DIRECT))
+        self.assertEqual("FF", result.value.hex())
+
+
 class TestExtendedOperand(unittest.TestCase):
     """
     A test class for the ExtendedOperand class.
@@ -1057,6 +1159,11 @@ class TestExtendedOperand(unittest.TestCase):
     def test_extended_value_passthrough_correct(self):
         operand = ExtendedOperand("", self.instruction, value="FFFF")
         self.assertEqual("FFFF", operand.value)
+
+    def test_extended_force_extended_mode_correct(self):
+        result = ExtendedOperand(">$FFFF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.EXTENDED))
+        self.assertEqual("FFFF", result.value.hex())
 
 # M A I N #####################################################################
 

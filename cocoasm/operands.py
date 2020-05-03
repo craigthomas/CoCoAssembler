@@ -29,7 +29,7 @@ DIRECT_REGEX = re.compile(
 
 # Pattern to recognize an extended value
 EXTENDED_REGEX = re.compile(
-    r"^<(?P<value>.*)"
+    r"^>(?P<value>.*)"
 )
 
 # Pattern to recognize an indexed value
@@ -186,9 +186,9 @@ class Operand(ABC):
             if self.operation == "-":
                 self.value = NumericValue("{}".format(left - right))
             if self.operation == "*":
-                self.value = NumericValue("{}".format(left * right))
+                self.value = NumericValue("{}".format(int(left * right)))
             if self.operation == "/":
-                self.value = NumericValue("{}".format(left / right))
+                self.value = NumericValue("{}".format(int(left / right)))
             if self.value.hex_len() == 2:
                 return DirectOperand(self.operand_string, self.instruction, value=self.value)
             return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
@@ -424,7 +424,7 @@ class DirectOperand(Operand):
             return
         match = DIRECT_REGEX.match(self.operand_string)
         if match:
-            self.value = Value.create_from_str(match.group("value")[1:], instruction)
+            self.value = Value.create_from_str(match.group("value"), instruction)
         else:
             self.value = Value.create_from_str(operand_string, instruction)
         if self.value is None or self.value.byte_len() != 1:
@@ -448,7 +448,7 @@ class ExtendedOperand(Operand):
             return
         match = EXTENDED_REGEX.match(self.operand_string)
         if match:
-            self.value = Value.create_from_str(match.group("value")[1:], instruction)
+            self.value = Value.create_from_str(match.group("value"), instruction)
         else:
             self.value = Value.create_from_str(operand_string, instruction)
         if self.value is None or self.value.byte_len() != 2:
