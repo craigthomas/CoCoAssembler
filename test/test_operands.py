@@ -281,7 +281,7 @@ class TestExpressionOperand(unittest.TestCase):
             "BLAH2": NumericValue(1)
         }
         operand = ExpressionOperand("BLAH1+BLAH2", self.instruction)
-        operand = operand.resolve_expression(symbol_table=symbol_table)
+        operand = operand.resolve_symbols(symbol_table=symbol_table)
         self.assertEqual("03", operand.value.hex())
 
 
