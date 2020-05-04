@@ -84,6 +84,53 @@ class TestBaseOperand(unittest.TestCase):
             Operand.create_from_str(",blah,", instruction)
         self.assertEqual("[,blah,] unknown operand type", str(context.exception))
 
+    def test_base_resolve_symbols_returns_self_if_not_symbol(self):
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3))
+        operand = ExtendedOperand("$FFFF", instruction)
+        result = operand.resolve_symbols({})
+        self.assertEqual(OperandType.EXTENDED, result.type)
+        self.assertEqual("FFFF", result.value.hex())
+
+    def test_base_resolve_symbols_returns_direct_symbol(self):
+        symbol_table = {
+            "BLAH": NumericValue("$FF")
+        }
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3))
+        operand = UnknownOperand("BLAH", instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual(OperandType.DIRECT, result.type)
+        self.assertEqual("FF", result.value.hex())
+
+    def test_base_resolve_symbols_returns_extended_symbol(self):
+        symbol_table = {
+            "BLAH": NumericValue("$FFFF")
+        }
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3))
+        operand = UnknownOperand("BLAH", instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual(OperandType.EXTENDED, result.type)
+        self.assertEqual("FFFF", result.value.hex())
+
+    def test_base_resolve_symbols_returns_extended_for_address_value(self):
+        symbol_table = {
+            "BLAH": AddressValue(2)
+        }
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3))
+        operand = UnknownOperand("BLAH", instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual(OperandType.EXTENDED, result.type)
+        self.assertEqual(2, result.value.int)
+
+    def test_base_resolve_symbols_returns_self_for_address_value(self):
+        symbol_table = {
+            "BLAH": AddressValue(2)
+        }
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3), is_short_branch=True)
+        operand = RelativeOperand("BLAH", instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual(OperandType.RELATIVE, result.type)
+        self.assertEqual(2, result.value.int)
+
 
 class TestUnknownOperand(unittest.TestCase):
     """
@@ -160,14 +207,6 @@ class TestExpressionOperand(unittest.TestCase):
         Common setup routines needed for all unit tests.
         """
         self.instruction = Instruction(mnemonic="LDA", mode=Mode(imm=0x86, imm_sz=2))
-
-    def test_expression_translate_returns_blank_code_package(self):
-        operand = ExpressionOperand("A+B", self.instruction)
-        result = operand.translate()
-        self.assertEqual("", result.op_code.hex())
-        self.assertEqual("", result.additional.hex())
-        self.assertEqual("", result.post_byte.hex())
-        self.assertEqual(0, result.size)
 
     def test_expression_translate_returns_blank_code_package(self):
         operand = ExpressionOperand("A+B", self.instruction)
@@ -826,6 +865,13 @@ class TestIndexedOperand(unittest.TestCase):
         code_pkg = operand.translate()
         self.assertEqual("1F", code_pkg.post_byte.hex())
 
+    def test_indexed_translate_left_address_raises(self):
+        operand = IndexedOperand("$1F,X", self.instruction)
+        operand.left = AddressValue(32767)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[$1F,X] cannot translate address in left hand side", str(context.exception))
+
 
 class TestExtendedIndexedOperand(unittest.TestCase):
     """
@@ -1097,6 +1143,21 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         self.assertEqual("0900", code_pkg.additional.hex())
         self.assertEqual(4, code_pkg.size)
 
+    def test_extended_indexed_resolve_symbol_correct(self):
+        symbol_table = {
+            "BLAH": NumericValue(2)
+        }
+        operand = ExtendedIndexedOperand("[BLAH]", self.instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual("02", result.value.hex())
+
+    def test_extended_indirect_translate_left_address_raises(self):
+        operand = ExtendedIndexedOperand("[$1F,X]", self.instruction)
+        operand.left = AddressValue(32767)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[[$1F,X]] cannot translate address in left hand side", str(context.exception))
+
 
 class TestDirectOperand(unittest.TestCase):
     """
@@ -1127,6 +1188,20 @@ class TestDirectOperand(unittest.TestCase):
         result = DirectOperand("<$FF", self.instruction)
         self.assertTrue(result.is_type(OperandType.DIRECT))
         self.assertEqual("FF", result.value.hex())
+
+    def test_direct_raises_on_translate_not_direct_instruction(self):
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(imm=0xB0, imm_sz=3))
+        operand = DirectOperand("<$FF", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("Instruction [SUBA] does not support direct addressing", str(context.exception))
+
+    def test_direct_translate_correct(self):
+        operand = DirectOperand("<$FF", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("B0", code_pkg.op_code.hex())
+        self.assertEqual("FF", code_pkg.additional.hex())
+        self.assertEqual(3, code_pkg.size)
 
 
 class TestExtendedOperand(unittest.TestCase):

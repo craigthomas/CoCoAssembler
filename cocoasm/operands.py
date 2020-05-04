@@ -451,6 +451,7 @@ class ExtendedOperand(Operand):
             self.value = Value.create_from_str(match.group("value"), instruction)
         else:
             self.value = Value.create_from_str(operand_string, instruction)
+
         if self.value is None or self.value.byte_len() != 2:
             raise ValueError("[{}] is not an extended value".format(operand_string))
 
