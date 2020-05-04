@@ -151,6 +151,14 @@ class Operand(ABC):
         return self.type == operand_type
 
     def resolve_symbols(self, symbol_table):
+        """
+        Given a symbol table, searches the operands for any symbols, and resolves
+        them with values from the symbol table. Returns a (possibly) new Operand
+        class type as a result of symbol resolution.
+
+        :param symbol_table: the symbol table to search
+        :return: self, or a new Operand class type with a resolved value
+        """
         if self.is_type(OperandType.EXPRESSION):
             return self.resolve_expression(symbol_table)
 
@@ -172,6 +180,14 @@ class Operand(ABC):
             return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
 
     def resolve_expression(self, symbol_table):
+        """
+        Attempts to resolve the expression contained in the operand using the
+        symbol table supplied. Returns a (possibly) new Operand class type as a
+        result of symbol resolution.
+
+        :param symbol_table: the symbol table to use for resolution
+        :return: self, or a new Operand class type with a resolved value
+        """
         if self.left.is_type(ValueType.SYMBOL):
             self.left = self.get_symbol(self.left.ascii(), symbol_table)
 

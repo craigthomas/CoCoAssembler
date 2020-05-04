@@ -275,6 +275,15 @@ class TestExpressionOperand(unittest.TestCase):
             operand.resolve_expression({})
         self.assertEqual("[$02+$02] unresolved expression", str(context.exception))
 
+    def test_expression_resolve_symbols_resolves_expression(self):
+        symbol_table = {
+            "BLAH1": NumericValue(2),
+            "BLAH2": NumericValue(1)
+        }
+        operand = ExpressionOperand("BLAH1+BLAH2", self.instruction)
+        operand = operand.resolve_expression(symbol_table=symbol_table)
+        self.assertEqual("03", operand.value.hex())
+
 
 class TestPseudoOperand(unittest.TestCase):
     """
