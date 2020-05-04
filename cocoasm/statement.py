@@ -74,15 +74,6 @@ class Statement(object):
             self.comment.ljust(40, ' '),
         )
 
-    def match_operation(self):
-        """
-        Returns the instruction with the specified mnemonic, or None if the
-        mnemonic does not exist.
-
-        :return: the instruction associated with the mnemonic
-        """
-        return next((op for op in INSTRUCTIONS if op.mnemonic == self.mnemonic), None)
-
     def get_include_filename(self):
         """
         Returns the name of the file to include in the current stream of
@@ -91,7 +82,7 @@ class Statement(object):
 
         :return: the name of the file to include
         """
-        return self.operand.get_operand_string() if self.instruction.is_include else None
+        return self.operand.operand_string if self.instruction.is_include else None
 
     def parse_line(self, line):
         """
@@ -113,16 +104,16 @@ class Statement(object):
         if data:
             self.label = data.group("label") or ""
             self.mnemonic = data.group("mnemonic").upper() or ""
-            self.instruction = copy(self.match_operation())
+            self.instruction = next((op for op in INSTRUCTIONS if op.mnemonic == self.mnemonic), None)
             if not self.instruction:
-                raise ParseError("Invalid mnemonic [{}]".format(self.mnemonic), self)
+                raise ParseError("[{}] invalid mnemonic".format(self.mnemonic), self)
             if self.instruction.is_string_define:
                 original_operand = data.group("operands")
                 if data.group("comment"):
                     original_operand = "{} {}".format(data.group("operands"), data.group("comment").strip())
                 starting_symbol = original_operand[0]
                 ending_location = original_operand.find(starting_symbol, 1)
-                self.operand = Operand.create_from_str(original_operand[0:ending_location + 1], self.instruction)
+                self.operand = Operand.create_from_str(original_operand[0:ending_location + 1].strip(), self.instruction)
                 self.original_operand = copy(self.operand)
                 self.comment = original_operand[ending_location + 2:].strip() or ""
                 self.is_empty = False
@@ -136,6 +127,16 @@ class Statement(object):
         raise ParseError("Could not parse line [{}]".format(line), self)
 
     def set_address(self, address):
+        """
+        This function sets the address where this statement should be located
+        in memory. If the address is not already set, it will set the address
+        and return the address that was set. If the address was already set
+        (for example, in an ORG operation), it will return that address
+        instead.
+
+        :param address: the address to set for the statement
+        :return: the address that was set or returned
+        """
         if not self.code_pkg.address.is_type(ValueType.NONE):
             return self.code_pkg.address.int
         self.code_pkg.address = NumericValue(address)
@@ -151,6 +152,17 @@ class Statement(object):
         self.code_pkg = self.operand.translate()
 
     def fix_addresses(self, statements, this_index):
+        """
+        Once all of the statements have been translated, all of the addresses
+        must be 'fixed'. In particular, branch operations need to know how
+        many statements they need to skip ahead or behind, and the address
+        at the target statement. This function calculates what the target
+        of a branch, jump or subroutine call needs to go to, and inserts
+        it in the code package for the assembled instruction.
+
+        :param statements: the full set of statements that make up the proram
+        :param this_index: the index that this instruction occurs at
+        """
         if self.operand.is_type(OperandType.RELATIVE):
             base_value = 0x101 if self.instruction.is_short_branch else 0x10001
             branch_index = self.code_pkg.additional.int
