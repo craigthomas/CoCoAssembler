@@ -99,6 +99,38 @@ class TestStatement(unittest.TestCase):
         statement2.fix_addresses(statements, 1)
         self.assertEqual("FFEE", statement2.code_pkg.additional.hex())
 
+    def test_fix_addresses_correct_for_forward_branches(self):
+        statement1 = Statement("START BRA DONE  ; branch to done")
+        statement2 = Statement("      CLRA      ; clear A")
+        statement3 = Statement("      CLRA      ; clear A")
+        statement4 = Statement("      CLRA      ; clear A")
+        statement5 = Statement("DONE  JSR $FFEE ; jump to subroutine")
+        statement1.code_pkg.additional = AddressValue(4)
+        statement1.code_pkg.size = 2
+        statement2.code_pkg.size = 1
+        statement3.code_pkg.size = 1
+        statement4.code_pkg.size = 1
+        statement5.code_pkg.size = 2
+        statements = [statement1, statement2, statement3, statement4, statement5]
+        statement1.fix_addresses(statements, 0)
+        self.assertEqual("03", statement1.code_pkg.additional.hex())
+
+    def test_fix_addresses_correct_for_reverse_branches(self):
+        statement1 = Statement("START JSR $FFEE ; jump to subroutine")
+        statement2 = Statement("      CLRA      ; clear A")
+        statement3 = Statement("      CLRA      ; clear A")
+        statement4 = Statement("      CLRA      ; clear A")
+        statement5 = Statement("DONE  BRA START ; jump to start")
+        statement1.code_pkg.size = 2
+        statement2.code_pkg.size = 1
+        statement3.code_pkg.size = 1
+        statement4.code_pkg.size = 1
+        statement5.code_pkg.size = 2
+        statement5.code_pkg.additional = AddressValue(0)
+        statements = [statement1, statement2, statement3, statement4, statement5]
+        statement5.fix_addresses(statements, 4)
+        self.assertEqual("F9", statement5.code_pkg.additional.hex())
+
 # M A I N #####################################################################
 
 
