@@ -10,9 +10,10 @@ import unittest
 
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
     OperandType, IndexedOperand, RelativeOperand, ExtendedIndexedOperand, \
-    Operand, ExtendedOperand, PseudoOperand, SpecialOperand
+    Operand, ExtendedOperand, PseudoOperand, SpecialOperand, ExpressionOperand, \
+    DirectOperand
 from cocoasm.instruction import Instruction, Mode
-from cocoasm.values import NumericValue, AddressValue
+from cocoasm.values import NumericValue, AddressValue, NoneValue, ValueType
 
 # C L A S S E S ###############################################################
 
@@ -83,6 +84,53 @@ class TestBaseOperand(unittest.TestCase):
             Operand.create_from_str(",blah,", instruction)
         self.assertEqual("[,blah,] unknown operand type", str(context.exception))
 
+    def test_base_resolve_symbols_returns_self_if_not_symbol(self):
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3))
+        operand = ExtendedOperand("$FFFF", instruction)
+        result = operand.resolve_symbols({})
+        self.assertEqual(OperandType.EXTENDED, result.type)
+        self.assertEqual("FFFF", result.value.hex())
+
+    def test_base_resolve_symbols_returns_direct_symbol(self):
+        symbol_table = {
+            "BLAH": NumericValue("$FF")
+        }
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3))
+        operand = UnknownOperand("BLAH", instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual(OperandType.DIRECT, result.type)
+        self.assertEqual("FF", result.value.hex())
+
+    def test_base_resolve_symbols_returns_extended_symbol(self):
+        symbol_table = {
+            "BLAH": NumericValue("$FFFF")
+        }
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3))
+        operand = UnknownOperand("BLAH", instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual(OperandType.EXTENDED, result.type)
+        self.assertEqual("FFFF", result.value.hex())
+
+    def test_base_resolve_symbols_returns_extended_for_address_value(self):
+        symbol_table = {
+            "BLAH": AddressValue(2)
+        }
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3))
+        operand = UnknownOperand("BLAH", instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual(OperandType.EXTENDED, result.type)
+        self.assertEqual(2, result.value.int)
+
+    def test_base_resolve_symbols_returns_self_for_address_value(self):
+        symbol_table = {
+            "BLAH": AddressValue(2)
+        }
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3), is_short_branch=True)
+        operand = RelativeOperand("BLAH", instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual(OperandType.RELATIVE, result.type)
+        self.assertEqual(2, result.value.int)
+
 
 class TestUnknownOperand(unittest.TestCase):
     """
@@ -115,6 +163,10 @@ class TestUnknownOperand(unittest.TestCase):
         self.assertEqual(0, result.post_byte.int)
         self.assertEqual(0, result.size)
 
+    def test_unknown_value_set_to_none_on_bad_operand(self):
+        operand = UnknownOperand("\\bad", self.instruction)
+        self.assertEqual(ValueType.NONE, operand.value.type)
+
 
 class TestRelativeOperand(unittest.TestCase):
     """
@@ -135,6 +187,102 @@ class TestRelativeOperand(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             RelativeOperand("$FF", instruction)
         self.assertEqual("[BEQ] is not a branch instruction", str(context.exception))
+
+    def test_relative_translate_correct(self):
+        instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1), is_short_branch=True)
+        operand = RelativeOperand("$FF", instruction)
+        operand.value = AddressValue(0xFFEE)
+        result = operand.translate()
+        self.assertEqual("3A", result.op_code.hex())
+        self.assertEqual(1, result.size)
+        self.assertEqual("FFEE", result.additional.hex())
+
+
+class TestExpressionOperand(unittest.TestCase):
+    """
+    A test class for the ExpressionOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="LDA", mode=Mode(imm=0x86, imm_sz=2))
+
+    def test_expression_translate_returns_blank_code_package(self):
+        operand = ExpressionOperand("A+B", self.instruction)
+        result = operand.translate()
+        self.assertEqual("", result.op_code.hex())
+        self.assertEqual("", result.additional.hex())
+        self.assertEqual("", result.post_byte.hex())
+        self.assertEqual(0, result.size)
+
+    def test_expression_parsed_correct(self):
+        operand = ExpressionOperand("$0F+$F0", self.instruction)
+        self.assertEqual("0F", operand.left.hex())
+        self.assertEqual("F0", operand.right.hex())
+        self.assertEqual("+", operand.operation)
+
+    def test_expression_resolve_expression_plus(self):
+        operand = ExpressionOperand("$01+$02", self.instruction)
+        operand.resolve_expression({})
+        self.assertEqual("03", operand.value.hex())
+
+    def test_expression_resolve_expression_minus(self):
+        operand = ExpressionOperand("$03-$02", self.instruction)
+        operand.resolve_expression({})
+        self.assertEqual("01", operand.value.hex())
+
+    def test_expression_resolve_expression_multiply(self):
+        operand = ExpressionOperand("$02*$02", self.instruction)
+        operand.resolve_expression({})
+        self.assertEqual("04", operand.value.hex())
+
+    def test_expression_resolve_expression_divide(self):
+        operand = ExpressionOperand("$04/$02", self.instruction)
+        operand.resolve_expression({})
+        self.assertEqual("02", operand.value.hex())
+
+    def test_expression_resolve_expression_direct_size(self):
+        operand = ExpressionOperand("$01+$02", self.instruction)
+        operand = operand.resolve_expression({})
+        self.assertEqual(OperandType.DIRECT, operand.type)
+
+    def test_expression_resolve_expression_extended_size(self):
+        operand = ExpressionOperand("$01+$FF", self.instruction)
+        operand = operand.resolve_expression({})
+        self.assertEqual(OperandType.EXTENDED, operand.type)
+
+    def test_expression_resolve_expression_left_resolves(self):
+        symbol_table = {
+            "BLAH": NumericValue(2)
+        }
+        operand = ExpressionOperand("BLAH+$01", self.instruction)
+        operand = operand.resolve_expression(symbol_table=symbol_table)
+        self.assertEqual("03", operand.value.hex())
+
+    def test_expression_resolve_expression_right_resolves(self):
+        symbol_table = {
+            "BLAH": NumericValue(2)
+        }
+        operand = ExpressionOperand("$02+BLAH", self.instruction)
+        operand = operand.resolve_expression(symbol_table=symbol_table)
+        self.assertEqual("04", operand.value.hex())
+
+    def test_expression_resolve_expression_none_type_raises(self):
+        operand = ExpressionOperand("$02+$02", self.instruction)
+        operand.left = NoneValue()
+        with self.assertRaises(ValueError) as context:
+            operand.resolve_expression({})
+        self.assertEqual("[$02+$02] unresolved expression", str(context.exception))
+
+    def test_expression_resolve_symbols_resolves_expression(self):
+        symbol_table = {
+            "BLAH1": NumericValue(2),
+            "BLAH2": NumericValue(1)
+        }
+        operand = ExpressionOperand("BLAH1+BLAH2", self.instruction)
+        operand = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual("03", operand.value.hex())
 
 
 class TestPseudoOperand(unittest.TestCase):
@@ -274,6 +422,99 @@ class TestSpecialOperand(unittest.TestCase):
         code_pkg = operand.translate()
         self.assertEqual("37", code_pkg.post_byte.hex())
 
+    def test_special_exg_raises_with_one_register(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[EXG] requires exactly 2 registers", str(context.exception))
+
+    def test_special_exg_raises_with_three_registers(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A,B,X", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[EXG] requires exactly 2 registers", str(context.exception))
+
+    def test_special_exg_raises_with_bad_register_first_reg(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("not_a_register,A", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[not_a_register] unknown register", str(context.exception))
+
+    def test_special_exg_raises_with_bad_register_second_reg(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A,not_a_register", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[not_a_register] unknown register", str(context.exception))
+
+    def test_special_exg_raises_with_A_to_D(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A,D", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[EXG] of [A] to [D] not allowed", str(context.exception))
+
+    def test_special_exg_works_self_to_self(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A,A", instruction)
+        result = operand.translate()
+        self.assertEqual("88", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("B,B", instruction)
+        result = operand.translate()
+        self.assertEqual("99", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("CC,CC", instruction)
+        result = operand.translate()
+        self.assertEqual("AA", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("DP,DP", instruction)
+        result = operand.translate()
+        self.assertEqual("BB", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("D,D", instruction)
+        result = operand.translate()
+        self.assertEqual("00", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("X,X", instruction)
+        result = operand.translate()
+        self.assertEqual("11", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("Y,Y", instruction)
+        result = operand.translate()
+        self.assertEqual("22", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("U,U", instruction)
+        result = operand.translate()
+        self.assertEqual("33", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("S,S", instruction)
+        result = operand.translate()
+        self.assertEqual("44", result.post_byte.hex())
+
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("PC,PC", instruction)
+        result = operand.translate()
+        self.assertEqual("55", result.post_byte.hex())
+
+    def test_special_resolve_symbols_returns_same(self):
+        instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
+        operand = SpecialOperand("A,A", instruction)
+        result = operand.resolve_symbols({})
+        self.assertEqual(operand.operand_string, result.operand_string)
+        self.assertEqual(operand.type, result.type)
+
 
 class TestInherentOperand(unittest.TestCase):
     """
@@ -362,6 +603,19 @@ class TestImmediateOperand(unittest.TestCase):
         self.assertEqual("3A", result.op_code.hex())
         self.assertEqual("FF", result.additional.hex())
         self.assertEqual(2, result.size)
+
+    def test_immediate_resolve_symbols_not_symbol(self):
+        operand = ImmediateOperand("#$FF", self.instruction)
+        result = operand.resolve_symbols({})
+        self.assertEqual(ValueType.NUMERIC, result.value.type)
+
+    def test_immediate_resolve_symbols_correct(self):
+        symbol_table = {
+            "BLAH": NumericValue(2)
+        }
+        operand = ImmediateOperand("#BLAH", self.instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual("02", result.value.hex())
 
 
 class TestIndexedOperand(unittest.TestCase):
@@ -619,6 +873,13 @@ class TestIndexedOperand(unittest.TestCase):
         operand = operand.resolve_symbols(symbol_table)
         code_pkg = operand.translate()
         self.assertEqual("1F", code_pkg.post_byte.hex())
+
+    def test_indexed_translate_left_address_raises(self):
+        operand = IndexedOperand("$1F,X", self.instruction)
+        operand.left = AddressValue(32767)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[$1F,X] cannot translate address in left hand side", str(context.exception))
 
 
 class TestExtendedIndexedOperand(unittest.TestCase):
@@ -891,6 +1152,66 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         self.assertEqual("0900", code_pkg.additional.hex())
         self.assertEqual(4, code_pkg.size)
 
+    def test_extended_indexed_resolve_symbol_correct(self):
+        symbol_table = {
+            "BLAH": NumericValue(2)
+        }
+        operand = ExtendedIndexedOperand("[BLAH]", self.instruction)
+        result = operand.resolve_symbols(symbol_table=symbol_table)
+        self.assertEqual("02", result.value.hex())
+
+    def test_extended_indirect_translate_left_address_raises(self):
+        operand = ExtendedIndexedOperand("[$1F,X]", self.instruction)
+        operand.left = AddressValue(32767)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("[[$1F,X]] cannot translate address in left hand side", str(context.exception))
+
+
+class TestDirectOperand(unittest.TestCase):
+    """
+    A test class for the DirectOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="SUBA", mode=Mode(dir=0xB0, dir_sz=3))
+
+    def test_direct_type_correct(self):
+        result = DirectOperand("$FF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.DIRECT))
+        self.assertEqual("FF", result.value.hex())
+
+    def test_direct_value_passthrough_correct(self):
+        result = DirectOperand("$FF", self.instruction, value=NumericValue("$FE"))
+        self.assertTrue(result.is_type(OperandType.DIRECT))
+        self.assertEqual("FE", result.value.hex())
+
+    def test_direct_raises_if_value_not_direct_length(self):
+        with self.assertRaises(ValueError) as context:
+            DirectOperand("$FFFF", self.instruction)
+        self.assertEqual("[$FFFF] is not a direct value", str(context.exception))
+
+    def test_direct_force_direct_mode_correct(self):
+        result = DirectOperand("<$FF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.DIRECT))
+        self.assertEqual("FF", result.value.hex())
+
+    def test_direct_raises_on_translate_not_direct_instruction(self):
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(imm=0xB0, imm_sz=3))
+        operand = DirectOperand("<$FF", instruction)
+        with self.assertRaises(ValueError) as context:
+            operand.translate()
+        self.assertEqual("Instruction [SUBA] does not support direct addressing", str(context.exception))
+
+    def test_direct_translate_correct(self):
+        operand = DirectOperand("<$FF", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("B0", code_pkg.op_code.hex())
+        self.assertEqual("FF", code_pkg.additional.hex())
+        self.assertEqual(3, code_pkg.size)
+
 
 class TestExtendedOperand(unittest.TestCase):
     """
@@ -922,6 +1243,11 @@ class TestExtendedOperand(unittest.TestCase):
     def test_extended_value_passthrough_correct(self):
         operand = ExtendedOperand("", self.instruction, value="FFFF")
         self.assertEqual("FFFF", operand.value)
+
+    def test_extended_force_extended_mode_correct(self):
+        result = ExtendedOperand(">$FFFF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.EXTENDED))
+        self.assertEqual("FFFF", result.value.hex())
 
 # M A I N #####################################################################
 

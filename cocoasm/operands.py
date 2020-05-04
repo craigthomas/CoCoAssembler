@@ -29,7 +29,7 @@ DIRECT_REGEX = re.compile(
 
 # Pattern to recognize an extended value
 EXTENDED_REGEX = re.compile(
-    r"^<(?P<value>.*)"
+    r"^>(?P<value>.*)"
 )
 
 # Pattern to recognize an indexed value
@@ -39,7 +39,7 @@ EXTENDED_INDIRECT_REGEX = re.compile(
 
 # Patten to recognize an expression
 EXPRESSION_REGEX = re.compile(
-    r"^(?P<left>[\d\w]+)(?P<operation>[+\-/*])(?P<right>[\d\w]+)$"
+    r"^(?P<left>[$]*[\d\w]+)(?P<operation>[+\-/*])(?P<right>[$]*[\d\w]+)$"
 )
 
 # Pattern to recognize invalid characters in an UnknownOperand
@@ -151,6 +151,14 @@ class Operand(ABC):
         return self.type == operand_type
 
     def resolve_symbols(self, symbol_table):
+        """
+        Given a symbol table, searches the operands for any symbols, and resolves
+        them with values from the symbol table. Returns a (possibly) new Operand
+        class type as a result of symbol resolution.
+
+        :param symbol_table: the symbol table to search
+        :return: self, or a new Operand class type with a resolved value
+        """
         if self.is_type(OperandType.EXPRESSION):
             return self.resolve_expression(symbol_table)
 
@@ -172,6 +180,14 @@ class Operand(ABC):
             return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
 
     def resolve_expression(self, symbol_table):
+        """
+        Attempts to resolve the expression contained in the operand using the
+        symbol table supplied. Returns a (possibly) new Operand class type as a
+        result of symbol resolution.
+
+        :param symbol_table: the symbol table to use for resolution
+        :return: self, or a new Operand class type with a resolved value
+        """
         if self.left.is_type(ValueType.SYMBOL):
             self.left = self.get_symbol(self.left.ascii(), symbol_table)
 
@@ -186,9 +202,9 @@ class Operand(ABC):
             if self.operation == "-":
                 self.value = NumericValue("{}".format(left - right))
             if self.operation == "*":
-                self.value = NumericValue("{}".format(left * right))
+                self.value = NumericValue("{}".format(int(left * right)))
             if self.operation == "/":
-                self.value = NumericValue("{}".format(left / right))
+                self.value = NumericValue("{}".format(int(left / right)))
             if self.value.hex_len() == 2:
                 return DirectOperand(self.operand_string, self.instruction, value=self.value)
             return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
@@ -296,13 +312,13 @@ class SpecialOperand(Operand):
         if self.instruction.mnemonic == "EXG" or self.instruction.mnemonic == "TFR":
             registers = self.operand_string.split(",")
             if len(registers) != 2:
-                raise ValueError("{} requires exactly 2 registers".format(self.instruction.mnemonic))
+                raise ValueError("[{}] requires exactly 2 registers".format(self.instruction.mnemonic))
 
             if registers[0] not in REGISTERS:
-                raise ValueError("unknown register {}".format(registers[0]))
+                raise ValueError("[{}] unknown register".format(registers[0]))
 
             if registers[1] not in REGISTERS:
-                raise ValueError("unknown register {}".format(registers[1]))
+                raise ValueError("[{}] unknown register".format(registers[1]))
 
             code_pkg.post_byte |= 0x00 if registers[0] == "D" else 0x00
             code_pkg.post_byte |= 0x00 if registers[1] == "D" else 0x00
@@ -345,7 +361,7 @@ class SpecialOperand(Operand):
                         0x88, 0x99, 0xAA, 0xBB
                     ]:
                 raise ValueError(
-                    "{} of {} to {} not allowed".format(self.instruction.mnemonic, registers[0], registers[1]))
+                    "[{}] of [{}] to [{}] not allowed".format(self.instruction.mnemonic, registers[0], registers[1]))
 
         code_pkg.post_byte = NumericValue(code_pkg.post_byte)
         return code_pkg
@@ -424,7 +440,7 @@ class DirectOperand(Operand):
             return
         match = DIRECT_REGEX.match(self.operand_string)
         if match:
-            self.value = Value.create_from_str(match.group("value")[1:], instruction)
+            self.value = Value.create_from_str(match.group("value"), instruction)
         else:
             self.value = Value.create_from_str(operand_string, instruction)
         if self.value is None or self.value.byte_len() != 1:
@@ -448,9 +464,10 @@ class ExtendedOperand(Operand):
             return
         match = EXTENDED_REGEX.match(self.operand_string)
         if match:
-            self.value = Value.create_from_str(match.group("value")[1:], instruction)
+            self.value = Value.create_from_str(match.group("value"), instruction)
         else:
             self.value = Value.create_from_str(operand_string, instruction)
+
         if self.value is None or self.value.byte_len() != 2:
             raise ValueError("[{}] is not an extended value".format(operand_string))
 
