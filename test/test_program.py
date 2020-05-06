@@ -13,6 +13,7 @@ from unittest.mock import patch, call
 from cocoasm.program import Program
 from cocoasm.statement import Statement
 from cocoasm.exceptions import TranslationError
+from cocoasm.values import NumericValue
 
 # C L A S S E S ###############################################################
 
@@ -124,6 +125,47 @@ class TestProgram(unittest.TestCase):
             ],
             print_mock.mock_calls
         )
+
+    def test_get_binary_array_empty_if_no_statements(self):
+        program = Program()
+        self.assertEqual([], program.get_binary_array())
+
+    def test_get_binary_array_empty_on_comments_and_empty_lines(self):
+        statement1 = Statement("")
+        statement2 = Statement("; comment only")
+        program = Program()
+        program.statements = [statement1, statement2]
+        self.assertEqual([], program.get_binary_array())
+
+    def test_get_binary_array_op_code_only(self):
+        statement1 = Statement("    JMP $FFFF")
+        statement1.code_pkg.op_code = NumericValue("$FF")
+        program = Program()
+        program.statements = [statement1]
+        self.assertEqual([0xFF], program.get_binary_array())
+
+    def test_get_binary_array_additional_only(self):
+        statement1 = Statement("    JMP $FFFF")
+        statement1.code_pkg.additional = NumericValue("$FF")
+        program = Program()
+        program.statements = [statement1]
+        self.assertEqual([0xFF], program.get_binary_array())
+
+    def test_get_binary_array_postbyte_only(self):
+        statement1 = Statement("    JMP $FFFF")
+        statement1.code_pkg.post_byte = NumericValue("$FF")
+        program = Program()
+        program.statements = [statement1]
+        self.assertEqual([0xFF], program.get_binary_array())
+
+    def test_get_binary_array_all_correct(self):
+        statement1 = Statement("    JMP $FFFF")
+        statement1.code_pkg.op_code = NumericValue("$DEAD")
+        statement1.code_pkg.post_byte = NumericValue("$BEEF")
+        statement1.code_pkg.additional = NumericValue("$CAFE")
+        program = Program()
+        program.statements = [statement1]
+        self.assertEqual([0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE], program.get_binary_array())
 
 
 # M A I N #####################################################################
