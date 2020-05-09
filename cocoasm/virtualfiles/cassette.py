@@ -6,12 +6,10 @@ A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
-import os
-
-from abc import ABC, abstractmethod
 from enum import IntEnum
 
-from cocoasm.values import NoneValue
+
+from cocoasm.virtualfiles.virtualfile import VirtualFile
 
 # C L A S S E S ###############################################################
 
@@ -27,90 +25,6 @@ class CassetteDataType(IntEnum):
     ASCII = 0xFF
 
 
-class CoCoFile(object):
-    pass
-
-
-class VirtualFile(ABC):
-    def __init__(self):
-        self.host_file = None
-        self.load_addr = NoneValue()
-        self.exec_addr = NoneValue()
-        self.append_mode = False
-        self.filename = None
-
-    def open_host_file(self, filename, append=False):
-        """
-        Opens the file on the host drive for reading.
-
-        :param filename: the name of the file to open
-        :param append: whether to append to an existing file
-        """
-        if not append and os.path.exists(filename):
-            raise ValueError("[{}] already exists, use --append to add to this file".format(filename))
-
-        if not append:
-            self.host_file = open(filename, "wb")
-        else:
-            self.host_file = open(filename, "ab")
-            self.append_mode = True
-
-        self.filename = filename
-
-    def close_host_file(self):
-        """
-        Closes the file on the host drive.
-        """
-        if self.host_file:
-            self.host_file.close()
-            self.host_file = None
-
-    def is_host_file_open(self):
-        """
-        Returns True if a host file is open, False otherwise.
-
-        :return: True if the host file is open, False otherwise
-        """
-        return self.host_file is not None
-
-    @abstractmethod
-    def list_files(self):
-        """
-        Lists the files contained within the virtual file.
-
-        :return: a list of CoCoFile objects in the virtual file
-        """
-
-    @abstractmethod
-    def save_file(self, name, raw_bytes):
-        """
-        Saves the specified file to the virtual image.
-
-        :param name: the name of the program
-        :param raw_bytes: the raw bytes of the file
-        """
-
-
-class BinaryFile(VirtualFile):
-    """
-    A binary file is a single file on the host filesystem that contains the
-    assembled program code. Note that no meta-information about the binary
-    file is stored within the file. Binary files store exactly one machine
-    code program, therefore list_files returns an empty list.
-    """
-    def __init__(self):
-        super().__init__()
-        self.outfile = None
-
-    def list_files(self):
-        return []
-
-    def save_file(self, name, raw_bytes):
-        if self.append_mode:
-            raise ValueError("[{}] cannot append to binary file".format(self.filename))
-        self.host_file.write(bytearray(raw_bytes))
-
-
 class CassetteFile(VirtualFile):
     """
     A CassetteFile contains a series of blocks that are separated by leaders
@@ -122,10 +36,28 @@ class CassetteFile(VirtualFile):
 
     CassetteFile may contain more than one file on it.
     """
-    def __init__(self, load_addr, exec_addr):
+    def __init__(self, load_addr=None, exec_addr=None):
         super().__init__()
         self.load_addr = load_addr
         self.exec_addr = exec_addr
+
+    def is_correct_type(self):
+        if not self.host_file:
+            raise ValueError("No file currently open")
+
+        if not self.read_mode:
+            raise ValueError("[{}] not open for reading".format(self.filename))
+
+        self.host_file.seek(0)
+
+        # First 128 bytes must be a leader of $55
+        for _ in range(128):
+            character = ord(self.host_file.read(1))
+            if character != 0x55:
+                return False
+
+        self.host_file.seek(0)
+        return True
 
     def list_files(self):
         pass
@@ -287,16 +219,5 @@ class CassetteFile(VirtualFile):
         buffer.append(0x00)
         buffer.append(0xFF)
         buffer.append(0x55)
-
-
-class DiskFile(VirtualFile):
-    def __init__(self):
-        super().__init__()
-
-    def list_files(self):
-        pass
-
-    def save_file(self, name, raw_bytes):
-        pass
 
 # E N D   O F   F I L E #######################################################

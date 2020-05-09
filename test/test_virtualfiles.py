@@ -9,8 +9,9 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.values import NumericValue
-from cocoasm.virtualfiles import BinaryFile, CassetteFile, CassetteFileType, \
+from cocoasm.virtualfiles.cassette import CassetteFile, CassetteFileType, \
     CassetteDataType
+from cocoasm.virtualfiles.binary import BinaryFile
 
 # C L A S S E S ###############################################################
 

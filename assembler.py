@@ -9,7 +9,8 @@ A Color Computer Assembler - see the README.md file for details.
 import argparse
 
 from cocoasm.program import Program
-from cocoasm.virtualfiles import BinaryFile, CassetteFile
+from cocoasm.virtualfiles.binary import BinaryFile
+from cocoasm.virtualfiles.cassette import CassetteFile
 
 # F U N C T I O N S ###########################################################
 
@@ -68,7 +69,7 @@ def main(args):
 
     if args.bin_file:
         binary_file = BinaryFile()
-        binary_file.open_host_file(args.bin_file)
+        binary_file.open_for_write(args.bin_file)
         binary_file.save_file(None, program.get_binary_array())
         binary_file.close_host_file()
 
@@ -78,7 +79,7 @@ def main(args):
             return
         try:
             binary_file = CassetteFile(program.origin, program.origin)
-            binary_file.open_host_file(args.cas_file, append=args.append)
+            binary_file.open_for_write(args.cas_file, append=args.append)
             binary_file.save_file(name, program.get_binary_array())
             binary_file.close_host_file()
         except ValueError as error:
