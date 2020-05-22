@@ -10,6 +10,7 @@ from enum import IntEnum
 
 
 from cocoasm.virtualfiles.virtualfile import VirtualFile, CoCoFile
+from cocoasm.values import NumericValue
 
 # C L A S S E S ###############################################################
 
@@ -58,7 +59,8 @@ class CassetteFile(VirtualFile):
         return True
 
     def list_files(self):
-        pass
+        self.read_leader(self.host_file)
+        return []
 
     def save_to_host_file(self, coco_file):
         data = []
@@ -68,6 +70,22 @@ class CassetteFile(VirtualFile):
         self.append_data_blocks(data, coco_file.data)
         self.append_eof(data)
         self.host_file.write(bytearray(data))
+
+    @staticmethod
+    def read_leader(file):
+        """
+        Reads a cassette leader. Should consist of 128 bytes of the value $55.
+        Raises a ValueError if there is a problem.
+
+        :param file: the file object to read from
+        """
+        for _ in range(128):
+            byte = file.read(1)
+            if byte == b"":
+                raise ValueError("No bytes left to read in header")
+            value = NumericValue(int.from_bytes(byte, byteorder='little'))
+            if value.hex() != "55":
+                raise ValueError("[{}] invalid header byte".format(value.hex()))
 
     @staticmethod
     def append_leader(buffer):
