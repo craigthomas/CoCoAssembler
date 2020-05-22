@@ -9,6 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import argparse
 
 from cocoasm.program import Program
+from cocoasm.virtualfiles.virtualfile import CoCoFile
 from cocoasm.virtualfiles.binary import BinaryFile
 from cocoasm.virtualfiles.cassette import CassetteFile
 
@@ -59,7 +60,12 @@ def main(args):
     """
     program = Program()
     program.process(args.filename)
-    name = program.name or args.name
+    coco_file = CoCoFile(
+        name=program.name or args.name,
+        load_addr=program.origin,
+        exec_addr=program.origin,
+        data=program.get_binary_array()
+    )
 
     if args.symbols:
         program.print_symbol_table()
@@ -68,20 +74,24 @@ def main(args):
         program.print_statements()
 
     if args.bin_file:
-        binary_file = BinaryFile()
-        binary_file.open_for_write(args.bin_file)
-        binary_file.save_file(None, program.get_binary_array())
-        binary_file.close_host_file()
+        try:
+            binary_file = BinaryFile()
+            binary_file.open_host_file_for_write(args.bin_file, append=args.append)
+            binary_file.save_to_host_file(coco_file)
+            binary_file.close_host_file()
+        except ValueError as error:
+            print("Unable to save binary file:")
+            print(error)
 
     if args.cas_file:
-        if not name:
+        if not coco_file.name:
             print("No name for the program specified, not creating cassette file")
             return
         try:
-            binary_file = CassetteFile(program.origin, program.origin)
-            binary_file.open_for_write(args.cas_file, append=args.append)
-            binary_file.save_file(name, program.get_binary_array())
-            binary_file.close_host_file()
+            cas_file = CassetteFile()
+            cas_file.open_host_file_for_write(args.cas_file, append=args.append)
+            cas_file.save_to_host_file(coco_file)
+            cas_file.close_host_file()
         except ValueError as error:
             print("Unable to save cassette file:")
             print(error)

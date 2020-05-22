@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 from enum import IntEnum
 
 
-from cocoasm.virtualfiles.virtualfile import VirtualFile
+from cocoasm.virtualfiles.virtualfile import VirtualFile, CoCoFile
 
 # C L A S S E S ###############################################################
 
@@ -36,10 +36,8 @@ class CassetteFile(VirtualFile):
 
     CassetteFile may contain more than one file on it.
     """
-    def __init__(self, load_addr=None, exec_addr=None):
+    def __init__(self):
         super().__init__()
-        self.load_addr = load_addr
-        self.exec_addr = exec_addr
 
     def is_correct_type(self):
         if not self.host_file:
@@ -62,14 +60,14 @@ class CassetteFile(VirtualFile):
     def list_files(self):
         pass
 
-    def save_file(self, name, raw_bytes):
-        buffer = []
-        self.append_leader(buffer)
-        self.append_header(buffer, name, CassetteFileType.OBJECT_FILE, CassetteDataType.BINARY)
-        self.append_leader(buffer)
-        self.append_data_blocks(buffer, raw_bytes)
-        self.append_eof(buffer)
-        self.host_file.write(bytearray(buffer))
+    def save_to_host_file(self, coco_file):
+        data = []
+        self.append_leader(data)
+        self.append_header(data, coco_file, CassetteFileType.OBJECT_FILE, CassetteDataType.BINARY)
+        self.append_leader(data)
+        self.append_data_blocks(data, coco_file.data)
+        self.append_eof(data)
+        self.host_file.write(bytearray(data))
 
     @staticmethod
     def append_leader(buffer):
@@ -82,7 +80,8 @@ class CassetteFile(VirtualFile):
         for _ in range(128):
             buffer.append(0x55)
 
-    def append_header(self, buffer, name, file_type, data_type):
+    @staticmethod
+    def append_header(buffer, coco_file, file_type, data_type):
         """
         The header of a cassette file is 21 bytes long:
           byte 1 = $55 (fixed value)
@@ -98,7 +97,7 @@ class CassetteFile(VirtualFile):
           byte 21 = $55 (fixed value)
 
         :param buffer: the buffer to append the header to
-        :param name: the name of the file as it should appear on the cassette
+        :param coco_file: the CoCoFile to append to cassette
         :param file_type: the CassetteFileType to save as
         :param data_type: the CassetteDataType to save as
         """
@@ -110,7 +109,7 @@ class CassetteFile(VirtualFile):
         checksum = 0x0F
 
         # Filename and type
-        checksum += CassetteFile.append_name(name, buffer)
+        checksum += CassetteFile.append_name(coco_file.name, buffer)
         buffer.append(file_type)
         buffer.append(data_type)
         checksum += file_type
@@ -120,14 +119,14 @@ class CassetteFile(VirtualFile):
         buffer.append(0x00)
 
         # The loading and execution addresses
-        buffer.append(self.load_addr.high_byte())
-        buffer.append(self.load_addr.low_byte())
-        buffer.append(self.exec_addr.high_byte())
-        buffer.append(self.exec_addr.low_byte())
-        checksum += self.load_addr.high_byte()
-        checksum += self.load_addr.low_byte()
-        checksum += self.exec_addr.high_byte()
-        checksum += self.exec_addr.low_byte()
+        buffer.append(coco_file.load_addr.high_byte())
+        buffer.append(coco_file.load_addr.low_byte())
+        buffer.append(coco_file.exec_addr.high_byte())
+        buffer.append(coco_file.exec_addr.low_byte())
+        checksum += coco_file.load_addr.high_byte()
+        checksum += coco_file.load_addr.low_byte()
+        checksum += coco_file.exec_addr.high_byte()
+        checksum += coco_file.exec_addr.low_byte()
 
         # Checksum byte
         buffer.append(checksum & 0xFF)

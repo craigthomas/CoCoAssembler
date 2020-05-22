@@ -8,7 +8,6 @@ A Color Computer Assembler - see the README.md file for details.
 
 import argparse
 
-from cocoasm.virtualfiles.binary import BinaryFile
 from cocoasm.virtualfiles.cassette import CassetteFile
 
 # F U N C T I O N S ###########################################################
@@ -39,7 +38,7 @@ def main(args):
     """
     if args.list:
         file = CassetteFile()
-        file.open_for_read(args.filename)
+        file.open_host_file_for_read(args.filename)
         if file.is_correct_type():
             print("Cassette file")
         else:

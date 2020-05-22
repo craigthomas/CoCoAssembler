@@ -6,7 +6,7 @@ A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
-from cocoasm.virtualfiles.virtualfile import VirtualFile
+from cocoasm.virtualfiles.virtualfile import VirtualFile, CoCoFile
 
 # C L A S S E S ###############################################################
 
@@ -28,9 +28,9 @@ class BinaryFile(VirtualFile):
     def is_correct_type(self):
         return False
 
-    def save_file(self, name, raw_bytes):
+    def save_to_host_file(self, coco_file):
         if self.append_mode:
             raise ValueError("[{}] cannot append to binary file".format(self.filename))
-        self.host_file.write(bytearray(raw_bytes))
+        self.host_file.write(bytearray(coco_file.data))
 
 # E N D   O F   F I L E #######################################################

@@ -18,7 +18,7 @@ class DiskFile(VirtualFile):
     def list_files(self):
         pass
 
-    def save_file(self, name, raw_bytes):
+    def save_to_host_file(self, name, raw_bytes):
         pass
 
 # E N D   O F   F I L E #######################################################
