@@ -140,6 +140,18 @@ class Value(ABC):
 
         raise ValueError("[{}] is an invalid value".format(value))
 
+    @classmethod
+    def create_from_byte(cls, byte):
+        """
+        Parses the byte and turns it into a NumericValue.
+
+        :param byte: the byte to read
+        :return: the Value class parsed
+        """
+        if byte == b"":
+            raise ValueError("No byte available for reading")
+        return NumericValue(int.from_bytes(byte, byteorder='big'))
+
 
 class NoneValue(Value):
     """

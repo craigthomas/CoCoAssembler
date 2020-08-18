@@ -40,7 +40,7 @@ def main(args):
         file = CassetteFile()
         file.open_host_file_for_read(args.filename)
         if file.is_correct_type():
-            print("Cassette file contents:")
+            print("-- Cassette File Contents --")
             files = file.list_files()
         else:
             print("[{}] is not a cassette file".format(args.filename))

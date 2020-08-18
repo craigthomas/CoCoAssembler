@@ -10,7 +10,7 @@ from enum import IntEnum
 
 
 from cocoasm.virtualfiles.virtualfile import VirtualFile, CoCoFile
-from cocoasm.values import NumericValue
+from cocoasm.values import Value
 
 # C L A S S E S ###############################################################
 
@@ -58,15 +58,30 @@ class CassetteFile(VirtualFile):
         self.host_file.seek(0)
         return True
 
-    def list_files(self):
-        self.read_leader(self.host_file)
-        return []
+    def get_file(self):
+        if not self.seek_header(self.host_file):
+            return -1
+        else:
+            self.read_header(self.host_file)
+            return 1
+
+    def list_files(self, files=None):
+        if files is None:
+            files = []
+
+        cassette_file = self.get_file()
+        if cassette_file == -1:
+            return files
+
+        files.append(cassette_file)
+        return self.list_files(files=files)
+
 
     def save_to_host_file(self, coco_file):
         data = []
-        self.append_leader(data)
+        self.write_leader(data)
         self.append_header(data, coco_file, CassetteFileType.OBJECT_FILE, CassetteDataType.BINARY)
-        self.append_leader(data)
+        self.write_leader(data)
         self.append_data_blocks(data, coco_file.data)
         self.append_eof(data)
         self.host_file.write(bytearray(data))
@@ -80,15 +95,12 @@ class CassetteFile(VirtualFile):
         :param file: the file object to read from
         """
         for _ in range(128):
-            byte = file.read(1)
-            if byte == b"":
-                raise ValueError("No bytes left to read in header")
-            value = NumericValue(int.from_bytes(byte, byteorder='little'))
+            value = Value.create_from_byte(file.read(1))
             if value.hex() != "55":
-                raise ValueError("[{}] invalid header byte".format(value.hex()))
+                raise ValueError("[{}] invalid leader byte".format(value.hex()))
 
     @staticmethod
-    def append_leader(buffer):
+    def write_leader(buffer):
         """
         Appends a cassette leader of character $55 to the buffer. The leader is
         always 128 bytes long consisting of value $55.
@@ -99,13 +111,92 @@ class CassetteFile(VirtualFile):
             buffer.append(0x55)
 
     @staticmethod
+    def seek_header(file):
+        """
+        Reads the file until a header is found. If a header is found, then the file
+        stream is rewound to the start of the header.
+
+        :param file: the file object to read from
+        """
+        while True:
+            try:
+                last_values = [Value.create_from_byte(file.read(1)).hex(),
+                               Value.create_from_byte(file.read(1)).hex(),
+                               Value.create_from_byte(file.read(1)).hex()]
+            except ValueError:
+                return False
+
+            if last_values == ["55", "3C", "00"]:
+                file.seek(-3, 1)
+                return True
+
+            file.seek(-2, 1)
+
+    @staticmethod
+    def read_header(file):
+        """
+        Reads the header for the file, and returns a CoCoFile object with the
+        information for the file (without data).
+
+        :param file: the file object to read from
+        :return: a CoCoFile with header information
+        """
+        value = Value.create_from_byte(file.read(1))
+        if value.hex() != "55":
+            raise ValueError("[{}] invalid first header byte".format(value.hex()))
+
+        value = Value.create_from_byte(file.read(1))
+        if value.hex() != "3C":
+            raise ValueError("[{}] invalid second header byte".format(value.hex()))
+
+        value = Value.create_from_byte(file.read(1))
+        if value.hex() != "00":
+            raise ValueError("[{}] invalid third header byte".format(value.hex()))
+
+        value = Value.create_from_byte(file.read(1))
+        if value.hex() != "0F":
+            raise ValueError("[{}] invalid fourth header byte".format(value.hex()))
+
+        # Read 8 bytes worth of data as the filename
+        filename = file.read(8)
+        print("--")
+        print("Filename:   {}".format(filename.decode("utf-8")))
+
+        value = Value.create_from_byte(file.read(1))
+        filetype = "BASIC"
+        if value.hex() == "01":
+            filetype = "Data"
+        if value.hex() == "02":
+            filetype = "Object"
+        print("File Type:  {}".format(filetype))
+
+        value = Value.create_from_byte(file.read(1))
+        data_type = "Binary"
+        if value.hex() == "FF":
+            data_type = "ASCII"
+        print("Data Type:  {}".format(data_type))
+
+        value = Value.create_from_byte(file.read(1))
+        gaps = "No Gaps"
+        if value.hex() == "FF":
+            gaps = "Gaps"
+        print("Gap Status: {}".format(gaps))
+
+        value = Value.create_from_byte(file.read(2))
+        print("Load Addr:  ${}".format(value.hex(size=4)))
+
+        value = Value.create_from_byte(file.read(2))
+        print("Exec Addr:  ${}".format(value.hex(size=4)))
+
+    @staticmethod
     def append_header(buffer, coco_file, file_type, data_type):
         """
         The header of a cassette file is 21 bytes long:
           byte 1 = $55 (fixed value)
           byte 2 = $3C (fixed value)
           byte 3 = $00 (block type - $00 = header)
-          byte 4 - 12 = $XX XX XX XX XX XX XX XX (filename - 8 bytes long)
+          byte 4 = $0F (length of block - fixed at $0F)
+          byte 5 - 12 = $XX XX XX XX XX XX XX XX (filename - 8 bytes long)
           byte 13 = $XX (filetype - $00 = BASIC, $01 = data file, $02 = object code)
           byte 14 = $XX (datatype - $00 = binary, $FF = ascii)
           byte 15 = $XX (gaps, $00 = none, $FF = gaps)
