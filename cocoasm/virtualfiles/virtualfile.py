@@ -23,13 +23,36 @@ class CoCoFile(NamedTuple):
     execution point, the name, type, etc.
     """
     name: str = ""
-    type: int = 0
+    type: Value = None
     load_addr: Value = None
     exec_addr: Value = None
-    data_type: int = 0
-    gaps: int = 0
+    data_type: Value = None
+    gaps: Value = None
     ascii: int = 0
     data: list = []
+
+    def __str__(self):
+        result = "Filename:   {}\n".format(self.name)
+        filetype = "BASIC"
+        if self.type.hex() == "01":
+            filetype = "Data"
+        if self.type.hex() == "02":
+            filetype = "Object"
+        result += "File Type:  {}\n".format(filetype)
+
+        data_type = "Binary"
+        if self.data_type.hex() == "FF":
+            data_type = "ASCII"
+        result += "Data Type:  {}\n".format(data_type)
+
+        gaps = "No Gaps"
+        if self.gaps.hex() == "FF":
+            gaps = "Gaps"
+        result += "Gap Status: {}\n".format(gaps)
+
+        result += "Load Addr:  ${}\n".format(self.load_addr.hex(size=4))
+        result += "Exec Addr:  ${}".format(self.exec_addr.hex(size=4))
+        return result
 
 
 class VirtualFile(ABC):

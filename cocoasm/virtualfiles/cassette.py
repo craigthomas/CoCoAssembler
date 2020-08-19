@@ -59,23 +59,18 @@ class CassetteFile(VirtualFile):
         return True
 
     def get_file(self):
-        if not self.seek_header(self.host_file):
-            return -1
-        else:
-            self.read_header(self.host_file)
-            return 1
+        return self.read_header(self.host_file) if self.seek_header(self.host_file) else None
 
     def list_files(self, files=None):
         if files is None:
             files = []
 
         cassette_file = self.get_file()
-        if cassette_file == -1:
+        if not cassette_file:
             return files
 
         files.append(cassette_file)
         return self.list_files(files=files)
-
 
     def save_to_host_file(self, coco_file):
         data = []
@@ -157,36 +152,14 @@ class CassetteFile(VirtualFile):
         if value.hex() != "0F":
             raise ValueError("[{}] invalid fourth header byte".format(value.hex()))
 
-        # Read 8 bytes worth of data as the filename
-        filename = file.read(8)
-        print("--")
-        print("Filename:   {}".format(filename.decode("utf-8")))
-
-        value = Value.create_from_byte(file.read(1))
-        filetype = "BASIC"
-        if value.hex() == "01":
-            filetype = "Data"
-        if value.hex() == "02":
-            filetype = "Object"
-        print("File Type:  {}".format(filetype))
-
-        value = Value.create_from_byte(file.read(1))
-        data_type = "Binary"
-        if value.hex() == "FF":
-            data_type = "ASCII"
-        print("Data Type:  {}".format(data_type))
-
-        value = Value.create_from_byte(file.read(1))
-        gaps = "No Gaps"
-        if value.hex() == "FF":
-            gaps = "Gaps"
-        print("Gap Status: {}".format(gaps))
-
-        value = Value.create_from_byte(file.read(2))
-        print("Load Addr:  ${}".format(value.hex(size=4)))
-
-        value = Value.create_from_byte(file.read(2))
-        print("Exec Addr:  ${}".format(value.hex(size=4)))
+        return CoCoFile(
+            name=file.read(8).decode("utf-8"),
+            type=Value.create_from_byte(file.read(1)),
+            data_type=Value.create_from_byte(file.read(1)),
+            gaps=Value.create_from_byte(file.read(1)),
+            load_addr=Value.create_from_byte(file.read(2)),
+            exec_addr=Value.create_from_byte(file.read(2))
+        )
 
     @staticmethod
     def append_header(buffer, coco_file, file_type, data_type):
