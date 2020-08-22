@@ -59,18 +59,20 @@ class CassetteFile(VirtualFile):
         return True
 
     def get_file(self):
-        return self.read_header(self.host_file) if self.seek_header(self.host_file) else None
+        return self.read_file(self.host_file) if self.read_file(self.host_file) else None
 
-    def list_files(self, files=None):
-        if files is None:
+    def list_files(self, filenames=None, files=None):
+        if not files:
             files = []
 
         cassette_file = self.get_file()
         if not cassette_file:
             return files
 
-        files.append(cassette_file)
-        return self.list_files(files=files)
+        if not filenames or cassette_file.name in filenames:
+            files.append(cassette_file)
+
+        return self.list_files(filenames=filenames, files=files)
 
     def save_to_host_file(self, coco_file):
         data = []
@@ -106,60 +108,98 @@ class CassetteFile(VirtualFile):
             buffer.append(0x55)
 
     @staticmethod
-    def seek_header(file):
+    def seek_sequence(file, sequence):
         """
-        Reads the file until a header is found. If a header is found, then the file
-        stream is rewound to the start of the header.
+        Reads the file until the specified sequence is found. Returns
+        True if the sequence is found. The internal file byte pointer will
+        point to the first byte beyond the sequence. If an EOF occurs,
+        will return False.
 
         :param file: the file object to read from
+        :param sequence: the sequence of values to search for
+        :return: True if the sequence is found, False otherwise
         """
+        sequence_length = len(sequence)
         while True:
+            last_values = []
             try:
-                last_values = [Value.create_from_byte(file.read(1)).hex(),
-                               Value.create_from_byte(file.read(1)).hex(),
-                               Value.create_from_byte(file.read(1)).hex()]
+                for _ in range(len(sequence)):
+                    last_values.append(Value.create_from_byte(file.read(1)).hex())
             except ValueError:
                 return False
 
-            if last_values == ["55", "3C", "00"]:
-                file.seek(-3, 1)
+            if last_values == sequence:
                 return True
 
-            file.seek(-2, 1)
+            file.seek(-(sequence_length - 1), 1)
 
     @staticmethod
-    def read_header(file):
+    def read_file(file):
         """
-        Reads the header for the file, and returns a CoCoFile object with the
-        information for the file (without data).
+        Reads a cassette file, and returns a CoCoFile object with the
+        information for the next file contained on the cassette file.
 
         :param file: the file object to read from
         :return: a CoCoFile with header information
         """
-        value = Value.create_from_byte(file.read(1))
-        if value.hex() != "55":
-            raise ValueError("[{}] invalid first header byte".format(value.hex()))
+        if not CassetteFile.seek_sequence(file, ["55", "3C", "00"]):
+            print("Header block not found")
+            return None
 
-        value = Value.create_from_byte(file.read(1))
-        if value.hex() != "3C":
-            raise ValueError("[{}] invalid second header byte".format(value.hex()))
+        # Skip length byte
+        file.read(1)
 
-        value = Value.create_from_byte(file.read(1))
-        if value.hex() != "00":
-            raise ValueError("[{}] invalid third header byte".format(value.hex()))
+        # Extract file meta-data
+        name = file.read(8).decode("utf-8")
+        file_type = Value.create_from_byte(file.read(1))
+        data_type = Value.create_from_byte(file.read(1))
+        gaps = Value.create_from_byte(file.read(1))
+        load_addr = Value.create_from_byte(file.read(2))
+        exec_addr = Value.create_from_byte(file.read(2))
 
-        value = Value.create_from_byte(file.read(1))
-        if value.hex() != "0F":
-            raise ValueError("[{}] invalid fourth header byte".format(value.hex()))
+        # Advance two spaces to move past the header
+        file.read(2)
+        file.read(2)
+
+        data = CassetteFile.read_blocks(file)
+        if not data:
+            return None
 
         return CoCoFile(
-            name=file.read(8).decode("utf-8"),
-            type=Value.create_from_byte(file.read(1)),
-            data_type=Value.create_from_byte(file.read(1)),
-            gaps=Value.create_from_byte(file.read(1)),
-            load_addr=Value.create_from_byte(file.read(2)),
-            exec_addr=Value.create_from_byte(file.read(2))
+            name=name,
+            type=file_type,
+            data_type=data_type,
+            gaps=gaps,
+            load_addr=load_addr,
+            exec_addr=exec_addr,
+            data=data
         )
+
+    @staticmethod
+    def read_blocks(file):
+        """
+        Reads all of the data blocks that exist in the file.
+
+        :param file: the file object to read from
+        :return: an array of bytes read from the file
+        """
+        data = []
+
+        while True:
+            if not CassetteFile.seek_sequence(file, ["55", "3C"]):
+                print("Data or EOF block not found")
+                return []
+
+            block_type = Value.create_from_byte(file.read(1))
+            if block_type.hex() == "FF":
+                file.read(3)
+                return data
+
+            data_len = Value.create_from_byte(file.read(1))
+            for _ in range(data_len.int):
+                data.append(Value.create_from_byte(file.read(1)).hex())
+
+            file.read(2)
 
     @staticmethod
     def append_header(buffer, coco_file, file_type, data_type):

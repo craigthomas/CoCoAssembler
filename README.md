@@ -1,4 +1,4 @@
-# CoCo Assembler
+# CoCo Assembler and File Utility
 
 [![Build Status](https://img.shields.io/travis/craigthomas/CoCoAssembler?style=flat-square)](https://travis-ci.org/craigthomas/CoCoAssembler) 
 [![Codecov](https://img.shields.io/codecov/c/gh/craigthomas/CoCoAssembler?style=flat-square)](https://codecov.io/gh/craigthomas/CoCoAssembler) 
@@ -33,6 +33,9 @@ It is intended to be statement compatible with any code written for the EDTASM+ 
 The assembler is capable of taking EDTASM+ assembly language code and translating it into
 machine code for the Color Computer 1, 2, and 3. Current support is for 6809 CPU instructions,
 but future enhancements will add 6309 instructions.
+
+This project also includes a general purpose file utility, used mainly for manipulating
+`CAS`, `DSK`, and `WAV` files. 
 
 ## Requirements
 

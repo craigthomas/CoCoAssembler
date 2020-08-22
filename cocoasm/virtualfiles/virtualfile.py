@@ -51,7 +51,8 @@ class CoCoFile(NamedTuple):
         result += "Gap Status: {}\n".format(gaps)
 
         result += "Load Addr:  ${}\n".format(self.load_addr.hex(size=4))
-        result += "Exec Addr:  ${}".format(self.exec_addr.hex(size=4))
+        result += "Exec Addr:  ${}\n".format(self.exec_addr.hex(size=4))
+        result += "Data Len:   {} bytes".format(len(self.data))
         return result
 
 
@@ -125,10 +126,12 @@ class VirtualFile(ABC):
         """
 
     @abstractmethod
-    def list_files(self):
+    def list_files(self, filenames=None, files=None):
         """
         Lists the files contained within the virtual file.
 
+        :param filenames: a list of filename strings to extract if they exist
+        :param files: the list of CoCoFile objects already extracted
         :return: a list of CoCoFile objects in the virtual file
         """
 
