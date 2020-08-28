@@ -6,6 +6,8 @@ A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
+import sys
+
 from enum import IntEnum
 
 
@@ -58,21 +60,16 @@ class CassetteFile(VirtualFile):
         self.host_file.seek(0)
         return True
 
-    def get_file(self):
-        return self.read_file(self.host_file) if self.read_file(self.host_file) else None
+    def list_files(self, filenames=None):
+        files = []
 
-    def list_files(self, filenames=None, files=None):
-        if not files:
-            files = []
+        while True:
+            coco_file = self.read_file(self.host_file)
+            if not coco_file:
+                return files
 
-        cassette_file = self.get_file()
-        if not cassette_file:
-            return files
-
-        if not filenames or cassette_file.name in filenames:
-            files.append(cassette_file)
-
-        return self.list_files(filenames=filenames, files=files)
+            if not filenames or coco_file.name in filenames:
+                files.append(coco_file)
 
     def save_to_host_file(self, coco_file):
         data = []
@@ -123,7 +120,7 @@ class CassetteFile(VirtualFile):
         while True:
             last_values = []
             try:
-                for _ in range(len(sequence)):
+                for _ in range(sequence_length):
                     last_values.append(Value.create_from_byte(file.read(1)).hex())
             except ValueError:
                 return False
@@ -143,7 +140,6 @@ class CassetteFile(VirtualFile):
         :return: a CoCoFile with header information
         """
         if not CassetteFile.seek_sequence(file, ["55", "3C", "00"]):
-            print("Header block not found")
             return None
 
         # Skip length byte
@@ -163,6 +159,7 @@ class CassetteFile(VirtualFile):
 
         data = CassetteFile.read_blocks(file)
         if not data:
+            print("Data blocks not found for file {}".format(name))
             return None
 
         return CoCoFile(
@@ -195,11 +192,15 @@ class CassetteFile(VirtualFile):
                 file.read(3)
                 return data
 
-            data_len = Value.create_from_byte(file.read(1))
-            for _ in range(data_len.int):
-                data.append(Value.create_from_byte(file.read(1)).hex())
+            elif block_type.hex() == "01":
+                data_len = Value.create_from_byte(file.read(1))
+                for _ in range(data_len.int):
+                    data.append(Value.create_from_byte(file.read(1)).hex())
 
-            file.read(2)
+                file.read(2)
+            else:
+                print("Unknown block type found: {}".format(block_type.hex()))
+                return []
 
     @staticmethod
     def append_header(buffer, coco_file, file_type, data_type):

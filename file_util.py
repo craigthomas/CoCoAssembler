@@ -7,7 +7,9 @@ A Color Computer Assembler - see the README.md file for details.
 # I M P O R T S ###############################################################
 
 import argparse
+import sys
 
+from cocoasm.virtualfiles.binary import BinaryFile
 from cocoasm.virtualfiles.cassette import CassetteFile
 
 # F U N C T I O N S ###########################################################
@@ -27,7 +29,27 @@ def parse_arguments():
     parser.add_argument(
         "--list", action="store_true", help="list all of the files on the specified image file"
     )
+    parser.add_argument(
+        "--to_bin", action="store_true", help="extracts all the files from the source, and saves them as BIN files"
+    )
     return parser.parse_args()
+
+
+def open_file(filename):
+    """
+    Attempts to open the specified filename. Will attempt to open it with all
+    known file formats. Will return the opened file, or None if the file
+    does not match any known types.
+
+    :param filename: the name of the file to attempt to open
+    :return: the opened host file or None
+    """
+    file = CassetteFile()
+    file.open_host_file_for_read(filename)
+    if file.is_correct_type():
+        return file
+
+    return None
 
 
 def main(args):
@@ -36,16 +58,30 @@ def main(args):
 
     :param args: the command-line arguments
     """
+    host_file = open_file(args.filename)
+    if not host_file:
+        print("Unable to determine file type for file [{}]".format(args.filename))
+        sys.exit(1)
+
     if args.list:
-        file = CassetteFile()
-        file.open_host_file_for_read(args.filename)
-        if file.is_correct_type():
-            print("-- Cassette File Contents --")
-            for file in file.list_files():
-                print(file)
-                print("--")
-        else:
-            print("[{}] is not a cassette file".format(args.filename))
+        for number, file in enumerate(host_file.list_files()):
+            print("-- File #{} --".format(number+1))
+            print(file)
+        sys.exit(0)
+
+    if args.to_bin:
+        for number, file in enumerate(host_file.list_files()):
+            print("-- File #{} [{}] --".format(number+1, file.name))
+            try:
+                binary_file_name = "{}.bin".format(file.name)
+                binary_file = BinaryFile()
+                binary_file.open_host_file_for_write(binary_file_name)
+                binary_file.save_to_host_file(file)
+                binary_file.close_host_file()
+                print("Saved as {}".format(binary_file_name))
+            except ValueError as error:
+                print("Unable to save binary file:")
+                print(error)
 
 # M A I N #####################################################################
 

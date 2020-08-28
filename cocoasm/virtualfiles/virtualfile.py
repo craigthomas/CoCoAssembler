@@ -126,12 +126,11 @@ class VirtualFile(ABC):
         """
 
     @abstractmethod
-    def list_files(self, filenames=None, files=None):
+    def list_files(self, filenames=None):
         """
         Lists the files contained within the virtual file.
 
         :param filenames: a list of filename strings to extract if they exist
-        :param files: the list of CoCoFile objects already extracted
         :return: a list of CoCoFile objects in the virtual file
         """
 
