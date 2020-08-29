@@ -24,13 +24,16 @@ def parse_arguments():
         "information, and LICENSE for terms of use."
     )
     parser.add_argument(
-        "filename", help="the image file to process (DSK, CAS, VDK, etc)"
+        "host_filename", help="the host file to process (DSK, CAS, VDK, etc)"
     )
     parser.add_argument(
-        "--list", action="store_true", help="list all of the files on the specified image file"
+        "--append", action="store_true", help="append to host file if it already exists"
     )
     parser.add_argument(
-        "--to_bin", action="store_true", help="extracts all the files from the source, and saves them as BIN files"
+        "--list", action="store_true", help="list all of the files on the specified host file"
+    )
+    parser.add_argument(
+        "--to_bin", action="store_true", help="extracts all the files from the host file, and saves them as BIN files"
     )
     return parser.parse_args()
 
@@ -58,9 +61,9 @@ def main(args):
 
     :param args: the command-line arguments
     """
-    host_file = open_file(args.filename)
+    host_file = open_file(args.host_filename)
     if not host_file:
-        print("Unable to determine file type for file [{}]".format(args.filename))
+        print("Unable to determine file type for file [{}]".format(args.host_filename))
         sys.exit(1)
 
     if args.list:
@@ -71,16 +74,17 @@ def main(args):
 
     if args.to_bin:
         for number, file in enumerate(host_file.list_files()):
-            print("-- File #{} [{}] --".format(number+1, file.name))
+            filename = file.name.strip().replace("\0", "")
+            binary_file_name = "{}.bin".format(filename)
+            print("-- File #{} [{}] --".format(number+1, filename))
             try:
-                binary_file_name = "{}.bin".format(file.name)
                 binary_file = BinaryFile()
-                binary_file.open_host_file_for_write(binary_file_name)
+                binary_file.open_host_file_for_write(binary_file_name, append=args.append)
                 binary_file.save_to_host_file(file)
                 binary_file.close_host_file()
                 print("Saved as {}".format(binary_file_name))
             except ValueError as error:
-                print("Unable to save binary file:")
+                print("Unable to save binary file [{}]:".format(binary_file_name))
                 print(error)
 
 # M A I N #####################################################################

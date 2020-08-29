@@ -195,7 +195,7 @@ class CassetteFile(VirtualFile):
             elif block_type.hex() == "01":
                 data_len = Value.create_from_byte(file.read(1))
                 for _ in range(data_len.int):
-                    data.append(Value.create_from_byte(file.read(1)).hex())
+                    data.append(Value.create_from_byte(file.read(1)).int)
 
                 file.read(2)
             else:
