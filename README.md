@@ -5,28 +5,33 @@
 [![Dependencies](https://img.shields.io/librariesio/github/craigthomas/CoCoAssembler?style=flat-square)](https://libraries.io/github/craigthomas/CoCoAssembler)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-## Table of Contents
+# Table of Contents
 
 1. [What is it?](#what-is-it)
 2. [Requirements](#requirements)
 3. [License](#license)
 4. [Installing](#installing)
-5. [Usage](#usage)
-   1. [Input File Format](#input-file-format)
-   2. [Print Symbol Table](#print-symbol-table)
-   3. [Print Assembled Statements](#print-assembled-statements)
-   4. [Save to Binary File](#save-to-binary-file)
-   5. [Save to Cassette File](#save-to-cassette-file)
-6. [Mnemonic Table](#mnemonic-table)
-   1. [Mnemonics](#mnemonics)
-   2. [Pseudo Operations](#pseudo-operations)
-7. [Operands](#operands)
-8. [Addresing Modes](#addressing-modes)
-9. [Common Examples](#common-examples)
+5. [Assembler](#assembler)
+   1. [Assembler Usage](#assembler-usage)
+      1. [Input File Format](#input-file-format)
+      2. [Print Symbol Table](#print-symbol-table)
+      3. [Print Assembled Statements](#print-assembled-statements)
+      4. [Save to Binary File](#save-to-binary-file)
+      5. [Save to Cassette File](#save-to-cassette-file)
+   2. [Mnemonic Table](#mnemonic-table)
+      1. [Mnemonics](#mnemonics)
+      2. [Pseudo Operations](#pseudo-operations)
+   3. [Operands](#operands)
+   4. [Addressing Modes](#addressing-modes)
+6. [File Utility](#file-utility)
+   1. [Listing Files](#listing-files)
+   2. [Extracting Binaries](#extracting-binaries)
+6. [Common Examples](#common-examples)
    1. [Appending to a Cassette](#appending-to-a-cassette)
-10. [Further Documentation](#further-documentation)
+   2. [Listing Files in an Image](#listing-files-in-an-image)
+   3. [Extracting Binary Files from Cassette Images](#extracting-binary-files-from-cassette-images)
 
-## What is it?
+# What is it?
 
 This project is an assembler for the Tandy Color Computer 1, 2 and 3 written in Python 3.6. 
 It is intended to be statement compatible with any code written for the EDTASM+ assembler.
@@ -37,19 +42,20 @@ but future enhancements will add 6309 instructions.
 This project also includes a general purpose file utility, used mainly for manipulating
 `CAS`, `DSK`, and `WAV` files. 
 
-## Requirements
+# Requirements
 
 In order to run the assembler, you will need Python 3.6 or greater. If you
 prefer to clone the repository, you will need Git (if you don't want to 
 install Git, then check the [Releases](https://github.com/craigthomas/CoCoAssembler/releases)
 section for the newest release of the package that you can download).
 
-## License
+# License
 
 This project makes use of an MIT style license. Please see the file called 
-LICENSE for more information.
+[LICENSE](https://github.com/craigthomas/CoCoAssembler/blob/master/LICENSE) 
+for more information.
 
-## Installing
+# Installing
 
 To install the source files, download the latest release from the 
 [Releases](https://github.com/craigthomas/CoCoAssembler/releases) 
@@ -63,7 +69,18 @@ Next, you will need to install the required packages for the file:
     pip install -r requirements.txt
 
     
-## Usage
+# Assembler 
+
+The assembler is contained in a file called `assmbler.py` and can be invoked with:
+
+    python assembler.py
+    
+In general, the assembler recognizes EDTASM+ mnemonics, along with a few other
+somewhat standardized mnemonics to make program compilation easier. By default,
+the assembler assumes it is assembling statements in 6809 machine code. Future
+releases will include a 6309 extension.
+ 
+## Assembler Usage
 
 To run the assembler:
 
@@ -137,7 +154,7 @@ The first column of output is the hex value of the symbol, the second columns is
 itself.
 
 
-#### Print Assembled Statements
+### Print Assembled Statements
 
 To print out the assembled version of the program, use the `--print` switch:
 
@@ -277,19 +294,89 @@ using direct page addressing. Instructions such as `JMP $0E8F` will become `JMP 
 responsible for loading the direct page register manually - this mnemonic does not output opcodes that
 change the direct page register. 
 
-### Operands
+## Operands
 
-### Addressing Modes
+(Under construction)
 
-### Common Examples
+## Addressing Modes
 
-#### Appending to a Cassette
+(Under construction)
+
+# File Utility
+
+The file utility included with the assembler package provides a method for manipulating and
+extracting information from image files (e.g. `CAS` or `DSK` files). 
+
+## Listing Files
+
+To list the files contained within a cassette or disk image, use the `--list` switch:
+
+    python file_util.py --list test.cas
+    
+The utility will print a list of all the files contained within the image, along with
+associated meta-data:
+
+    -- File #1 --
+    Filename:   HELLO
+    File Type:  Object
+    Data Type:  Binary
+    Gap Status: No Gaps
+    Load Addr:  $0E00
+    Exec Addr:  $0E00
+    Data Len:   39 bytes
+    -- File #2 --
+    Filename:   WORLD
+    File Type:  Object
+    Data Type:  Binary
+    Gap Status: No Gaps
+    Load Addr:  $0F00
+    Exec Addr:  $0F00
+    Data Len:   73 bytes
+
+## Extracting Binaries
+
+To extract the files from a disk image, and save each one as a binary, use the
+`--to_bin` switch:
+
+    python file_util.py --to_bin test.cas
+    
+To command will list the files being extracted and their status:
+
+    -- File #1 [HELLO] --
+    Saved as HELLO.bin
+    -- File #2 [WORLD] --
+    Saved as WORLD.bin
+
+Note that no meta-data is saved with the extraction (meaning that load addresses, 
+and execute addresses are not saved in the resulting `.bin` files).
+
+# Common Examples
+
+Below are a collection of common examples with their command-line usage.
+
+## Appending to a Cassette
 
 To assemble a program called `myprog.asm` and add it to an existing cassette file:
 
     python assembler.py myprog.asm --cas_file my_cassette.cas --append
-    
-## Further Documentation
 
-The best documentation is in the code itself. Please feel free to examine the
-code and experiment with it.
+## Listing Files in an Image
+
+To list the files contained within an container file (such as `CAS` or `DSK` file):
+
+    python file_util.py --list my_cassette.cas
+    
+This will print out a list of all the file contents on the cassette image 
+`my_cassette.cas`. Note that `BIN` or binary only file contents only have a single
+program with no meta-information stored in them. As such, no information will be
+available for binary file types.
+
+## Extracting Binary Files from Cassette Images
+
+To extract all the binary files from a cassette image:
+
+    python file_util.py --to_bin my_cassette.cas
+    
+Will extract all of the files in the image file `my_cassette.bin` to separate
+files ending in a `.bin` extension. No meta-information about the files will
+be saved in `.bin` format.
