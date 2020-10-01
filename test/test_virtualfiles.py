@@ -9,8 +9,10 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.values import NumericValue
-from cocoasm.virtualfiles import BinaryFile, CassetteFile, CassetteFileType, \
+from cocoasm.virtualfiles.cassette import CassetteFile, CassetteFileType, \
     CassetteDataType
+from cocoasm.virtualfiles.virtualfile import CoCoFile
+from cocoasm.virtualfiles.binary import BinaryFile
 
 # C L A S S E S ###############################################################
 
@@ -63,7 +65,7 @@ class TestCassetteFile(unittest.TestCase):
                     0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
                     0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55]
         buffer = []
-        CassetteFile.append_leader(buffer)
+        CassetteFile.write_leader(buffer)
         self.assertEqual(expected, buffer)
 
     def test_append_name_full_length_correct(self):
@@ -95,8 +97,13 @@ class TestCassetteFile(unittest.TestCase):
         expected = [0x55, 0x3C, 0x00, 0x0F, 0x74, 0x65, 0x73, 0x74, 0x66, 0x69, 0x6C, 0x65, 0x02, 0xFF, 0x00, 0x12,
                     0x34, 0x56, 0x78, 0x84, 0x55]
         buffer = []
-        cassette_file = CassetteFile(NumericValue(0x1234), NumericValue(0x5678))
-        cassette_file.append_header(buffer, name, CassetteFileType.OBJECT_FILE, CassetteDataType.ASCII)
+        coco_file = CoCoFile(
+            name=name,
+            load_addr=NumericValue(0x1234),
+            exec_addr=NumericValue(0x5678)
+        )
+        cassette_file = CassetteFile()
+        cassette_file.append_header(buffer, coco_file, CassetteFileType.OBJECT_FILE, CassetteDataType.ASCII)
         self.assertEqual(expected, buffer)
 
     def test_append_data_blocks_appends_nothing_when_raw_empty(self):
@@ -154,7 +161,7 @@ class TestCassetteFile(unittest.TestCase):
         self.assertEqual(expected, buffer)
 
     def test_save_file_works_correct(self):
-        cassette_file = CassetteFile(NumericValue(0x1234), NumericValue(0x5678))
+        cassette_file = CassetteFile()
         raw_bytes = [0x02]
         expected = [
             0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
@@ -178,7 +185,13 @@ class TestCassetteFile(unittest.TestCase):
             0xFF, 0x55
         ]
         cassette_file.host_file = MockFile()
-        cassette_file.save_file("testfile", raw_bytes)
+        coco_file = CoCoFile(
+            name="testfile",
+            load_addr=NumericValue(0x1234),
+            exec_addr=NumericValue(0x5678),
+            data=raw_bytes
+        )
+        cassette_file.save_to_host_file(coco_file)
         self.assertEqual(expected, [value for value in cassette_file.host_file.value])
 
 
