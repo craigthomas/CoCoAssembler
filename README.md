@@ -333,6 +333,14 @@ associated meta-data:
     Load Addr:  $0F00
     Exec Addr:  $0F00
     Data Len:   73 bytes
+    -- File #3 --
+    Filename:   ANOTHER
+    File Type:  Object
+    Data Type:  Binary
+    Gap Status: No Gaps
+    Load Addr:  $0C00
+    Exec Addr:  $0C00
+    Data Len:   24 bytes
 
 ## Extracting Binaries
 
@@ -347,9 +355,22 @@ To command will list the files being extracted and their status:
     Saved as HELLO.bin
     -- File #2 [WORLD] --
     Saved as WORLD.bin
+    -- File #3 [ANOTHER] --
+    Saved as ANOTHER.bin
 
 Note that no meta-data is saved with the extraction (meaning that load addresses, 
-and execute addresses are not saved in the resulting `.bin` files).
+and execute addresses are not saved in the resulting `.bin` files). If you only wish to
+extract a specific subset of files, you can provide a space-separated, case-insensitive
+list of filenames to extract with the `--files` switch:
+
+    python file_util.py --to_bin test.cas --files hello another
+
+Which will result in:
+
+    -- File #1 [HELLO] --
+    Saved as HELLO.bin
+    -- File #3 [ANOTHER] --
+    Saved as ANOTHER.bin
 
 # Common Examples
 

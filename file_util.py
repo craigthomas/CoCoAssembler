@@ -35,6 +35,9 @@ def parse_arguments():
     parser.add_argument(
         "--to_bin", action="store_true", help="extracts all the files from the host file, and saves them as BIN files"
     )
+    parser.add_argument(
+        "--files", nargs="+", type=str, help="list of file names to extract"
+    )
     return parser.parse_args()
 
 
@@ -62,6 +65,7 @@ def main(args):
     :param args: the command-line arguments
     """
     host_file = open_file(args.host_filename)
+    files_to_include = [x.upper() for x in args.files] if args.files else None
     if not host_file:
         print("Unable to determine file type for file [{}]".format(args.host_filename))
         sys.exit(1)
@@ -75,17 +79,18 @@ def main(args):
     if args.to_bin:
         for number, file in enumerate(host_file.list_files()):
             filename = file.name.strip().replace("\0", "")
-            binary_file_name = "{}.bin".format(filename)
-            print("-- File #{} [{}] --".format(number+1, filename))
-            try:
-                binary_file = BinaryFile()
-                binary_file.open_host_file_for_write(binary_file_name, append=args.append)
-                binary_file.save_to_host_file(file)
-                binary_file.close_host_file()
-                print("Saved as {}".format(binary_file_name))
-            except ValueError as error:
-                print("Unable to save binary file [{}]:".format(binary_file_name))
-                print(error)
+            if files_to_include is None or filename in files_to_include:
+                binary_file_name = "{}.bin".format(filename)
+                print("-- File #{} [{}] --".format(number+1, filename))
+                try:
+                    binary_file = BinaryFile()
+                    binary_file.open_host_file_for_write(binary_file_name, append=args.append)
+                    binary_file.save_to_host_file(file)
+                    binary_file.close_host_file()
+                    print("Saved as {}".format(binary_file_name))
+                except ValueError as error:
+                    print("Unable to save binary file [{}]:".format(binary_file_name))
+                    print(error)
 
 # M A I N #####################################################################
 
