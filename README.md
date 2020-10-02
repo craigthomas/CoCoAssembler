@@ -284,6 +284,7 @@ symbols are:
 | `INCLUDE`| Includes another assembly source file at this location.                    | `INCLUDE globals.asm`  |
 | `NAM`    | Sets the name for the program when assembled to disk or cassette.          | `NAM myprog`           |
 | `ORG`    | Defines where in memory the program should originate at.                   | `ORG $0E00`            |
+| `RMB`    | Defines a block of _n_ bytes initialized to a zero value.                  | `RMB $8`               |
 | `SETDP`  | Sets the direct page value for the assembler (see notes below).            | `SETDP $0E00`          |
 
 **Notes**

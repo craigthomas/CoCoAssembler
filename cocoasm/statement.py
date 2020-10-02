@@ -160,7 +160,7 @@ class Statement(object):
         of a branch, jump or subroutine call needs to go to, and inserts
         it in the code package for the assembled instruction.
 
-        :param statements: the full set of statements that make up the proram
+        :param statements: the full set of statements that make up the program
         :param this_index: the index that this instruction occurs at
         """
         if self.operand.is_type(OperandType.RELATIVE):
