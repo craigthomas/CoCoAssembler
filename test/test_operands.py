@@ -323,6 +323,12 @@ class TestPseudoOperand(unittest.TestCase):
         code_pkg = operand.translate()
         self.assertEqual("FFCC", code_pkg.additional.hex())
 
+    def test_pseudo_translate_rmb(self):
+        instruction = Instruction(mnemonic="RMB", is_pseudo=True)
+        operand = PseudoOperand("$10", instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("00000000000000000000000000000000", code_pkg.additional.hex())
+
     def test_pseudo_translate_org(self):
         instruction = Instruction(mnemonic="ORG", is_pseudo=True)
         operand = PseudoOperand("$FFCC", instruction)

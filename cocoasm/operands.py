@@ -264,6 +264,9 @@ class PseudoOperand(Operand):
         if self.instruction.mnemonic == "FDB":
             return CodePackage(additional=NumericValue(self.value.int, size_hint=4), size=2)
 
+        if self.instruction.mnemonic == "RMB":
+            return CodePackage(additional=NumericValue(0, size_hint=self.value.int*2), size=self.value.int)
+
         if self.instruction.mnemonic == "ORG":
             return CodePackage(address=self.value)
 
