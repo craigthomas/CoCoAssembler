@@ -11,6 +11,7 @@ import sys
 
 from cocoasm.virtualfiles.binary import BinaryFile
 from cocoasm.virtualfiles.cassette import CassetteFile
+from cocoasm.virtualfiles.disk import DiskFile
 
 # F U N C T I O N S ###########################################################
 
@@ -51,6 +52,11 @@ def open_file(filename):
     :return: the opened host file or None
     """
     file = CassetteFile()
+    file.open_host_file_for_read(filename)
+    if file.is_correct_type():
+        return file
+
+    file = DiskFile()
     file.open_host_file_for_read(filename)
     if file.is_correct_type():
         return file
