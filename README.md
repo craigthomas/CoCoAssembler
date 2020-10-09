@@ -25,11 +25,13 @@
    4. [Addressing Modes](#addressing-modes)
 6. [File Utility](#file-utility)
    1. [Listing Files](#listing-files)
-   2. [Extracting Binaries](#extracting-binaries)
-6. [Common Examples](#common-examples)
+   2. [Extracting to Binary File](#extracting-to-binary-file)
+   3. [Extracting to Cassette File](#extracting-to-cassette-file)
+7. [Common Examples](#common-examples)
    1. [Appending to a Cassette](#appending-to-a-cassette)
    2. [Listing Files in an Image](#listing-files-in-an-image)
    3. [Extracting Binary Files from Cassette Images](#extracting-binary-files-from-cassette-images)
+   3. [Extracting Binary Files from Disk Images](#extracting-binary-files-from-disk-images)
 
 # What is it?
 
@@ -342,9 +344,9 @@ associated meta-data:
     Exec Addr:  $0C00
     Data Len:   24 bytes
 
-## Extracting Binaries
+## Extracting to Binary File
 
-To extract the files from a disk image, and save each one as a binary, use the
+To extract the files from a disk or cassette image, and save each one as a binary, use the
 `--to_bin` switch:
 
     python file_util.py --to_bin test.cas
@@ -372,6 +374,34 @@ Which will result in:
     -- File #3 [ANOTHER] --
     Saved as ANOTHER.bin
 
+## Extracting to Cassette File
+
+To extract the files from a disk image, and save each one as a cassette file, use the
+`--to_cas` switch:
+
+    python file_util.py --to_cas test.dsk
+    
+To command will list the files being extracted and their status:
+
+    -- File #1 [HELLO] --
+    Saved as HELLO.cas
+    -- File #2 [WORLD] --
+    Saved as WORLD.cas
+    -- File #3 [ANOTHER] --
+    Saved as ANOTHER.cas
+
+If you only wish to extract a specific subset of files, you can provide a space-separated, 
+case-insensitive list of filenames to extract with the `--files` switch:
+
+    python file_util.py --to_cas test.dsk --files hello another
+
+Which will result in:
+
+    -- File #1 [HELLO] --
+    Saved as HELLO.cas
+    -- File #3 [ANOTHER] --
+    Saved as ANOTHER.cas
+    
 # Common Examples
 
 Below are a collection of common examples with their command-line usage.
@@ -400,5 +430,15 @@ To extract all the binary files from a cassette image:
     python file_util.py --to_bin my_cassette.cas
     
 Will extract all of the files in the image file `my_cassette.bin` to separate
+files ending in a `.bin` extension. No meta-information about the files will
+be saved in `.bin` format.
+
+## Extracting Binary Files from Disk Images
+
+To extract all the binary files from a disk image:
+
+    python file_util.py --to_bin my_disk.dsk
+    
+Will extract all of the files in the image file `my_disk.dsk` to separate
 files ending in a `.bin` extension. No meta-information about the files will
 be saved in `.bin` format.
