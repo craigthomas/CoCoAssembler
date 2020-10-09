@@ -6,10 +6,7 @@ A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
-import sys
-
 from enum import IntEnum
-
 
 from cocoasm.virtualfiles.virtualfile import VirtualFile, CoCoFile
 from cocoasm.values import Value

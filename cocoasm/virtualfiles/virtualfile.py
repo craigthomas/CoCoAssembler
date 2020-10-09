@@ -23,6 +23,7 @@ class CoCoFile(NamedTuple):
     execution point, the name, type, etc.
     """
     name: str = ""
+    extension: str = ""
     type: Value = None
     load_addr: Value = None
     exec_addr: Value = None
@@ -30,14 +31,18 @@ class CoCoFile(NamedTuple):
     gaps: Value = None
     ascii: int = 0
     data: list = []
+    ignore_gaps: bool = False
 
     def __str__(self):
         result = "Filename:   {}\n".format(self.name)
+        result += "Extension:  {}\n".format(self.extension)
         filetype = "BASIC"
         if self.type.hex() == "01":
             filetype = "Data"
         if self.type.hex() == "02":
             filetype = "Object"
+        if self.type.hex() == "03":
+            filetype = "Text"
         result += "File Type:  {}\n".format(filetype)
 
         data_type = "Binary"
@@ -45,10 +50,11 @@ class CoCoFile(NamedTuple):
             data_type = "ASCII"
         result += "Data Type:  {}\n".format(data_type)
 
-        gaps = "No Gaps"
-        if self.gaps.hex() == "FF":
-            gaps = "Gaps"
-        result += "Gap Status: {}\n".format(gaps)
+        if not self.ignore_gaps:
+            gaps = "No Gaps"
+            if self.gaps.hex() == "FF":
+                gaps = "Gaps"
+            result += "Gap Status: {}\n".format(gaps)
 
         result += "Load Addr:  ${}\n".format(self.load_addr.hex(size=4))
         result += "Exec Addr:  ${}\n".format(self.exec_addr.hex(size=4))
