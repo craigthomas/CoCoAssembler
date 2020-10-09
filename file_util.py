@@ -37,6 +37,9 @@ def parse_arguments():
         "--to_bin", action="store_true", help="extracts all the files from the host file, and saves them as BIN files"
     )
     parser.add_argument(
+        "--to_cas", action="store_true", help="extracts all the files from the host file, and saves them as CAS files"
+    )
+    parser.add_argument(
         "--files", nargs="+", type=str, help="list of file names to extract"
     )
     return parser.parse_args()
@@ -96,6 +99,22 @@ def main(args):
                     print("Saved as {}".format(binary_file_name))
                 except ValueError as error:
                     print("Unable to save binary file [{}]:".format(binary_file_name))
+                    print(error)
+
+    if args.to_cas:
+        for number, file in enumerate(host_file.list_files()):
+            filename = file.name.strip().replace("\0", "")
+            if files_to_include is None or filename in files_to_include:
+                cas_file_name = "{}.cas".format(filename)
+                print("-- File #{} [{}] --".format(number + 1, filename))
+                try:
+                    cas_file = CassetteFile()
+                    cas_file.open_host_file_for_write(cas_file_name, append=args.append)
+                    cas_file.save_to_host_file(file)
+                    cas_file.close_host_file()
+                    print("Saved as {}".format(cas_file_name))
+                except ValueError as error:
+                    print("Unable to save cassette file [{}]:".format(cas_file_name))
                     print(error)
 
 # M A I N #####################################################################

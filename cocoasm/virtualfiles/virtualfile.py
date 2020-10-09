@@ -23,6 +23,7 @@ class CoCoFile(NamedTuple):
     execution point, the name, type, etc.
     """
     name: str = ""
+    extension: str = ""
     type: Value = None
     load_addr: Value = None
     exec_addr: Value = None
@@ -34,6 +35,7 @@ class CoCoFile(NamedTuple):
 
     def __str__(self):
         result = "Filename:   {}\n".format(self.name)
+        result += "Extension:  {}\n".format(self.extension)
         filetype = "BASIC"
         if self.type.hex() == "01":
             filetype = "Data"
