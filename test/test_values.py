@@ -9,8 +9,9 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.values import NumericValue, StringValue, NoneValue, SymbolValue, \
-    AddressValue, ValueType, Value
+    AddressValue, ValueType, Value, ExpressionValue
 from cocoasm.instruction import Instruction, Mode
+from cocoasm.exceptions import ValueTypeError
 
 # C L A S S E S ###############################################################
 
@@ -25,6 +26,11 @@ class TestValue(unittest.TestCase):
         """
         self.instruction = Instruction(mnemonic="ABX", mode=Mode(inh=0x3A, inh_sz=1))
         self.fcc_instruction = Instruction(mnemonic="FCC", is_pseudo=True, is_string_define=True)
+
+    def test_value_get_symbol_no_symbol_table_raises(self):
+        with self.assertRaises(ValueError) as context:
+            Value.get_symbol("blah", {})
+        self.assertEqual("[blah] not in symbol table", str(context.exception))
 
     def test_value_create_from_str_numeric_correct(self):
         result = Value.create_from_str("$DEAD", self.instruction)
@@ -41,12 +47,12 @@ class TestValue(unittest.TestCase):
         self.assertTrue(result.is_type(ValueType.SYMBOL))
 
     def test_value_create_from_str_raises_on_bad_string_value(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ValueTypeError) as context:
             Value.create_from_str("'bad string", self.fcc_instruction)
         self.assertEqual("['bad string] is an invalid value", str(context.exception))
 
     def test_value_create_from_str_raises_on_bad_value(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ValueTypeError) as context:
             Value.create_from_str("invalid!", self.instruction)
         self.assertEqual("[invalid!] is an invalid value", str(context.exception))
 
@@ -74,22 +80,22 @@ class TestNumericValue(unittest.TestCase):
         self.assertEqual(1234, result.int)
 
     def test_numeric_raises_exception_on_long_strings(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ValueTypeError) as context:
             NumericValue("$DEADBEEF")
         self.assertEqual("hex value length cannot exceed 4 characters", str(context.exception))
 
     def test_numeric_raises_exception_on_large_integer_string(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ValueTypeError) as context:
             NumericValue("65536")
         self.assertEqual("integer value cannot exceed 65535", str(context.exception))
 
     def test_numeric_raises_exception_on_large_integer(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ValueTypeError) as context:
             NumericValue(65536)
         self.assertEqual("integer value cannot exceed 65535", str(context.exception))
 
     def test_numeric_raises_exception_on_invalid_strings(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ValueTypeError) as context:
             NumericValue("this is not a valid string")
         self.assertEqual("[this is not a valid string] is neither integer or hex value", str(context.exception))
 
@@ -141,7 +147,7 @@ class TestStringValue(unittest.TestCase):
         self.assertEqual("test string", result.ascii())
 
     def test_string_raises_exception_on_mismatched_delimiters(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ValueTypeError) as context:
             StringValue('"test string')
         self.assertEqual("string must begin and end with same delimiter", str(context.exception))
 
@@ -212,7 +218,7 @@ class TestSymbolValue(unittest.TestCase):
         pass
 
     def test_symbol_raises_exception_on_invalid_strings(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ValueTypeError) as context:
             SymbolValue("invalid!")
         self.assertEqual("[invalid!] is not a valid symbol", str(context.exception))
 
@@ -294,6 +300,96 @@ class TestAddressValue(unittest.TestCase):
     def test_symbol_byte_len_correct(self):
         result = AddressValue('16')
         self.assertEqual(1, result.byte_len())
+
+
+class TestExpressionValue(unittest.TestCase):
+    """
+    A test class for the ExpressionValue class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        pass
+
+    def test_expression_resolve_numeric_only_addition_works_correctly(self):
+        result = ExpressionValue("2+3")
+        result = result.resolve(None)
+        self.assertEqual(result.int, 5)
+
+    def test_expression_resolve_numeric_only_multiplication_works_correctly(self):
+        result = ExpressionValue("2*3")
+        result = result.resolve(None)
+        self.assertEqual(result.int, 6)
+
+    # def test_expression_parsed_correct(self):
+    #     operand = ExpressionOperand("$0F+$F0", self.instruction)
+    #     self.assertEqual("0F", operand.left.hex())
+    #     self.assertEqual("F0", operand.right.hex())
+    #     self.assertEqual("+", operand.operation)
+    #
+    # def test_expression_resolve_expression_plus(self):
+    #     operand = ExpressionOperand("$01+$02", self.instruction)
+    #     operand.resolve_expression({})
+    #     self.assertEqual("03", operand.value.hex())
+    #
+    # def test_expression_resolve_expression_minus(self):
+    #     operand = ExpressionOperand("$03-$02", self.instruction)
+    #     operand.resolve_expression({})
+    #     self.assertEqual("01", operand.value.hex())
+    #
+    # def test_expression_resolve_expression_multiply(self):
+    #     operand = ExpressionOperand("$02*$02", self.instruction)
+    #     operand.resolve_expression({})
+    #     self.assertEqual("04", operand.value.hex())
+    #
+    # def test_expression_resolve_expression_divide(self):
+    #     operand = ExpressionOperand("$04/$02", self.instruction)
+    #     operand.resolve_expression({})
+    #     self.assertEqual("02", operand.value.hex())
+    #
+    # def test_expression_resolve_expression_direct_size(self):
+    #     operand = ExpressionOperand("$01+$02", self.instruction)
+    #     operand = operand.resolve_expression({})
+    #     self.assertEqual(OperandType.DIRECT, operand.type)
+    #
+    # def test_expression_resolve_expression_extended_size(self):
+    #     operand = ExpressionOperand("$01+$FF", self.instruction)
+    #     operand = operand.resolve_expression({})
+    #     self.assertEqual(OperandType.EXTENDED, operand.type)
+    #
+    # def test_expression_resolve_expression_left_resolves(self):
+    #     symbol_table = {
+    #         "BLAH": NumericValue(2)
+    #     }
+    #     operand = ExpressionOperand("BLAH+$01", self.instruction)
+    #     operand = operand.resolve_expression(symbol_table=symbol_table)
+    #     self.assertEqual("03", operand.value.hex())
+    #
+    # def test_expression_resolve_expression_right_resolves(self):
+    #     symbol_table = {
+    #         "BLAH": NumericValue(2)
+    #     }
+    #     operand = ExpressionOperand("$02+BLAH", self.instruction)
+    #     operand = operand.resolve_expression(symbol_table=symbol_table)
+    #     self.assertEqual("04", operand.value.hex())
+    #
+    # def test_expression_resolve_expression_none_type_raises(self):
+    #     operand = ExpressionOperand("$02+$02", self.instruction)
+    #     operand.left = NoneValue()
+    #     with self.assertRaises(ValueError) as context:
+    #         operand.resolve_expression({})
+    #     self.assertEqual("[$02+$02] unresolved expression", str(context.exception))
+    #
+    # def test_expression_resolve_symbols_resolves_expression(self):
+    #     symbol_table = {
+    #         "BLAH1": NumericValue(2),
+    #         "BLAH2": NumericValue(1)
+    #     }
+    #     operand = ExpressionOperand("BLAH1+BLAH2", self.instruction)
+    #     operand = operand.resolve_symbols(symbol_table=symbol_table)
+    #     self.assertEqual("03", operand.value.hex())
+
 
 # M A I N #####################################################################
 

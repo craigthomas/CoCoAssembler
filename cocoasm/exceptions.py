@@ -36,4 +36,20 @@ class ParseError(Exception):
     def __str__(self):
         return repr(self.value)
 
+
+class ValueTypeError(Exception):
+    """
+    ValueTypeErrors are raised when generating or manipulating anything of
+    the Value class.
+    """
+    pass
+
+
+class OperandTypeError(Exception):
+    """
+    OperandTypeErrors are raised when generating or manipulating any type of
+    Operand class.
+    """
+    pass
+
 # E N D   O F   F I L E #######################################################

@@ -167,8 +167,8 @@ class TestProgram(unittest.TestCase):
         program.statements = [statement1]
         self.assertEqual([0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE], program.get_binary_array())
 
-
 # M A I N #####################################################################
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -14,12 +14,13 @@ from cocoasm.values import NoneValue
 # C L A S S E S ###############################################################
 
 class CodePackage(object):
-    def __init__(self, op_code=NoneValue(), address=NoneValue(), post_byte=NoneValue(), additional=NoneValue(), size=0):
+    def __init__(self, op_code=NoneValue(), address=NoneValue(), post_byte=NoneValue(), additional=NoneValue(), size=0, additional_needs_resolution=False):
         self.op_code = op_code
         self.address = address
         self.post_byte = post_byte
         self.additional = additional
         self.size = size
+        self.additional_needs_resolution = additional_needs_resolution
 
 
 class Mode(NamedTuple):

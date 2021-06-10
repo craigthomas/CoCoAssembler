@@ -10,10 +10,10 @@ import unittest
 
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
     OperandType, IndexedOperand, RelativeOperand, ExtendedIndexedOperand, \
-    Operand, ExtendedOperand, PseudoOperand, SpecialOperand, ExpressionOperand, \
-    DirectOperand
+    Operand, ExtendedOperand, PseudoOperand, SpecialOperand, DirectOperand
 from cocoasm.instruction import Instruction, Mode
-from cocoasm.values import NumericValue, AddressValue, NoneValue, ValueType
+from cocoasm.values import NumericValue, AddressValue, ValueType
+from cocoasm.exceptions import ValueTypeError, OperandTypeError
 
 # C L A S S E S ###############################################################
 
@@ -27,11 +27,6 @@ class TestBaseOperand(unittest.TestCase):
         Common setup routines needed for all unit tests.
         """
         pass
-
-    def test_base_operand_get_symbol_no_symbol_table_raises(self):
-        with self.assertRaises(ValueError) as context:
-            Operand.get_symbol("blah", {})
-        self.assertEqual("[blah] not in symbol table", str(context.exception))
 
     def test_base_operand_create_from_str_returns_relative(self):
         instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x27, rel_sz=2), is_short_branch=True)
@@ -48,16 +43,6 @@ class TestBaseOperand(unittest.TestCase):
         operand = Operand.create_from_str("#$01", instruction)
         self.assertTrue(operand.is_type(OperandType.IMMEDIATE))
 
-    def test_base_operand_create_from_str_returns_direct(self):
-        instruction = Instruction(mnemonic="ROL", mode=Mode(dir=0x09, dir_sz=2))
-        operand = Operand.create_from_str("$01", instruction)
-        self.assertTrue(operand.is_type(OperandType.DIRECT))
-
-    def test_base_operand_create_from_str_returns_extended(self):
-        instruction = Instruction(mnemonic="ROL", mode=Mode(ext=0x79, ext_sz=3))
-        operand = Operand.create_from_str("$2000", instruction)
-        self.assertTrue(operand.is_type(OperandType.EXTENDED))
-
     def test_base_operand_create_from_str_returns_extended_indexed(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(ind=0x69, ind_sz=2))
         operand = Operand.create_from_str("[$2000]", instruction)
@@ -71,16 +56,16 @@ class TestBaseOperand(unittest.TestCase):
     def test_base_operand_create_from_str_returns_expression(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(ind=0x69, ind_sz=2))
         operand = Operand.create_from_str("VAL+1", instruction)
-        self.assertTrue(operand.is_type(OperandType.EXPRESSION))
+        self.assertTrue(operand.value.is_type(ValueType.EXPRESSION))
 
     def test_base_operand_create_from_str_returns_unknown(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(ind=0x69, ind_sz=2))
         operand = Operand.create_from_str("VAL", instruction)
-        self.assertTrue(operand.is_type(OperandType.UNKNOWN))
+        self.assertEqual(operand.type, OperandType.UNKNOWN)
 
     def test_base_operand_create_from_str_raises(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(ind=0x69, ind_sz=2))
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             Operand.create_from_str(",blah,", instruction)
         self.assertEqual("[,blah,] unknown operand type", str(context.exception))
 
@@ -184,7 +169,7 @@ class TestRelativeOperand(unittest.TestCase):
 
     def test_relative_raises_if_instruction_not_branch(self):
         instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1))
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             RelativeOperand("$FF", instruction)
         self.assertEqual("[BEQ] is not a branch instruction", str(context.exception))
 
@@ -196,93 +181,6 @@ class TestRelativeOperand(unittest.TestCase):
         self.assertEqual("3A", result.op_code.hex())
         self.assertEqual(1, result.size)
         self.assertEqual("FFEE", result.additional.hex())
-
-
-class TestExpressionOperand(unittest.TestCase):
-    """
-    A test class for the ExpressionOperand class.
-    """
-    def setUp(self):
-        """
-        Common setup routines needed for all unit tests.
-        """
-        self.instruction = Instruction(mnemonic="LDA", mode=Mode(imm=0x86, imm_sz=2))
-
-    def test_expression_translate_returns_blank_code_package(self):
-        operand = ExpressionOperand("A+B", self.instruction)
-        result = operand.translate()
-        self.assertEqual("", result.op_code.hex())
-        self.assertEqual("", result.additional.hex())
-        self.assertEqual("", result.post_byte.hex())
-        self.assertEqual(0, result.size)
-
-    def test_expression_parsed_correct(self):
-        operand = ExpressionOperand("$0F+$F0", self.instruction)
-        self.assertEqual("0F", operand.left.hex())
-        self.assertEqual("F0", operand.right.hex())
-        self.assertEqual("+", operand.operation)
-
-    def test_expression_resolve_expression_plus(self):
-        operand = ExpressionOperand("$01+$02", self.instruction)
-        operand.resolve_expression({})
-        self.assertEqual("03", operand.value.hex())
-
-    def test_expression_resolve_expression_minus(self):
-        operand = ExpressionOperand("$03-$02", self.instruction)
-        operand.resolve_expression({})
-        self.assertEqual("01", operand.value.hex())
-
-    def test_expression_resolve_expression_multiply(self):
-        operand = ExpressionOperand("$02*$02", self.instruction)
-        operand.resolve_expression({})
-        self.assertEqual("04", operand.value.hex())
-
-    def test_expression_resolve_expression_divide(self):
-        operand = ExpressionOperand("$04/$02", self.instruction)
-        operand.resolve_expression({})
-        self.assertEqual("02", operand.value.hex())
-
-    def test_expression_resolve_expression_direct_size(self):
-        operand = ExpressionOperand("$01+$02", self.instruction)
-        operand = operand.resolve_expression({})
-        self.assertEqual(OperandType.DIRECT, operand.type)
-
-    def test_expression_resolve_expression_extended_size(self):
-        operand = ExpressionOperand("$01+$FF", self.instruction)
-        operand = operand.resolve_expression({})
-        self.assertEqual(OperandType.EXTENDED, operand.type)
-
-    def test_expression_resolve_expression_left_resolves(self):
-        symbol_table = {
-            "BLAH": NumericValue(2)
-        }
-        operand = ExpressionOperand("BLAH+$01", self.instruction)
-        operand = operand.resolve_expression(symbol_table=symbol_table)
-        self.assertEqual("03", operand.value.hex())
-
-    def test_expression_resolve_expression_right_resolves(self):
-        symbol_table = {
-            "BLAH": NumericValue(2)
-        }
-        operand = ExpressionOperand("$02+BLAH", self.instruction)
-        operand = operand.resolve_expression(symbol_table=symbol_table)
-        self.assertEqual("04", operand.value.hex())
-
-    def test_expression_resolve_expression_none_type_raises(self):
-        operand = ExpressionOperand("$02+$02", self.instruction)
-        operand.left = NoneValue()
-        with self.assertRaises(ValueError) as context:
-            operand.resolve_expression({})
-        self.assertEqual("[$02+$02] unresolved expression", str(context.exception))
-
-    def test_expression_resolve_symbols_resolves_expression(self):
-        symbol_table = {
-            "BLAH1": NumericValue(2),
-            "BLAH2": NumericValue(1)
-        }
-        operand = ExpressionOperand("BLAH1+BLAH2", self.instruction)
-        operand = operand.resolve_symbols(symbol_table=symbol_table)
-        self.assertEqual("03", operand.value.hex())
 
 
 class TestPseudoOperand(unittest.TestCase):
@@ -301,13 +199,13 @@ class TestPseudoOperand(unittest.TestCase):
 
     def test_pseudo_raises_if_instruction_not_pseudo(self):
         instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1))
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             PseudoOperand("$FF", instruction)
         self.assertEqual("[BEQ] is not a pseudo instruction", str(context.exception))
 
     def test_pseudo_translate_returns_empty_code_package_on_non_defined_instruction(self):
         instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1))
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             PseudoOperand("$FF", instruction)
         self.assertEqual("[BEQ] is not a pseudo instruction", str(context.exception))
 
@@ -358,7 +256,7 @@ class TestSpecialOperand(unittest.TestCase):
 
     def test_special_raises_if_instruction_not_special(self):
         instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1))
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             SpecialOperand("$FF", instruction)
         self.assertEqual("[BEQ] is not a special instruction", str(context.exception))
 
@@ -373,14 +271,14 @@ class TestSpecialOperand(unittest.TestCase):
     def test_special_pshs_raises_with_bad_register(self):
         instruction = Instruction(mnemonic="PSHS", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
         operand = SpecialOperand("not_a_register", instruction)
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand.translate()
         self.assertEqual("[not_a_register] unknown register", str(context.exception))
 
     def test_special_pshs_raises_with_no_register(self):
         instruction = Instruction(mnemonic="PSHS", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
         operand = SpecialOperand("", instruction)
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand.translate()
         self.assertEqual("one or more registers must be specified", str(context.exception))
 
@@ -431,35 +329,35 @@ class TestSpecialOperand(unittest.TestCase):
     def test_special_exg_raises_with_one_register(self):
         instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
         operand = SpecialOperand("A", instruction)
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand.translate()
         self.assertEqual("[EXG] requires exactly 2 registers", str(context.exception))
 
     def test_special_exg_raises_with_three_registers(self):
         instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
         operand = SpecialOperand("A,B,X", instruction)
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand.translate()
         self.assertEqual("[EXG] requires exactly 2 registers", str(context.exception))
 
     def test_special_exg_raises_with_bad_register_first_reg(self):
         instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
         operand = SpecialOperand("not_a_register,A", instruction)
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand.translate()
         self.assertEqual("[not_a_register] unknown register", str(context.exception))
 
     def test_special_exg_raises_with_bad_register_second_reg(self):
         instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
         operand = SpecialOperand("A,not_a_register", instruction)
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand.translate()
         self.assertEqual("[not_a_register] unknown register", str(context.exception))
 
     def test_special_exg_raises_with_A_to_D(self):
         instruction = Instruction(mnemonic="EXG", mode=Mode(imm=0x3A, imm_sz=1), is_special=True)
         operand = SpecialOperand("A,D", instruction)
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand.translate()
         self.assertEqual("[EXG] of [A] to [D] not allowed", str(context.exception))
 
@@ -541,19 +439,19 @@ class TestInherentOperand(unittest.TestCase):
         self.assertEqual("", result.operand_string)
 
     def test_inherent_raises_with_value(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             InherentOperand("$FF", self.instruction)
         self.assertEqual("[$FF] is not an inherent value", str(context.exception))
 
     def test_inherent_raises_with_value_passthrough(self):
         value = NumericValue("$FF")
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             InherentOperand(None, self.instruction, value=value)
         self.assertEqual("[$FF] is not an inherent value", str(context.exception))
 
     def test_inherent_raises_with_bad_instruction_on_translate(self):
         instruction = Instruction(mnemonic="STX", mode=Mode(imm=0xAF, imm_sz=1))
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             result = InherentOperand(None, instruction)
             result.translate()
         self.assertEqual("Instruction [STX] requires an operand", str(context.exception))
@@ -584,7 +482,7 @@ class TestImmediateOperand(unittest.TestCase):
         self.assertEqual("#blah", result.operand_string)
 
     def test_immediate_raises_with_bad_value(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             ImmediateOperand("blah", self.instruction)
         self.assertEqual("[blah] is not an immediate value", str(context.exception))
 
@@ -598,7 +496,7 @@ class TestImmediateOperand(unittest.TestCase):
 
     def test_immediate_raises_with_bad_instruction_on_translate(self):
         instruction = Instruction(mnemonic="STX", mode=Mode(inh=0xAF, inh_sz=1))
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             result = ImmediateOperand("#$FF", instruction)
             result.translate()
         self.assertEqual("Instruction [STX] does not support immediate addressing", str(context.exception))
@@ -643,18 +541,18 @@ class TestIndexedOperand(unittest.TestCase):
         self.assertEqual(",X", result.operand_string)
 
     def test_indexed_raises_with_bad_value(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             IndexedOperand(",blah,", self.instruction)
         self.assertEqual("[,blah,] incorrect number of commas in indexed value", str(context.exception))
 
     def test_indexed_raises_with_no_commas(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             IndexedOperand("blah", self.instruction)
         self.assertEqual("[blah] is not an indexed value", str(context.exception))
 
     def test_indexed_raises_with_instruction_that_does_not_support_indexed(self):
         instruction = Instruction(mnemonic="STX", mode=Mode(inh=0x1F, inh_sz=1))
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand = IndexedOperand(",X", instruction)
             operand.translate()
         self.assertEqual("Instruction [STX] does not support indexed addressing", str(context.exception))
@@ -785,7 +683,7 @@ class TestIndexedOperand(unittest.TestCase):
         self.assertEqual(2, code_pkg.size)
 
     def test_indexed_offset_from_register_with_auto_increment_raises(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand = IndexedOperand("$1F,X+", self.instruction)
             operand.translate()
         self.assertEqual("[$1F,X+] invalid indexed expression", str(context.exception))
@@ -820,7 +718,7 @@ class TestIndexedOperand(unittest.TestCase):
         self.assertEqual(4, code_pkg.size)
 
     def test_indexed_8_bit_value_from_pc_correct(self):
-        operand = IndexedOperand("$20,PC", self.instruction)
+        operand = IndexedOperand("$20,PCR", self.instruction)
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("8C", code_pkg.post_byte.hex())
@@ -828,7 +726,7 @@ class TestIndexedOperand(unittest.TestCase):
         self.assertEqual(3, code_pkg.size)
 
     def test_indexed_16_bit_value_from_pc_correct(self):
-        operand = IndexedOperand("$2000,PC", self.instruction)
+        operand = IndexedOperand("$2000,PCR", self.instruction)
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("8D", code_pkg.post_byte.hex())
@@ -880,12 +778,11 @@ class TestIndexedOperand(unittest.TestCase):
         code_pkg = operand.translate()
         self.assertEqual("1F", code_pkg.post_byte.hex())
 
-    def test_indexed_translate_left_address_raises(self):
+    def test_indexed_translate_left_address_requires_additional_resolution(self):
         operand = IndexedOperand("$1F,X", self.instruction)
         operand.left = AddressValue(32767)
-        with self.assertRaises(ValueError) as context:
-            operand.translate()
-        self.assertEqual("[$1F,X] cannot translate address in left hand side", str(context.exception))
+        code_pkg = operand.translate()
+        self.assertTrue(code_pkg.additional_needs_resolution)
 
 
 class TestExtendedIndexedOperand(unittest.TestCase):
@@ -907,18 +804,18 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         self.assertEqual("[,X]", result.operand_string)
 
     def test_extended_indexed_raises_with_bad_value(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             ExtendedIndexedOperand("[,blah,]", self.instruction)
         self.assertEqual("[[,blah,]] incorrect number of commas in extended indexed value", str(context.exception))
 
     def test_extended_indexed_raises_with_no_surrounding_braces(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             ExtendedIndexedOperand("blah", self.instruction)
         self.assertEqual("[blah] is not an extended indexed value", str(context.exception))
 
     def test_extended_indexed_raises_with_instruction_that_does_not_support_indexed(self):
         instruction = Instruction(mnemonic="STX", mode=Mode(inh=0x1F, inh_sz=1))
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand = ExtendedIndexedOperand("[,X]", instruction)
             operand.translate()
         self.assertEqual("Instruction [STX] does not support indexed addressing", str(context.exception))
@@ -1024,12 +921,12 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         self.assertEqual(2, code_pkg.size)
 
     def test_extended_indexed_auto_single_increments_not_allowed(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand = ExtendedIndexedOperand("[,X+]", self.instruction)
             operand.translate()
         self.assertEqual("[X+] not allowed as an extended indirect value", str(context.exception))
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand = ExtendedIndexedOperand("[,-X]", self.instruction)
             operand.translate()
         self.assertEqual("[-X] not allowed as an extended indirect value", str(context.exception))
@@ -1048,7 +945,7 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         self.assertEqual(2, code_pkg.size)
 
     def test_extended_indexed_offset_from_register_with_auto_increment_raises(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand = ExtendedIndexedOperand("[$1F,X++]", self.instruction)
             operand.translate()
         self.assertEqual("[[$1F,X++]] invalid indexed expression", str(context.exception))
@@ -1081,14 +978,14 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         self.assertEqual(4, code_pkg.size)
 
     def test_extended_indexed_8_bit_value_from_pc_correct(self):
-        operand = ExtendedIndexedOperand("[$20,PC]", self.instruction)
+        operand = ExtendedIndexedOperand("[$20,PCR]", self.instruction)
         code_pkg = operand.translate()
         self.assertEqual("9C", code_pkg.post_byte.hex())
         self.assertEqual("20", code_pkg.additional.hex())
         self.assertEqual(3, code_pkg.size)
 
     def test_extended_indexed_16_bit_value_from_pc_correct(self):
-        operand = ExtendedIndexedOperand("[$2000,PC]", self.instruction)
+        operand = ExtendedIndexedOperand("[$2000,PCR]", self.instruction)
         code_pkg = operand.translate()
         self.assertEqual("9D", code_pkg.post_byte.hex())
         self.assertEqual("2000", code_pkg.additional.hex())
@@ -1166,12 +1063,11 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         result = operand.resolve_symbols(symbol_table=symbol_table)
         self.assertEqual("02", result.value.hex())
 
-    def test_extended_indirect_translate_left_address_raises(self):
+    def test_extended_indirect_translate_left_address_requires_resolution(self):
         operand = ExtendedIndexedOperand("[$1F,X]", self.instruction)
         operand.left = AddressValue(32767)
-        with self.assertRaises(ValueError) as context:
-            operand.translate()
-        self.assertEqual("[[$1F,X]] cannot translate address in left hand side", str(context.exception))
+        code_pkg = operand.translate()
+        self.assertTrue(code_pkg.additional_needs_resolution)
 
 
 class TestDirectOperand(unittest.TestCase):
@@ -1195,7 +1091,7 @@ class TestDirectOperand(unittest.TestCase):
         self.assertEqual("FE", result.value.hex())
 
     def test_direct_raises_if_value_not_direct_length(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             DirectOperand("$FFFF", self.instruction)
         self.assertEqual("[$FFFF] is not a direct value", str(context.exception))
 
@@ -1207,7 +1103,7 @@ class TestDirectOperand(unittest.TestCase):
     def test_direct_raises_on_translate_not_direct_instruction(self):
         instruction = Instruction(mnemonic="SUBA", mode=Mode(imm=0xB0, imm_sz=3))
         operand = DirectOperand("<$FF", instruction)
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand.translate()
         self.assertEqual("Instruction [SUBA] does not support direct addressing", str(context.exception))
 
@@ -1235,7 +1131,7 @@ class TestExtendedOperand(unittest.TestCase):
 
     def test_extended_translate_raises_if_instruction_not_extended(self):
         instruction = Instruction(mnemonic="SUBA", mode=Mode(rel=0x3A, rel_sz=1))
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OperandTypeError) as context:
             operand = ExtendedOperand("$FFFF", instruction)
             operand.translate()
         self.assertEqual("Instruction [SUBA] does not support extended addressing", str(context.exception))
