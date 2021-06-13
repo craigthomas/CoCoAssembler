@@ -58,7 +58,7 @@ class Value(ABC):
     one of several types, being Unknown, Numeric, String, Symbol,
     Address, Expression or a special None type.
     """
-    def __init__(self, value, size_hint=0):
+    def __init__(self, value, size_hint=None):
         self.original_string = value
         self.type = ValueType.UNKNOWN
         self.resolved = True
@@ -94,14 +94,14 @@ class Value(ABC):
         return self.type == value_type
 
     def high_byte(self):
-        if self.hex_len() < 2:
+        if self.hex_len() <= 2:
             return 0x00
         return int(self.hex()[0:2], 16)
 
     def low_byte(self):
-        if self.hex_len() < 1:
+        if self.hex_len() == 0:
             return 0x00
-        if self.hex_len() < 2:
+        if self.hex_len() <= 2:
             return int(self.hex()[0:2], 16)
         return int(self.hex()[2:], 16)
 
@@ -223,7 +223,7 @@ class NumericValue(Value):
     Represents a numeric value that can be retrieved as an integer or hex value
     string.
     """
-    def __init__(self, value, size_hint=0):
+    def __init__(self, value, size_hint=None):
         super().__init__(value, size_hint)
         self.type = ValueType.NUMERIC
         if type(value) == int:
@@ -249,7 +249,7 @@ class NumericValue(Value):
         raise ValueTypeError("[{}] is neither integer or hex value".format(value))
 
     def hex(self, size=0):
-        if self.size_hint != 0:
+        if self.size_hint:
             size = self.size_hint
         if size == 0:
             size = self.hex_len()
@@ -258,7 +258,7 @@ class NumericValue(Value):
         return format_specifier.format(self.int)
 
     def hex_len(self):
-        if self.size_hint:
+        if self.size_hint is not None:
             return self.size_hint
         length = len(hex(self.int)[2:])
         length += 1 if length % 2 == 1 else 0
@@ -332,10 +332,10 @@ class ExpressionValue(Value):
         self.resolved = False
 
     def hex(self, size=0):
-        pass
+        return "00" if not self.resolved else self.value.hex()
 
     def hex_len(self):
-        pass
+        return 0 if not self.resolved else self.value.hex_len()
 
     def resolve(self, symbol_table):
         """

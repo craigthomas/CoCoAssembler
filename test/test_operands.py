@@ -10,10 +10,11 @@ import unittest
 
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
     OperandType, IndexedOperand, RelativeOperand, ExtendedIndexedOperand, \
-    Operand, ExtendedOperand, PseudoOperand, SpecialOperand, DirectOperand
+    Operand, ExtendedOperand, PseudoOperand, SpecialOperand, DirectOperand, \
+    BadInstructionOperand
 from cocoasm.instruction import Instruction, Mode
 from cocoasm.values import NumericValue, AddressValue, ValueType
-from cocoasm.exceptions import ValueTypeError, OperandTypeError
+from cocoasm.exceptions import OperandTypeError
 
 # C L A S S E S ###############################################################
 
@@ -115,6 +116,32 @@ class TestBaseOperand(unittest.TestCase):
         result = operand.resolve_symbols(symbol_table=symbol_table)
         self.assertEqual(OperandType.RELATIVE, result.type)
         self.assertEqual(2, result.value.int)
+
+
+class TestBadInstructionOperand(unittest.TestCase):
+    """
+    A test class for the BadInstructionOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        pass
+
+    def test_bad_instruction_operand_translate_returns_empty_code_package(self):
+        result = BadInstructionOperand("$FF", None)
+        code_pkg = result.translate()
+        self.assertTrue(code_pkg.op_code.is_type(ValueType.NONE))
+        self.assertTrue(code_pkg.address.is_type(ValueType.NONE))
+        self.assertTrue(code_pkg.post_byte.is_type(ValueType.NONE))
+        self.assertTrue(code_pkg.additional.is_type(ValueType.NONE))
+        self.assertEqual(code_pkg.size, 0)
+        self.assertFalse(code_pkg.additional_needs_resolution)
+
+    def test_bad_instruction_operand_instantiates_to_strings(self):
+        result = BadInstructionOperand("string", None)
+        self.assertEqual(result.operand_string, "string")
+        self.assertEqual(result.original_operand, "string")
 
 
 class TestUnknownOperand(unittest.TestCase):

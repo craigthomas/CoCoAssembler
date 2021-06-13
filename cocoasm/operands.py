@@ -162,8 +162,8 @@ class Operand(ABC):
 
 
 class BadInstructionOperand(Operand):
-    def __init__self(self, operand_string, instruction, value=None):
-        super().__init__(instruction)
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(operand_string, instruction)
         self.operand_string = operand_string
         self.original_operand = operand_string
 
