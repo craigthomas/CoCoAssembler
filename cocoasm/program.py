@@ -109,32 +109,38 @@ class Program(object):
         Translates all the parsed statements into their respective
         opcodes.
         """
-        self.statements = self.process_mnemonics(self.statements)
-        for index, statement in enumerate(self.statements):
-            self.save_symbol(index, statement)
+        try:
+            self.statements = self.process_mnemonics(self.statements)
+            for index, statement in enumerate(self.statements):
+                self.save_symbol(index, statement)
 
-        for index, statement in enumerate(self.statements):
-            statement.translate(self.symbol_table)
+            for index, statement in enumerate(self.statements):
+                statement.resolve_symbols(self.symbol_table)
 
-        address = 0
-        for index, statement in enumerate(self.statements):
-            address = statement.set_address(address)
-            address += statement.code_pkg.size
+            for index, statement in enumerate(self.statements):
+                statement.translate()
 
-        for index, statement in enumerate(self.statements):
-            statement.fix_addresses(self.statements, index)
+            address = 0
+            for index, statement in enumerate(self.statements):
+                address = statement.set_address(address)
+                address += statement.code_pkg.size
 
-        # Update the symbol table with the proper addresses
-        for symbol, value in self.symbol_table.items():
-            if value.is_type(ValueType.ADDRESS):
-                self.symbol_table[symbol] = self.statements[value.int].code_pkg.address
+            for index, statement in enumerate(self.statements):
+                statement.fix_addresses(self.statements, index)
 
-        # Find the origin and name of the project
-        for statement in self.statements:
-            if statement.instruction.is_origin:
-                self.origin = statement.code_pkg.address
-            if statement.instruction.is_name:
-                self.name = statement.operand.operand_string
+            # Update the symbol table with the proper addresses
+            for symbol, value in self.symbol_table.items():
+                if value.is_type(ValueType.ADDRESS):
+                    self.symbol_table[symbol] = self.statements[value.int].code_pkg.address
+
+            # Find the origin and name of the project
+            for statement in self.statements:
+                if statement.instruction.is_origin:
+                    self.origin = statement.code_pkg.address
+                if statement.instruction.is_name:
+                    self.name = statement.operand.operand_string
+        except TranslationError as error:
+            self.throw_error(error)
 
     def get_binary_array(self):
         """

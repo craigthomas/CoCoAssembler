@@ -9,11 +9,11 @@ A Color Computer Assembler - see the README.md file for details.
 import re
 
 from abc import ABC, abstractmethod
-from copy import copy
 from enum import Enum
 
-from cocoasm.values import NoneValue, ValueType, AddressValue, Value, NumericValue
+from cocoasm.values import NoneValue, ValueType, Value, NumericValue
 from cocoasm.instruction import CodePackage
+from cocoasm.exceptions import OperandTypeError, ValueTypeError
 
 # C O N S T A N T S ###########################################################
 
@@ -35,11 +35,6 @@ EXTENDED_REGEX = re.compile(
 # Pattern to recognize an indexed value
 EXTENDED_INDIRECT_REGEX = re.compile(
     r"^\[(?P<value>.*)\]"
-)
-
-# Patten to recognize an expression
-EXPRESSION_REGEX = re.compile(
-    r"^(?P<left>[$]*[\d\w]+)(?P<operation>[+\-/*])(?P<right>[$]*[\d\w]+)$"
 )
 
 # Pattern to recognize invalid characters in an UnknownOperand
@@ -66,9 +61,8 @@ class OperandType(Enum):
     DIRECT = 6
     RELATIVE = 7
     SYMBOL = 8
-    EXPRESSION = 9
-    PSEUDO = 10
-    SPECIAL = 11
+    PSEUDO = 9
+    SPECIAL = 10
 
 
 class Operand(ABC):
@@ -86,60 +80,45 @@ class Operand(ABC):
     def create_from_str(cls, operand_string, instruction):
         try:
             return PseudoOperand(operand_string, instruction)
-        except ValueError:
+        except OperandTypeError:
             pass
 
         try:
             return SpecialOperand(operand_string, instruction)
-        except ValueError:
+        except OperandTypeError:
             pass
 
         try:
             return RelativeOperand(operand_string, instruction)
-        except ValueError:
+        except OperandTypeError:
             pass
 
         try:
             return InherentOperand(operand_string, instruction)
-        except ValueError:
+        except OperandTypeError:
             pass
 
         try:
             return ImmediateOperand(operand_string, instruction)
-        except ValueError:
-            pass
-
-        try:
-            return DirectOperand(operand_string, instruction)
-        except ValueError:
-            pass
-
-        try:
-            return ExtendedOperand(operand_string, instruction)
-        except ValueError:
+        except OperandTypeError:
             pass
 
         try:
             return ExtendedIndexedOperand(operand_string, instruction)
-        except ValueError:
+        except OperandTypeError:
             pass
 
         try:
             return IndexedOperand(operand_string, instruction)
-        except ValueError:
-            pass
-
-        try:
-            return ExpressionOperand(operand_string, instruction)
-        except ValueError:
+        except OperandTypeError:
             pass
 
         try:
             return UnknownOperand(operand_string, instruction)
-        except ValueError:
+        except OperandTypeError:
             pass
 
-        raise ValueError("[{}] unknown operand type".format(operand_string))
+        raise OperandTypeError("[{}] unknown operand type".format(operand_string))
 
     def is_type(self, operand_type):
         """
@@ -159,63 +138,18 @@ class Operand(ABC):
         :param symbol_table: the symbol table to search
         :return: self, or a new Operand class type with a resolved value
         """
-        if self.is_type(OperandType.EXPRESSION):
-            return self.resolve_expression(symbol_table)
+        self.value = self.value.resolve(symbol_table)
 
-        if not self.value.is_type(ValueType.SYMBOL):
-            return self
-
-        symbol = self.get_symbol(self.value.ascii(), symbol_table)
-
-        if symbol.is_type(ValueType.ADDRESS):
-            self.value = AddressValue(symbol.int)
-            if self.type == OperandType.UNKNOWN:
+        if self.value.is_type(ValueType.ADDRESS):
+            if self.is_type(OperandType.UNKNOWN):
                 return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
-            return self
 
-        if symbol.is_type(ValueType.NUMERIC):
-            self.value = copy(symbol)
-            if self.value.hex_len() == 2:
-                return DirectOperand(self.operand_string, self.instruction, value=self.value)
-            return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
+        if self.value.is_type(ValueType.NUMERIC):
+            if self.is_type(OperandType.UNKNOWN):
+                operand = DirectOperand if self.value.hex_len() == 2 else ExtendedOperand
+                return operand(self.operand_string, self.instruction, value=self.value)
 
-    def resolve_expression(self, symbol_table):
-        """
-        Attempts to resolve the expression contained in the operand using the
-        symbol table supplied. Returns a (possibly) new Operand class type as a
-        result of symbol resolution.
-
-        :param symbol_table: the symbol table to use for resolution
-        :return: self, or a new Operand class type with a resolved value
-        """
-        if self.left.is_type(ValueType.SYMBOL):
-            self.left = self.get_symbol(self.left.ascii(), symbol_table)
-
-        if self.right.is_type(ValueType.SYMBOL):
-            self.right = self.get_symbol(self.right.ascii(), symbol_table)
-
-        if self.right.is_type(ValueType.NUMERIC) and self.left.is_type(ValueType.NUMERIC):
-            left = self.left.int
-            right = self.right.int
-            if self.operation == "+":
-                self.value = NumericValue("{}".format(left + right))
-            if self.operation == "-":
-                self.value = NumericValue("{}".format(left - right))
-            if self.operation == "*":
-                self.value = NumericValue("{}".format(int(left * right)))
-            if self.operation == "/":
-                self.value = NumericValue("{}".format(int(left / right)))
-            if self.value.hex_len() == 2:
-                return DirectOperand(self.operand_string, self.instruction, value=self.value)
-            return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
-
-        raise ValueError("[{}] unresolved expression".format(self.operand_string))
-
-    @staticmethod
-    def get_symbol(symbol_label, symbol_table):
-        if symbol_label not in symbol_table:
-            raise ValueError("[{}] not in symbol table".format(symbol_label))
-        return symbol_table[symbol_label]
+        return self
 
     @abstractmethod
     def translate(self):
@@ -227,6 +161,16 @@ class Operand(ABC):
         """
 
 
+class BadInstructionOperand(Operand):
+    def __init__self(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
+        self.operand_string = operand_string
+        self.original_operand = operand_string
+
+    def translate(self):
+        return CodePackage()
+
+
 class UnknownOperand(Operand):
     def __init__(self, operand_string, instruction, value=None):
         super().__init__(instruction)
@@ -235,10 +179,10 @@ class UnknownOperand(Operand):
             self.value = value
             return
         if UNKNOWN_REGEX.search(operand_string):
-            raise ValueError("[{}] invalid operand".format(operand_string))
+            raise OperandTypeError("[{}] invalid operand".format(operand_string))
         try:
             self.value = Value.create_from_str(operand_string, instruction)
-        except ValueError:
+        except ValueTypeError:
             self.value = NoneValue()
 
     def translate(self):
@@ -251,8 +195,8 @@ class PseudoOperand(Operand):
         self.operand_string = operand_string
         self.type = OperandType.PSEUDO
         if not instruction.is_pseudo:
-            raise ValueError("[{}] is not a pseudo instruction".format(instruction.mnemonic))
-        self.value = Value.create_from_str(operand_string, instruction)
+            raise OperandTypeError("[{}] is not a pseudo instruction".format(instruction.mnemonic))
+        self.value = NoneValue() if instruction.is_include else Value.create_from_str(operand_string, instruction)
 
     def resolve_symbols(self, symbol_table):
         return self
@@ -282,7 +226,7 @@ class SpecialOperand(Operand):
         self.operand_string = operand_string
         self.type = OperandType.SPECIAL
         if not instruction.is_special:
-            raise ValueError("[{}] is not a special instruction".format(instruction.mnemonic))
+            raise OperandTypeError("[{}] is not a special instruction".format(instruction.mnemonic))
 
     def resolve_symbols(self, symbol_table):
         return self
@@ -295,12 +239,12 @@ class SpecialOperand(Operand):
 
         if self.instruction.mnemonic == "PSHS" or self.instruction.mnemonic == "PULS":
             if not self.operand_string:
-                raise ValueError("one or more registers must be specified")
+                raise OperandTypeError("one or more registers must be specified")
 
             registers = self.operand_string.split(",")
             for register in registers:
                 if register not in REGISTERS:
-                    raise ValueError("[{}] unknown register".format(register))
+                    raise OperandTypeError("[{}] unknown register".format(register))
 
                 code_pkg.post_byte |= 0x06 if register == "D" else 0x00
                 code_pkg.post_byte |= 0x01 if register == "CC" else 0x00
@@ -315,13 +259,13 @@ class SpecialOperand(Operand):
         if self.instruction.mnemonic == "EXG" or self.instruction.mnemonic == "TFR":
             registers = self.operand_string.split(",")
             if len(registers) != 2:
-                raise ValueError("[{}] requires exactly 2 registers".format(self.instruction.mnemonic))
+                raise OperandTypeError("[{}] requires exactly 2 registers".format(self.instruction.mnemonic))
 
             if registers[0] not in REGISTERS:
-                raise ValueError("[{}] unknown register".format(registers[0]))
+                raise OperandTypeError("[{}] unknown register".format(registers[0]))
 
             if registers[1] not in REGISTERS:
-                raise ValueError("[{}] unknown register".format(registers[1]))
+                raise OperandTypeError("[{}] unknown register".format(registers[1]))
 
             code_pkg.post_byte |= 0x00 if registers[0] == "D" else 0x00
             code_pkg.post_byte |= 0x00 if registers[1] == "D" else 0x00
@@ -363,7 +307,7 @@ class SpecialOperand(Operand):
                         0xAB, 0xBA, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
                         0x88, 0x99, 0xAA, 0xBB
                     ]:
-                raise ValueError(
+                raise OperandTypeError(
                     "[{}] of [{}] to [{}] not allowed".format(self.instruction.mnemonic, registers[0], registers[1]))
 
         code_pkg.post_byte = NumericValue(code_pkg.post_byte)
@@ -375,7 +319,7 @@ class RelativeOperand(Operand):
         super().__init__(instruction)
         self.type = OperandType.RELATIVE
         if not instruction.is_short_branch and not instruction.is_long_branch:
-            raise ValueError("[{}] is not a branch instruction".format(instruction.mnemonic))
+            raise OperandTypeError("[{}] is not a branch instruction".format(instruction.mnemonic))
         self.operand_string = operand_string
         self.value = value if value else Value.create_from_str(operand_string, instruction)
 
@@ -393,13 +337,13 @@ class InherentOperand(Operand):
         super().__init__(instruction)
         self.type = OperandType.INHERENT
         if value:
-            raise ValueError("[{}] is not an inherent value".format(value.ascii()))
+            raise OperandTypeError("[{}] is not an inherent value".format(value.ascii()))
         if operand_string:
-            raise ValueError("[{}] is not an inherent value".format(operand_string))
+            raise OperandTypeError("[{}] is not an inherent value".format(operand_string))
 
     def translate(self):
         if not self.instruction.mode.inh:
-            raise ValueError("Instruction [{}] requires an operand".format(self.instruction.mnemonic))
+            raise OperandTypeError("Instruction [{}] requires an operand".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.inh), size=self.instruction.mode.inh_sz)
 
 
@@ -411,23 +355,14 @@ class ImmediateOperand(Operand):
         if value:
             self.value = value
             return
-        match = IMMEDIATE_REGEX.match(operand_string)
+        match = IMMEDIATE_REGEX.match(self.operand_string)
         if not match:
-            raise ValueError("[{}] is not an immediate value".format(operand_string))
+            raise OperandTypeError("[{}] is not an immediate value".format(operand_string))
         self.value = Value.create_from_str(match.group("value"), instruction)
-
-    def resolve_symbols(self, symbol_table):
-        if not self.value.is_type(ValueType.SYMBOL):
-            return self
-
-        symbol = self.get_symbol(self.value.ascii(), symbol_table)
-        self.value = copy(symbol)
-
-        return self
 
     def translate(self):
         if not self.instruction.mode.imm:
-            raise ValueError("Instruction [{}] does not support immediate addressing".format(self.instruction.mnemonic))
+            raise OperandTypeError("Instruction [{}] does not support immediate addressing".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.imm),
                            additional=self.value,
                            size=self.instruction.mode.imm_sz)
@@ -446,12 +381,14 @@ class DirectOperand(Operand):
             self.value = Value.create_from_str(match.group("value"), instruction)
         else:
             self.value = Value.create_from_str(operand_string, instruction)
-        if self.value is None or self.value.byte_len() != 1:
-            raise ValueError("[{}] is not a direct value".format(operand_string))
+
+        # If we have a numeric, we can run a check here for direct value size
+        if self.value.is_type(ValueType.NUMERIC) and self.value.byte_len() != 1:
+            raise OperandTypeError("[{}] is not a direct value".format(self.operand_string))
 
     def translate(self):
         if not self.instruction.mode.dir:
-            raise ValueError("Instruction [{}] does not support direct addressing".format(self.instruction.mnemonic))
+            raise OperandTypeError("Instruction [{}] does not support direct addressing".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.dir),
                            additional=self.value,
                            size=self.instruction.mode.dir_sz)
@@ -471,12 +408,9 @@ class ExtendedOperand(Operand):
         else:
             self.value = Value.create_from_str(operand_string, instruction)
 
-        if self.value is None or self.value.byte_len() != 2:
-            raise ValueError("[{}] is not an extended value".format(operand_string))
-
     def translate(self):
         if not self.instruction.mode.ext:
-            raise ValueError("Instruction [{}] does not support extended addressing".format(self.instruction.mnemonic))
+            raise OperandTypeError("Instruction [{}] does not support extended addressing".format(self.instruction.mnemonic))
         return CodePackage(op_code=NumericValue(self.instruction.mode.ext),
                            additional=self.value,
                            size=self.instruction.mode.ext_sz)
@@ -494,30 +428,30 @@ class ExtendedIndexedOperand(Operand):
             return
         match = EXTENDED_INDIRECT_REGEX.match(self.operand_string)
         if not match:
-            raise ValueError("[{}] is not an extended indexed value".format(operand_string))
+            raise OperandTypeError("[{}] is not an extended indexed value".format(operand_string))
         parsed_value = match.group("value")
         if "," not in parsed_value:
             self.value = Value.create_from_str(parsed_value, self.instruction)
         elif len(parsed_value.split(",")) == 2:
             self.left, self.right = parsed_value.split(",")
         else:
-            raise ValueError("[{}] incorrect number of commas in extended indexed value".format(operand_string))
+            raise OperandTypeError("[{}] incorrect number of commas in extended indexed value".format(operand_string))
 
     def resolve_symbols(self, symbol_table):
-        if not self.value.is_type(ValueType.NONE) and self.value.is_type(ValueType.SYMBOL):
-            self.value = self.get_symbol(self.value.ascii(), symbol_table)
+        if not self.value.is_type(ValueType.NONE):
+            self.value = self.value.resolve(symbol_table)
             return self
 
         if self.left and self.left != "":
             if self.left != "A" and self.left != "B" and self.left != "D":
                 self.left = Value.create_from_str(self.left, self.instruction)
                 if self.left.is_type(ValueType.SYMBOL):
-                    self.left = self.get_symbol(self.left.ascii(), symbol_table)
+                    self.left = self.left.resolve(symbol_table)
         return self
 
     def translate(self):
         if not self.instruction.mode.ind:
-            raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
+            raise OperandTypeError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
         size = self.instruction.mode.ind_sz
 
         if not type(self.value) == str and self.value.is_type(ValueType.ADDRESS):
@@ -538,6 +472,7 @@ class ExtendedIndexedOperand(Operand):
 
         raw_post_byte = 0x80
         additional = NoneValue()
+        additional_needs_resolution = False
 
         if "X" in self.right:
             raw_post_byte |= 0x00
@@ -551,9 +486,9 @@ class ExtendedIndexedOperand(Operand):
         if self.left == "":
             if "-" in self.right or "+" in self.right:
                 if self.right == "X+" or self.right == "Y+" or self.right == "U+" or self.right == "S+":
-                    raise ValueError("[{}] not allowed as an extended indirect value".format(self.right))
+                    raise OperandTypeError("[{}] not allowed as an extended indirect value".format(self.right))
                 if self.right == "-X" or self.right == "-Y" or self.right == "-U" or self.right == "-S":
-                    raise ValueError("[{}] not allowed as an extended indirect value".format(self.right))
+                    raise OperandTypeError("[{}] not allowed as an extended indirect value".format(self.right))
                 if "++" in self.right:
                     raw_post_byte |= 0x11
                 if "--" in self.right:
@@ -571,33 +506,31 @@ class ExtendedIndexedOperand(Operand):
 
         else:
             if "+" in self.right or "-" in self.right:
-                raise ValueError("[{}] invalid indexed expression".format(self.operand_string))
+                raise OperandTypeError("[{}] invalid indexed expression".format(self.operand_string))
             if type(self.left) == str:
                 self.left = NumericValue(self.left)
             if self.left.is_type(ValueType.ADDRESS):
-                raise ValueError("[{}] cannot translate address in left hand side".format(self.operand_string))
-            numeric = self.left
-            if numeric.byte_len() == 2:
-                size += 2
-                if "PC" in self.right:
+                additional_needs_resolution = True
+                self.left = NumericValue(self.left.int)
+            additional = self.left
+
+            if "PCR" in self.right:
+                # TODO: all address symbols resolve to 16-bit offsets, need to find a way to calculate 8-bit offsets
+                if additional_needs_resolution:
+                    size += 2
                     raw_post_byte |= 0x9D
-                    additional = numeric
                 else:
-                    raw_post_byte |= 0x99
-                    additional = numeric
-            elif numeric.byte_len() == 1:
-                size += 1
-                if "PC" in self.right:
-                    raw_post_byte |= 0x9C
-                    additional = numeric
-                else:
-                    raw_post_byte |= 0x98
-                    additional = numeric
+                    size += additional.byte_len()
+                    raw_post_byte |= 0x9D if additional.byte_len() == 2 else 0x9C
+            else:
+                size += additional.byte_len()
+                raw_post_byte |= 0x99 if additional.byte_len() == 2 else 0x98
 
         return CodePackage(op_code=NumericValue(self.instruction.mode.ind),
                            post_byte=NumericValue(raw_post_byte),
                            additional=additional,
-                           size=size)
+                           size=size,
+                           additional_needs_resolution=additional_needs_resolution)
 
 
 class IndexedOperand(Operand):
@@ -608,9 +541,9 @@ class IndexedOperand(Operand):
         self.right = ""
         self.left = ""
         if "," not in operand_string or instruction.is_string_define:
-            raise ValueError("[{}] is not an indexed value".format(operand_string))
+            raise OperandTypeError("[{}] is not an indexed value".format(operand_string))
         if len(operand_string.split(",")) != 2:
-            raise ValueError("[{}] incorrect number of commas in indexed value".format(operand_string))
+            raise OperandTypeError("[{}] incorrect number of commas in indexed value".format(operand_string))
         self.left, self.right = operand_string.split(",")
 
     def resolve_symbols(self, symbol_table):
@@ -618,15 +551,16 @@ class IndexedOperand(Operand):
             if self.left != "A" and self.left != "B" and self.left != "D":
                 self.left = Value.create_from_str(self.left, self.instruction)
                 if self.left.is_type(ValueType.SYMBOL):
-                    self.left = self.get_symbol(self.left.ascii(), symbol_table)
+                    self.left = self.left.resolve(symbol_table)
         return self
 
     def translate(self):
         if not self.instruction.mode.ind:
-            raise ValueError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
+            raise OperandTypeError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
         raw_post_byte = 0x00
         size = self.instruction.mode.ind_sz
         additional = NoneValue()
+        additional_needs_resolution = False
 
         # Determine register (if any)
         if "X" in self.right:
@@ -663,53 +597,35 @@ class IndexedOperand(Operand):
 
         else:
             if "+" in self.right or "-" in self.right:
-                raise ValueError("[{}] invalid indexed expression".format(self.operand_string))
+                raise OperandTypeError("[{}] invalid indexed expression".format(self.operand_string))
             if type(self.left) == str:
                 self.left = NumericValue(self.left)
             if self.left.is_type(ValueType.ADDRESS):
-                raise ValueError("[{}] cannot translate address in left hand side".format(self.operand_string))
-            numeric = self.left
-            if numeric.byte_len() == 2:
-                size += 2
-                if "PC" in self.right:
+                additional_needs_resolution = True
+                self.left = NumericValue(self.left.int)
+
+            additional = self.left
+
+            if "PCR" in self.right:
+                # TODO: all address symbols resolve to 16-bit offsets, need to find a way to calculate 8-bit offsets
+                if additional_needs_resolution:
+                    size += 2
                     raw_post_byte |= 0x8D
-                    additional = numeric
                 else:
-                    raw_post_byte |= 0x89
-                    additional = numeric
-            elif numeric.byte_len() == 1:
-                if "PC" in self.right:
-                    raw_post_byte |= 0x8C
-                    additional = numeric
-                    size += 1
+                    size += additional.byte_len()
+                    raw_post_byte |= 0x8D if additional.byte_len() == 2 else 0x8C
+            else:
+                if additional.int <= 0x1F:
+                    raw_post_byte |= additional.int
                 else:
-                    if numeric.int <= 0x1F:
-                        raw_post_byte |= numeric.int
-                    else:
-                        raw_post_byte |= 0x88
-                        additional = numeric
-                        size += 1
+                    size += additional.byte_len()
+                    raw_post_byte |= 0x89 if additional.byte_len() == 2 else 0x88
 
         return CodePackage(op_code=NumericValue(self.instruction.mode.ind),
                            post_byte=NumericValue(raw_post_byte),
                            additional=additional,
-                           size=size)
+                           size=size,
+                           additional_needs_resolution=additional_needs_resolution)
 
-
-class ExpressionOperand(Operand):
-    def __init__(self, operand_string, instruction, value=None):
-        super().__init__(instruction)
-        self.type = OperandType.EXPRESSION
-        self.operand_string = operand_string
-        match = EXPRESSION_REGEX.match(operand_string)
-        if not match:
-            raise ValueError("[{}] is not a valid expression".format(operand_string))
-        self.left = Value.create_from_str(match.group("left"), instruction)
-        self.right = Value.create_from_str(match.group("right"), instruction)
-        self.operation = match.group("operation")
-        self.value = NoneValue("")
-
-    def translate(self):
-        return CodePackage()
 
 # E N D   O F   F I L E #######################################################

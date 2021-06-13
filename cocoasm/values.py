@@ -11,6 +11,8 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 
+from cocoasm.exceptions import ValueTypeError
+
 # C O N S T A N T S ###########################################################
 
 # Pattern to recognize a hex value
@@ -28,6 +30,11 @@ SYMBOL_REGEX = re.compile(
     r"^(?P<value>[a-zA-Z0-9@]+)$"
 )
 
+# Patten to recognize an expression
+EXPRESSION_REGEX = re.compile(
+    r"^(?P<left>[$]*[\d\w]+)(?P<operation>[+\-/*])(?P<right>[$]*[\d\w]+)$"
+)
+
 # C L A S S E S  ##############################################################
 
 
@@ -42,6 +49,7 @@ class ValueType(Enum):
     SYMBOL = 3
     ADDRESS = 4
     NONE = 5
+    EXPRESSION = 6
 
 
 class Value(ABC):
@@ -97,6 +105,14 @@ class Value(ABC):
             return int(self.hex()[0:2], 16)
         return int(self.hex()[2:], 16)
 
+    def resolve(self, symbol_table):
+        """
+        Attempts to resolve the proper value of the object given the supplied symbol table
+
+        :return: a new Value type object with the resolved information
+        """
+        return self
+
     @abstractmethod
     def hex(self, size=0):
         """
@@ -114,7 +130,7 @@ class Value(ABC):
         """
 
     @classmethod
-    def create_from_str(cls, value, instruction):
+    def create_from_str(cls, value, instruction=None):
         """
         Parses the value by trying to instantiate various Value classes.
 
@@ -124,21 +140,26 @@ class Value(ABC):
         """
         try:
             return NumericValue(value)
-        except ValueError:
+        except ValueTypeError:
             pass
 
-        if instruction.is_string_define:
+        if instruction and instruction.is_string_define:
             try:
                 return StringValue(value)
-            except ValueError:
+            except ValueTypeError:
                 pass
 
         try:
             return SymbolValue(value)
-        except ValueError:
+        except ValueTypeError:
             pass
 
-        raise ValueError("[{}] is an invalid value".format(value))
+        try:
+            return ExpressionValue(value)
+        except ValueTypeError:
+            pass
+
+        raise ValueTypeError("[{}] is an invalid value".format(value))
 
     @classmethod
     def create_from_byte(cls, byte):
@@ -149,8 +170,14 @@ class Value(ABC):
         :return: the Value class parsed
         """
         if byte == b"":
-            raise ValueError("No byte available for reading")
+            raise ValueTypeError("No byte available for reading")
         return NumericValue(int.from_bytes(byte, byteorder='big'))
+
+    @staticmethod
+    def get_symbol(symbol_label, symbol_table):
+        if symbol_label not in symbol_table:
+            raise ValueError("[{}] not in symbol table".format(symbol_label))
+        return symbol_table[symbol_label]
 
 
 class NoneValue(Value):
@@ -180,7 +207,7 @@ class StringValue(Value):
         self.type = ValueType.STRING
         delimiter = value[0]
         if not value[-1] == delimiter:
-            raise ValueError("string must begin and end with same delimiter")
+            raise ValueTypeError("string must begin and end with same delimiter")
         self.original_string = value[1:-1]
         self.hex_array = ["{:X}".format(ord(x)) for x in value[1:-1]]
 
@@ -202,13 +229,13 @@ class NumericValue(Value):
         if type(value) == int:
             self.int = value
             if self.int > 65535:
-                raise ValueError("integer value cannot exceed 65535")
+                raise ValueTypeError("integer value cannot exceed 65535")
             return
 
         data = HEX_REGEX.match(value)
         if data:
             if len(data.group("value")) > 4:
-                raise ValueError("hex value length cannot exceed 4 characters")
+                raise ValueTypeError("hex value length cannot exceed 4 characters")
             self.int = int(data.group("value"), 16)
             return
 
@@ -216,10 +243,10 @@ class NumericValue(Value):
         if data:
             self.int = int(data.group("value"), 10)
             if self.int > 65535:
-                raise ValueError("integer value cannot exceed 65535")
+                raise ValueTypeError("integer value cannot exceed 65535")
             return
 
-        raise ValueError("[{}] is neither integer or hex value".format(value))
+        raise ValueTypeError("[{}] is neither integer or hex value".format(value))
 
     def hex(self, size=0):
         if self.size_hint != 0:
@@ -249,7 +276,7 @@ class SymbolValue(Value):
         self.type = ValueType.SYMBOL
         data = SYMBOL_REGEX.match(value)
         if not data:
-            raise ValueError("[{}] is not a valid symbol".format(value))
+            raise ValueTypeError("[{}] is not a valid symbol".format(value))
         self.value = value
 
     def hex(self, size=0):
@@ -257,6 +284,14 @@ class SymbolValue(Value):
 
     def hex_len(self):
         return self.value.hex_len() if self.resolved else 0
+
+    def resolve(self, symbol_table):
+        symbol = self.get_symbol(self.value, symbol_table)
+        if symbol.is_type(ValueType.ADDRESS):
+            return AddressValue(symbol.int)
+
+        if symbol.is_type(ValueType.NUMERIC):
+            return NumericValue(symbol.int)
 
 
 class AddressValue(Value):
@@ -277,5 +312,71 @@ class AddressValue(Value):
 
     def hex_len(self):
         return len(hex(self.int)[2:])
+
+
+class ExpressionValue(Value):
+    """
+    A value type that has an expression at its core.
+    """
+    def __init__(self, value):
+        super().__init__(value)
+        self.type = ValueType.EXPRESSION
+        self.original_value = value
+        match = EXPRESSION_REGEX.match(value)
+        if not match:
+            raise ValueTypeError("[{}] is not a valid expression".format(value))
+        self.left = Value.create_from_str(match.group("left"))
+        self.right = Value.create_from_str(match.group("right"))
+        self.operation = match.group("operation")
+        self.value = NoneValue("")
+        self.resolved = False
+
+    def hex(self, size=0):
+        pass
+
+    def hex_len(self):
+        pass
+
+    def resolve(self, symbol_table):
+        """
+        Attempts to resolve the expression using the symbol table supplied. Updates the
+        main value of the
+
+        :param symbol_table: the symbol table to use for resolution
+        :return: self, or a new Operand class type with a resolved value
+        """
+        if self.left.is_type(ValueType.SYMBOL):
+            self.left = self.get_symbol(self.left.ascii(), symbol_table)
+
+        if self.right.is_type(ValueType.SYMBOL):
+            self.right = self.get_symbol(self.right.ascii(), symbol_table)
+
+        if self.right.is_type(ValueType.NUMERIC) and self.left.is_type(ValueType.NUMERIC):
+            left = self.left.int
+            right = self.right.int
+            if self.operation == "+":
+                self.value = NumericValue("{}".format(left + right))
+            if self.operation == "-":
+                self.value = NumericValue("{}".format(left - right))
+            if self.operation == "*":
+                self.value = NumericValue("{}".format(int(left * right)))
+            if self.operation == "/":
+                self.value = NumericValue("{}".format(int(left / right)))
+            return self.value
+
+        if self.right.is_type(ValueType.NUMERIC) and self.left.is_type(ValueType.ADDRESS):
+            left = self.left.int
+            right = self.right.int
+            if self.operation == "+":
+                self.value = AddressValue(left + right)
+            if self.operation == "-":
+                self.value = AddressValue(left - right)
+            if self.operation == "*":
+                self.value = AddressValue(left * right)
+            if self.operation == "/":
+                self.value = AddressValue(left / right)
+            return self.value
+
+        raise ValueError("[{}] unresolved expression".format(self.original_value))
 
 # E N D   O F   F I L E #######################################################

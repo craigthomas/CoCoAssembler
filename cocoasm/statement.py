@@ -10,9 +10,9 @@ import re
 
 from copy import copy
 
-from cocoasm.exceptions import ParseError
+from cocoasm.exceptions import ParseError, TranslationError
 from cocoasm.instruction import INSTRUCTIONS, CodePackage
-from cocoasm.operands import Operand, OperandType
+from cocoasm.operands import Operand, OperandType, BadInstructionOperand, ExtendedOperand, DirectOperand
 from cocoasm.values import ValueType, NumericValue
 
 # C O N S T A N T S ###########################################################
@@ -72,6 +72,7 @@ class Statement(object):
             self.mnemonic.rjust(5, ' '),
             self.original_operand.operand_string.ljust(30, ' '),
             self.comment.ljust(40, ' '),
+            # self.operand.type
         )
 
     def get_include_filename(self):
@@ -105,7 +106,10 @@ class Statement(object):
             self.label = data.group("label") or ""
             self.mnemonic = data.group("mnemonic").upper() or ""
             self.instruction = next((op for op in INSTRUCTIONS if op.mnemonic == self.mnemonic), None)
+            self.original_operand = copy(self.operand)
             if not self.instruction:
+                self.original_operand = BadInstructionOperand(data.group("operands"))
+                self.comment = data.group("comment")
                 raise ParseError("[{}] invalid mnemonic".format(self.mnemonic), self)
             if self.instruction.is_string_define:
                 original_operand = data.group("operands")
@@ -142,14 +146,43 @@ class Statement(object):
         self.code_pkg.address = NumericValue(address)
         return self.code_pkg.address.int
 
-    def translate(self, symbol_table):
+    def resolve_symbols(self, symbol_table):
+        """
+        Resolve any symbols within operands, and check to make sure operand types
+        are valid.
+        """
+        try:
+            self.operand = self.operand.resolve_symbols(symbol_table)
+            self.check_types()
+        except ValueError as error:
+            raise TranslationError(str(error), self)
+
+    def translate(self):
         """
         Translate the mnemonic into an actual operation.
-
-        :param symbol_table: the dictionary of symbol table elements
         """
-        self.operand = self.operand.resolve_symbols(symbol_table)
-        self.code_pkg = self.operand.translate()
+        try:
+            self.code_pkg = self.operand.translate()
+        except ValueError as error:
+            raise TranslationError(str(error), self)
+
+    def check_types(self):
+        if self.operand.is_type(OperandType.DIRECT):
+            if self.operand.value.is_type(ValueType.NUMERIC):
+                if self.operand.value.byte_len() == 2:
+                    self.operand = ExtendedOperand(
+                        self.operand.operand_string,
+                        self.operand.instruction,
+                        self.operand.value,
+                    )
+                    return
+
+            # TODO: Add in ability to check direct page register here - extended operands may be direct instead
+
+        if self.operand.is_type(OperandType.EXTENDED):
+            if self.operand.value.is_type(ValueType.NUMERIC):
+                if self.operand.value.byte_len() == 1:
+                    raise TranslationError("[{}] is not an extended value".format(self.operand.operand_string), self)
 
     def fix_addresses(self, statements, this_index):
         """
@@ -181,5 +214,14 @@ class Statement(object):
 
         if self.operand.value.is_type(ValueType.ADDRESS):
             self.code_pkg.additional = statements[self.operand.value.int].code_pkg.address
+
+        if self.code_pkg.additional_needs_resolution:
+            start_address = statements[this_index].code_pkg.address
+            relative_address = statements[self.code_pkg.additional.int].code_pkg.address
+            if relative_address.int > start_address.int:
+                self.code_pkg.additional = NumericValue(relative_address.int - start_address.int, size_hint=4)
+            else:
+                jump_amount = start_address.int - relative_address.int
+                self.code_pkg.additional = NumericValue(0x10001 - jump_amount, size_hint=4)
 
 # E N D   O F   F I L E #######################################################
