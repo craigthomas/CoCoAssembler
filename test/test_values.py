@@ -56,6 +56,36 @@ class TestValue(unittest.TestCase):
             Value.create_from_str("invalid!", self.instruction)
         self.assertEqual("[invalid!] is an invalid value", str(context.exception))
 
+    def test_value_high_value_zero_when_length_less_than_two(self):
+        result = NumericValue("$0123", size_hint=1)
+        self.assertEqual(result.high_byte(), 0x00)
+
+    def test_value_high_value_correct_when_length_is_two(self):
+        result = NumericValue("$0123")
+        self.assertEqual(result.high_byte(), 0x01)
+
+    def test_value_low_value_zero_when_length_zero(self):
+        result = NumericValue("$0123", size_hint=0)
+        self.assertEqual(result.low_byte(), 0x00)
+
+    def test_value_low_value_correct_when_length_less_or_equal_to_two(self):
+        result = NumericValue("$23")
+        self.assertEqual(result.low_byte(), 0x23)
+
+    def test_value_low_value_correct(self):
+        result = NumericValue("$1223")
+        self.assertEqual(result.low_byte(), 0x23)
+
+    def test_create_from_byte_raises_on_empty_byte(self):
+        with self.assertRaises(ValueTypeError) as context:
+            Value.create_from_byte(b"")
+        self.assertEqual("No byte available for reading", str(context.exception))
+
+    def test_create_from_byte_works_correctly(self):
+        result = Value.create_from_byte(b"\xDE\xAD")
+        print(result.hex())
+        self.assertEqual(result.int, 0xDEAD)
+
 
 class TestNumericValue(unittest.TestCase):
     """
@@ -322,73 +352,52 @@ class TestExpressionValue(unittest.TestCase):
         result = result.resolve(None)
         self.assertEqual(result.int, 6)
 
-    # def test_expression_parsed_correct(self):
-    #     operand = ExpressionOperand("$0F+$F0", self.instruction)
-    #     self.assertEqual("0F", operand.left.hex())
-    #     self.assertEqual("F0", operand.right.hex())
-    #     self.assertEqual("+", operand.operation)
-    #
-    # def test_expression_resolve_expression_plus(self):
-    #     operand = ExpressionOperand("$01+$02", self.instruction)
-    #     operand.resolve_expression({})
-    #     self.assertEqual("03", operand.value.hex())
-    #
-    # def test_expression_resolve_expression_minus(self):
-    #     operand = ExpressionOperand("$03-$02", self.instruction)
-    #     operand.resolve_expression({})
-    #     self.assertEqual("01", operand.value.hex())
-    #
-    # def test_expression_resolve_expression_multiply(self):
-    #     operand = ExpressionOperand("$02*$02", self.instruction)
-    #     operand.resolve_expression({})
-    #     self.assertEqual("04", operand.value.hex())
-    #
-    # def test_expression_resolve_expression_divide(self):
-    #     operand = ExpressionOperand("$04/$02", self.instruction)
-    #     operand.resolve_expression({})
-    #     self.assertEqual("02", operand.value.hex())
-    #
-    # def test_expression_resolve_expression_direct_size(self):
-    #     operand = ExpressionOperand("$01+$02", self.instruction)
-    #     operand = operand.resolve_expression({})
-    #     self.assertEqual(OperandType.DIRECT, operand.type)
-    #
-    # def test_expression_resolve_expression_extended_size(self):
-    #     operand = ExpressionOperand("$01+$FF", self.instruction)
-    #     operand = operand.resolve_expression({})
-    #     self.assertEqual(OperandType.EXTENDED, operand.type)
-    #
-    # def test_expression_resolve_expression_left_resolves(self):
-    #     symbol_table = {
-    #         "BLAH": NumericValue(2)
-    #     }
-    #     operand = ExpressionOperand("BLAH+$01", self.instruction)
-    #     operand = operand.resolve_expression(symbol_table=symbol_table)
-    #     self.assertEqual("03", operand.value.hex())
-    #
-    # def test_expression_resolve_expression_right_resolves(self):
-    #     symbol_table = {
-    #         "BLAH": NumericValue(2)
-    #     }
-    #     operand = ExpressionOperand("$02+BLAH", self.instruction)
-    #     operand = operand.resolve_expression(symbol_table=symbol_table)
-    #     self.assertEqual("04", operand.value.hex())
-    #
-    # def test_expression_resolve_expression_none_type_raises(self):
-    #     operand = ExpressionOperand("$02+$02", self.instruction)
-    #     operand.left = NoneValue()
-    #     with self.assertRaises(ValueError) as context:
-    #         operand.resolve_expression({})
-    #     self.assertEqual("[$02+$02] unresolved expression", str(context.exception))
-    #
-    # def test_expression_resolve_symbols_resolves_expression(self):
-    #     symbol_table = {
-    #         "BLAH1": NumericValue(2),
-    #         "BLAH2": NumericValue(1)
-    #     }
-    #     operand = ExpressionOperand("BLAH1+BLAH2", self.instruction)
-    #     operand = operand.resolve_symbols(symbol_table=symbol_table)
-    #     self.assertEqual("03", operand.value.hex())
+    def test_expression_resolve_numeric_only_subtraction_works_correctly(self):
+        result = ExpressionValue("3-2")
+        result = result.resolve(None)
+        self.assertEqual(result.int, 1)
+
+    def test_expression_resolve_numeric_only_division_works_correctly(self):
+        result = ExpressionValue("4/2")
+        result = result.resolve(None)
+        self.assertEqual(result.int, 2)
+
+    def test_expression_hex_returns_zero_if_not_resolved(self):
+        result = ExpressionValue("2+3")
+        self.assertEqual(result.hex(), "00")
+
+    def test_expression_hex_len_returns_zero_if_not_resolved(self):
+        result = ExpressionValue("2+3")
+        self.assertEqual(result.hex_len(), 0)
+
+    def test_expression_hex_returns_correct_when_resolved(self):
+        result = ExpressionValue("254+1")
+        result = result.resolve(None)
+        self.assertEqual(result.hex(), "FF")
+
+    def test_expression_hex_len_returns_correct_when_resolved(self):
+        result = ExpressionValue("254+1")
+        result = result.resolve(None)
+        self.assertEqual(result.hex_len(), 2)
+
+    def test_expression_symbol_right_resolves_correctly(self):
+        symbol_table = {"VAR": NumericValue("$FE")}
+        result = ExpressionValue("1+VAR")
+        result = result.resolve(symbol_table)
+        self.assertEqual(result.hex(), "FF")
+
+    def test_expression_symbol_left_resolves_correctly(self):
+        symbol_table = {"VAR": NumericValue("$FE")}
+        result = ExpressionValue("VAR+1")
+        result = result.resolve(symbol_table)
+        self.assertEqual(result.hex(), "FF")
+
+    def test_expression_raises_when_not_numeric_or_address_for_resolve(self):
+        result = ExpressionValue("VAR+1")
+        result.left = NoneValue()
+        with self.assertRaises(ValueError) as context:
+            result.resolve({})
+        self.assertEqual("[VAR+1] unresolved expression", str(context.exception))
 
 
 # M A I N #####################################################################

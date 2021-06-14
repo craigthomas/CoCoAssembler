@@ -108,7 +108,7 @@ class Statement(object):
             self.instruction = next((op for op in INSTRUCTIONS if op.mnemonic == self.mnemonic), None)
             self.original_operand = copy(self.operand)
             if not self.instruction:
-                self.original_operand = BadInstructionOperand(data.group("operands"))
+                self.original_operand = BadInstructionOperand(data.group("operands"), self.instruction)
                 self.comment = data.group("comment")
                 raise ParseError("[{}] invalid mnemonic".format(self.mnemonic), self)
             if self.instruction.is_string_define:
