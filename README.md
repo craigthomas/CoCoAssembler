@@ -1,6 +1,6 @@
 # CoCo Assembler and File Utility
 
-[![Build Status](https://img.shields.io/travis/craigthomas/CoCoAssembler?style=flat-square)](https://travis-ci.org/craigthomas/CoCoAssembler) 
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/craigthomas/CoCoAssembler/Build%20Test%20Coverage?style=flat-square)](https://github.com/craigthomas/CoCoAssembler/actions)
 [![Codecov](https://img.shields.io/codecov/c/gh/craigthomas/CoCoAssembler?style=flat-square)](https://codecov.io/gh/craigthomas/CoCoAssembler) 
 [![Dependencies](https://img.shields.io/librariesio/github/craigthomas/CoCoAssembler?style=flat-square)](https://libraries.io/github/craigthomas/CoCoAssembler)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
