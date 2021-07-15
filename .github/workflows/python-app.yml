@@ -16,6 +16,6 @@ jobs:
     - name: Generate Report
       run: |
         pip install -r requirements.txt
-        coverage run --source=cocasm -m unittest
+        coverage run --source=cocoasm -m unittest
     - name: Codecov
       uses: codecov/codecov-action@v1.5.2
