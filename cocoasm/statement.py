@@ -184,6 +184,48 @@ class Statement(object):
                 if self.operand.value.byte_len() == 1:
                     raise TranslationError("[{}] is not an extended value".format(self.operand.operand_string), self)
 
+    def fix_pcr_relative_addresses(self, statements, this_index):
+        """
+        Once all of the statements have been translated, then we need to
+        check whether program counter relative indexed statements can
+        be 8-bit, or if they must be 16-bit. This operation changes the
+        size of a code package depending on how many steps away a statement
+        is. To calculate the relative offset, we use a cheat - since we
+        don't yet know how big any of the PCR statements are, we count the
+        size of each instruction between the PCR statement using the code
+        package's max_size. This tells us potentially how large the statements
+        will be. If they are bigger than an 8-bit value, then we can default
+        to a 16-bit offset. There may be edge cases where this heuristic may fail,
+        most notably when there is a PCR statement that has not yet been resolved
+        to be 8-bit, and would change the max_size calculation to be a valid
+        8-bit offset value instead.
+
+        :param statements: the full set of statements that make up the program
+        :param this_index: the index that this instruction occurs at
+        """
+        if self.code_pkg.additional_needs_resolution and self.code_pkg.post_byte_choices:
+            relative_index = self.code_pkg.additional.int
+            if relative_index > this_index:
+                # TODO: calculate look-forward amount
+                # total_size = 0
+                # for x in range(this_index, relative_index):
+                #     total_size += statements[this_index].code_pkg.max_size
+                # self.code_pkg.additional = NumericValue(relative_address.int - start_address.int, size_hint=4)
+                pass
+            else:
+                total_size = 0
+                raw_post_byte = self.code_pkg.post_byte.int
+                print("raw_post_byte: {}".format(raw_post_byte))
+                for x in range(relative_index, this_index):
+                    total_size += statements[x].code_pkg.max_size
+                if total_size <= 255:
+                    self.code_pkg.size += 1
+                    raw_post_byte |= self.code_pkg.post_byte_choices[0]
+                else:
+                    self.code_pkg.size += 2
+                    raw_post_byte |= self.code_pkg.post_byte_choices[1]
+                self.code_pkg.post_byte = NumericValue(raw_post_byte)
+
     def fix_addresses(self, statements, this_index):
         """
         Once all of the statements have been translated, all of the addresses
@@ -219,9 +261,17 @@ class Statement(object):
             start_address = statements[this_index].code_pkg.address
             relative_address = statements[self.code_pkg.additional.int].code_pkg.address
             if relative_address.int > start_address.int:
-                self.code_pkg.additional = NumericValue(relative_address.int - start_address.int, size_hint=4)
+                self.code_pkg.additional = NumericValue(
+                    relative_address.int - start_address.int,
+                    size_hint=self.code_pkg.size * 2,
+                )
             else:
                 jump_amount = start_address.int - relative_address.int
-                self.code_pkg.additional = NumericValue(0x10001 - jump_amount, size_hint=4)
+                base_offset = 0x100 if jump_amount <= 255 else 0x10000
+                size_hint = 4 if base_offset == 0x10000 else 2
+                self.code_pkg.additional = NumericValue(
+                    base_offset - jump_amount - self.code_pkg.size,
+                    size_hint=size_hint,
+                )
 
 # E N D   O F   F I L E #######################################################

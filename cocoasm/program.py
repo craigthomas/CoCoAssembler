@@ -120,6 +120,10 @@ class Program(object):
             for index, statement in enumerate(self.statements):
                 statement.translate()
 
+            # Check for any PCR indexed addresses, and flag them
+            for index, statement in enumerate(self.statements):
+                statement.fix_pcr_relative_addresses(self.statements, index)
+
             address = 0
             for index, statement in enumerate(self.statements):
                 address = statement.set_address(address)
