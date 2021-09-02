@@ -206,16 +206,20 @@ class Statement(object):
         if self.code_pkg.additional_needs_resolution and self.code_pkg.post_byte_choices:
             relative_index = self.code_pkg.additional.int
             if relative_index > this_index:
-                # TODO: calculate look-forward amount
-                # total_size = 0
-                # for x in range(this_index, relative_index):
-                #     total_size += statements[this_index].code_pkg.max_size
-                # self.code_pkg.additional = NumericValue(relative_address.int - start_address.int, size_hint=4)
-                pass
+                total_size = 0
+                raw_post_byte = self.code_pkg.post_byte.int
+                for x in range(this_index, relative_index):
+                    total_size += statements[x].code_pkg.max_size
+                if total_size <= 255:
+                    self.code_pkg.size += 1
+                    raw_post_byte |= self.code_pkg.post_byte_choices[0]
+                else:
+                    self.code_pkg.size += 2
+                    raw_post_byte |= self.code_pkg.post_byte_choices[1]
+                self.code_pkg.post_byte = NumericValue(raw_post_byte)
             else:
                 total_size = 0
                 raw_post_byte = self.code_pkg.post_byte.int
-                print("raw_post_byte: {}".format(raw_post_byte))
                 for x in range(relative_index, this_index):
                     total_size += statements[x].code_pkg.max_size
                 if total_size <= 255:
@@ -260,15 +264,22 @@ class Statement(object):
         if self.code_pkg.additional_needs_resolution:
             start_address = statements[this_index].code_pkg.address
             relative_address = statements[self.code_pkg.additional.int].code_pkg.address
+            size_hint = 2
             if relative_address.int > start_address.int:
+                jump_amount = relative_address.int - start_address.int
+                # Effective address loading is always 16-bit regardless of actual size
+                if jump_amount > 255 or self.instruction.mnemonic in ["LEAX", "LEAY", "LEAS", "LEAU"]:
+                    size_hint = 4
                 self.code_pkg.additional = NumericValue(
-                    relative_address.int - start_address.int,
-                    size_hint=self.code_pkg.size * 2,
+                    0x00 + jump_amount - self.code_pkg.size,
+                    size_hint=size_hint,
                 )
             else:
                 jump_amount = start_address.int - relative_address.int
                 base_offset = 0x100 if jump_amount <= 255 else 0x10000
-                size_hint = 4 if base_offset == 0x10000 else 2
+                # Effective address loading is always 16-bit regardless of actual size
+                if base_offset == 0x10000 or self.instruction.mnemonic in ["LEAX", "LEAY", "LEAS", "LEAU"]:
+                    size_hint = 4
                 self.code_pkg.additional = NumericValue(
                     base_offset - jump_amount - self.code_pkg.size,
                     size_hint=size_hint,

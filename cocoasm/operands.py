@@ -501,6 +501,9 @@ class ExtendedIndexedOperand(Operand):
             )
 
         raw_post_byte = 0x80
+        post_byte_choices = []
+        size = self.instruction.mode.ind_sz
+        max_size = size
         additional = NoneValue()
         additional_needs_resolution = False
 
@@ -545,23 +548,32 @@ class ExtendedIndexedOperand(Operand):
             additional = self.left
 
             if "PCR" in self.right:
-                # TODO: all address symbols resolve to 16-bit offsets, need to find a way to calculate 8-bit offsets
                 if additional_needs_resolution:
-                    size += 2
-                    raw_post_byte |= 0x9D
+                    # Effective address loading is always 16-bit regardless of actual size
+                    if self.instruction.mnemonic in ["LEAX", "LEAY", "LEAS", "LEAU"]:
+                        raw_post_byte |= 0x9D
+                        size += 2
+                        max_size += 2
+                    else:
+                        raw_post_byte |= 0x00
+                        post_byte_choices = [0x9C, 0x9D]
+                        max_size += 2
                 else:
                     size += additional.byte_len()
+                    max_size = size
                     raw_post_byte |= 0x9D if additional.byte_len() == 2 else 0x9C
             else:
                 size += additional.byte_len()
+                max_size = size
                 raw_post_byte |= 0x99 if additional.byte_len() == 2 else 0x98
 
         return CodePackage(
             op_code=NumericValue(self.instruction.mode.ind),
             post_byte=NumericValue(raw_post_byte),
+            post_byte_choices=post_byte_choices,
             additional=additional,
             size=size,
-            max_size=size,
+            max_size=max_size,
             additional_needs_resolution=additional_needs_resolution,
         )
 
@@ -645,9 +657,15 @@ class IndexedOperand(Operand):
 
             if "PCR" in self.right:
                 if additional_needs_resolution:
-                    raw_post_byte |= 0x00
-                    post_byte_choices = [0x8C, 0x8D]
-                    max_size += 2
+                    # Effective address loading is always 16-bit regardless of actual size
+                    if self.instruction.mnemonic in ["LEAX", "LEAY", "LEAS", "LEAU"]:
+                        raw_post_byte |= 0x8D
+                        size += 2
+                        max_size += 2
+                    else:
+                        raw_post_byte |= 0x00
+                        post_byte_choices = [0x8C, 0x8D]
+                        max_size += 2
                 else:
                     size += additional.byte_len()
                     max_size = size

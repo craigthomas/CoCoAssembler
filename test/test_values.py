@@ -83,7 +83,6 @@ class TestValue(unittest.TestCase):
 
     def test_create_from_byte_works_correctly(self):
         result = Value.create_from_byte(b"\xDE\xAD")
-        print(result.hex())
         self.assertEqual(result.int, 0xDEAD)
 
 
