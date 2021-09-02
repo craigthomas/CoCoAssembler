@@ -14,13 +14,25 @@ from cocoasm.values import NoneValue
 # C L A S S E S ###############################################################
 
 class CodePackage(object):
-    def __init__(self, op_code=NoneValue(), address=NoneValue(), post_byte=NoneValue(), additional=NoneValue(), size=0, additional_needs_resolution=False):
+    def __init__(self,
+                 op_code=NoneValue(),
+                 address=NoneValue(),
+                 post_byte=NoneValue(),
+                 additional=NoneValue(),
+                 size=0,
+                 additional_needs_resolution=False,
+                 post_byte_choices=None,
+                 max_size=0,
+                 ):
+        post_byte_choices = [] if post_byte_choices is None else post_byte_choices
         self.op_code = op_code
         self.address = address
         self.post_byte = post_byte
         self.additional = additional
         self.size = size
         self.additional_needs_resolution = additional_needs_resolution
+        self.post_byte_choices = post_byte_choices
+        self.max_size = max_size
 
 
 class Mode(NamedTuple):

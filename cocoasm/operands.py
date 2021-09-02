@@ -203,19 +203,23 @@ class PseudoOperand(Operand):
 
     def translate(self):
         if self.instruction.mnemonic == "FCB":
-            return CodePackage(additional=self.value, size=1)
+            return CodePackage(additional=self.value, size=1, max_size=1)
 
         if self.instruction.mnemonic == "FDB":
-            return CodePackage(additional=NumericValue(self.value.int, size_hint=4), size=2)
+            return CodePackage(additional=NumericValue(self.value.int, size_hint=4), size=2, max_size=2)
 
         if self.instruction.mnemonic == "RMB":
-            return CodePackage(additional=NumericValue(0, size_hint=self.value.int*2), size=self.value.int)
+            return CodePackage(
+                additional=NumericValue(0, size_hint=self.value.int*2),
+                size=self.value.int,
+                max_size=self.value.int,
+            )
 
         if self.instruction.mnemonic == "ORG":
             return CodePackage(address=self.value)
 
         if self.instruction.mnemonic == "FCC":
-            return CodePackage(additional=self.value, size=self.value.byte_len())
+            return CodePackage(additional=self.value, size=self.value.byte_len(), max_size=self.value.byte_len())
 
         return CodePackage()
 
@@ -232,10 +236,7 @@ class SpecialOperand(Operand):
         return self
 
     def translate(self):
-        code_pkg = CodePackage()
-        code_pkg.op_code = NumericValue(self.instruction.mode.imm)
-        code_pkg.size = self.instruction.mode.imm_sz
-        code_pkg.post_byte = 0x00
+        post_byte = 0x00
 
         if self.instruction.mnemonic == "PSHS" or self.instruction.mnemonic == "PULS":
             if not self.operand_string:
@@ -246,15 +247,15 @@ class SpecialOperand(Operand):
                 if register not in REGISTERS:
                     raise OperandTypeError("[{}] unknown register".format(register))
 
-                code_pkg.post_byte |= 0x06 if register == "D" else 0x00
-                code_pkg.post_byte |= 0x01 if register == "CC" else 0x00
-                code_pkg.post_byte |= 0x02 if register == "A" else 0x00
-                code_pkg.post_byte |= 0x04 if register == "B" else 0x00
-                code_pkg.post_byte |= 0x08 if register == "DP" else 0x00
-                code_pkg.post_byte |= 0x10 if register == "X" else 0x00
-                code_pkg.post_byte |= 0x20 if register == "Y" else 0x00
-                code_pkg.post_byte |= 0x40 if register == "U" else 0x00
-                code_pkg.post_byte |= 0x80 if register == "PC" else 0x00
+                post_byte |= 0x06 if register == "D" else 0x00
+                post_byte |= 0x01 if register == "CC" else 0x00
+                post_byte |= 0x02 if register == "A" else 0x00
+                post_byte |= 0x04 if register == "B" else 0x00
+                post_byte |= 0x08 if register == "DP" else 0x00
+                post_byte |= 0x10 if register == "X" else 0x00
+                post_byte |= 0x20 if register == "Y" else 0x00
+                post_byte |= 0x40 if register == "U" else 0x00
+                post_byte |= 0x80 if register == "PC" else 0x00
 
         if self.instruction.mnemonic == "EXG" or self.instruction.mnemonic == "TFR":
             registers = self.operand_string.split(",")
@@ -267,37 +268,37 @@ class SpecialOperand(Operand):
             if registers[1] not in REGISTERS:
                 raise OperandTypeError("[{}] unknown register".format(registers[1]))
 
-            code_pkg.post_byte |= 0x00 if registers[0] == "D" else 0x00
-            code_pkg.post_byte |= 0x00 if registers[1] == "D" else 0x00
+            post_byte |= 0x00 if registers[0] == "D" else 0x00
+            post_byte |= 0x00 if registers[1] == "D" else 0x00
 
-            code_pkg.post_byte |= 0x10 if registers[0] == "X" else 0x00
-            code_pkg.post_byte |= 0x01 if registers[1] == "X" else 0x00
+            post_byte |= 0x10 if registers[0] == "X" else 0x00
+            post_byte |= 0x01 if registers[1] == "X" else 0x00
 
-            code_pkg.post_byte |= 0x20 if registers[0] == "Y" else 0x00
-            code_pkg.post_byte |= 0x02 if registers[1] == "Y" else 0x00
+            post_byte |= 0x20 if registers[0] == "Y" else 0x00
+            post_byte |= 0x02 if registers[1] == "Y" else 0x00
 
-            code_pkg.post_byte |= 0x30 if registers[0] == "U" else 0x00
-            code_pkg.post_byte |= 0x03 if registers[1] == "U" else 0x00
+            post_byte |= 0x30 if registers[0] == "U" else 0x00
+            post_byte |= 0x03 if registers[1] == "U" else 0x00
 
-            code_pkg.post_byte |= 0x40 if registers[0] == "S" else 0x00
-            code_pkg.post_byte |= 0x04 if registers[1] == "S" else 0x00
+            post_byte |= 0x40 if registers[0] == "S" else 0x00
+            post_byte |= 0x04 if registers[1] == "S" else 0x00
 
-            code_pkg.post_byte |= 0x50 if registers[0] == "PC" else 0x00
-            code_pkg.post_byte |= 0x05 if registers[1] == "PC" else 0x00
+            post_byte |= 0x50 if registers[0] == "PC" else 0x00
+            post_byte |= 0x05 if registers[1] == "PC" else 0x00
 
-            code_pkg.post_byte |= 0x80 if registers[0] == "A" else 0x00
-            code_pkg.post_byte |= 0x08 if registers[1] == "A" else 0x00
+            post_byte |= 0x80 if registers[0] == "A" else 0x00
+            post_byte |= 0x08 if registers[1] == "A" else 0x00
 
-            code_pkg.post_byte |= 0x90 if registers[0] == "B" else 0x00
-            code_pkg.post_byte |= 0x09 if registers[1] == "B" else 0x00
+            post_byte |= 0x90 if registers[0] == "B" else 0x00
+            post_byte |= 0x09 if registers[1] == "B" else 0x00
 
-            code_pkg.post_byte |= 0xA0 if registers[0] == "CC" else 0x00
-            code_pkg.post_byte |= 0x0A if registers[1] == "CC" else 0x00
+            post_byte |= 0xA0 if registers[0] == "CC" else 0x00
+            post_byte |= 0x0A if registers[1] == "CC" else 0x00
 
-            code_pkg.post_byte |= 0xB0 if registers[0] == "DP" else 0x00
-            code_pkg.post_byte |= 0x0B if registers[1] == "DP" else 0x00
+            post_byte |= 0xB0 if registers[0] == "DP" else 0x00
+            post_byte |= 0x0B if registers[1] == "DP" else 0x00
 
-            if code_pkg.post_byte not in \
+            if post_byte not in \
                     [
                         0x01, 0x10, 0x02, 0x20, 0x03, 0x30, 0x04, 0x40,
                         0x05, 0x50, 0x12, 0x21, 0x13, 0x31, 0x14, 0x41,
@@ -310,8 +311,12 @@ class SpecialOperand(Operand):
                 raise OperandTypeError(
                     "[{}] of [{}] to [{}] not allowed".format(self.instruction.mnemonic, registers[0], registers[1]))
 
-        code_pkg.post_byte = NumericValue(code_pkg.post_byte)
-        return code_pkg
+        return CodePackage(
+            op_code=NumericValue(self.instruction.mode.imm),
+            post_byte=NumericValue(post_byte),
+            size=self.instruction.mode.imm_sz,
+            max_size=self.instruction.mode.imm_sz,
+        )
 
 
 class RelativeOperand(Operand):
@@ -324,12 +329,12 @@ class RelativeOperand(Operand):
         self.value = value if value else Value.create_from_str(operand_string, instruction)
 
     def translate(self):
-        code_pkg = CodePackage()
-        code_pkg.op_code = NumericValue(self.instruction.mode.rel)
-        if self.value.is_type(ValueType.ADDRESS):
-            code_pkg.additional = self.value
-        code_pkg.size = self.instruction.mode.rel_sz
-        return code_pkg
+        return CodePackage(
+            op_code=NumericValue(self.instruction.mode.rel),
+            additional=self.value if self.value.is_type(ValueType.ADDRESS) else NoneValue(),
+            size=self.instruction.mode.rel_sz,
+            max_size=self.instruction.mode.rel_sz,
+        )
 
 
 class InherentOperand(Operand):
@@ -344,7 +349,11 @@ class InherentOperand(Operand):
     def translate(self):
         if not self.instruction.mode.inh:
             raise OperandTypeError("Instruction [{}] requires an operand".format(self.instruction.mnemonic))
-        return CodePackage(op_code=NumericValue(self.instruction.mode.inh), size=self.instruction.mode.inh_sz)
+        return CodePackage(
+            op_code=NumericValue(self.instruction.mode.inh),
+            size=self.instruction.mode.inh_sz,
+            max_size=self.instruction.mode.inh_sz,
+        )
 
 
 class ImmediateOperand(Operand):
@@ -362,10 +371,15 @@ class ImmediateOperand(Operand):
 
     def translate(self):
         if not self.instruction.mode.imm:
-            raise OperandTypeError("Instruction [{}] does not support immediate addressing".format(self.instruction.mnemonic))
-        return CodePackage(op_code=NumericValue(self.instruction.mode.imm),
-                           additional=self.value,
-                           size=self.instruction.mode.imm_sz)
+            raise OperandTypeError(
+                "Instruction [{}] does not support immediate addressing".format(self.instruction.mnemonic)
+            )
+        return CodePackage(
+            op_code=NumericValue(self.instruction.mode.imm),
+            additional=self.value,
+            size=self.instruction.mode.imm_sz,
+            max_size=self.instruction.mode.imm_sz,
+        )
 
 
 class DirectOperand(Operand):
@@ -388,10 +402,15 @@ class DirectOperand(Operand):
 
     def translate(self):
         if not self.instruction.mode.dir:
-            raise OperandTypeError("Instruction [{}] does not support direct addressing".format(self.instruction.mnemonic))
-        return CodePackage(op_code=NumericValue(self.instruction.mode.dir),
-                           additional=self.value,
-                           size=self.instruction.mode.dir_sz)
+            raise OperandTypeError(
+                "Instruction [{}] does not support direct addressing".format(self.instruction.mnemonic)
+            )
+        return CodePackage(
+            op_code=NumericValue(self.instruction.mode.dir),
+            additional=self.value,
+            size=self.instruction.mode.dir_sz,
+            max_size=self.instruction.mode.dir_sz,
+        )
 
 
 class ExtendedOperand(Operand):
@@ -410,10 +429,15 @@ class ExtendedOperand(Operand):
 
     def translate(self):
         if not self.instruction.mode.ext:
-            raise OperandTypeError("Instruction [{}] does not support extended addressing".format(self.instruction.mnemonic))
-        return CodePackage(op_code=NumericValue(self.instruction.mode.ext),
-                           additional=self.value,
-                           size=self.instruction.mode.ext_sz)
+            raise OperandTypeError(
+                "Instruction [{}] does not support extended addressing".format(self.instruction.mnemonic)
+            )
+        return CodePackage(
+            op_code=NumericValue(self.instruction.mode.ext),
+            additional=self.value,
+            size=self.instruction.mode.ext_sz,
+            max_size=self.instruction.mode.ext_sz,
+        )
 
 
 class ExtendedIndexedOperand(Operand):
@@ -451,7 +475,9 @@ class ExtendedIndexedOperand(Operand):
 
     def translate(self):
         if not self.instruction.mode.ind:
-            raise OperandTypeError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
+            raise OperandTypeError(
+                "Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic)
+            )
         size = self.instruction.mode.ind_sz
 
         if not type(self.value) == str and self.value.is_type(ValueType.ADDRESS):
@@ -460,7 +486,9 @@ class ExtendedIndexedOperand(Operand):
                 op_code=NumericValue(self.instruction.mode.ind),
                 post_byte=NumericValue(0x9F),
                 additional=self.value,
-                size=size)
+                size=size,
+                max_size=size,
+            )
 
         if not type(self.value) == str and self.value.is_type(ValueType.NUMERIC):
             size += 2
@@ -468,9 +496,14 @@ class ExtendedIndexedOperand(Operand):
                 op_code=NumericValue(self.instruction.mode.ind),
                 post_byte=NumericValue(0x9F),
                 additional=self.value,
-                size=size)
+                size=size,
+                max_size=size,
+            )
 
         raw_post_byte = 0x80
+        post_byte_choices = []
+        size = self.instruction.mode.ind_sz
+        max_size = size
         additional = NoneValue()
         additional_needs_resolution = False
 
@@ -515,22 +548,34 @@ class ExtendedIndexedOperand(Operand):
             additional = self.left
 
             if "PCR" in self.right:
-                # TODO: all address symbols resolve to 16-bit offsets, need to find a way to calculate 8-bit offsets
                 if additional_needs_resolution:
-                    size += 2
-                    raw_post_byte |= 0x9D
+                    # Effective address loading is always 16-bit regardless of actual size
+                    if self.instruction.mnemonic in ["LEAX", "LEAY", "LEAS", "LEAU"]:
+                        raw_post_byte |= 0x9D
+                        size += 2
+                        max_size += 2
+                    else:
+                        raw_post_byte |= 0x00
+                        post_byte_choices = [0x9C, 0x9D]
+                        max_size += 2
                 else:
                     size += additional.byte_len()
+                    max_size = size
                     raw_post_byte |= 0x9D if additional.byte_len() == 2 else 0x9C
             else:
                 size += additional.byte_len()
+                max_size = size
                 raw_post_byte |= 0x99 if additional.byte_len() == 2 else 0x98
 
-        return CodePackage(op_code=NumericValue(self.instruction.mode.ind),
-                           post_byte=NumericValue(raw_post_byte),
-                           additional=additional,
-                           size=size,
-                           additional_needs_resolution=additional_needs_resolution)
+        return CodePackage(
+            op_code=NumericValue(self.instruction.mode.ind),
+            post_byte=NumericValue(raw_post_byte),
+            post_byte_choices=post_byte_choices,
+            additional=additional,
+            size=size,
+            max_size=max_size,
+            additional_needs_resolution=additional_needs_resolution,
+        )
 
 
 class IndexedOperand(Operand):
@@ -556,9 +601,13 @@ class IndexedOperand(Operand):
 
     def translate(self):
         if not self.instruction.mode.ind:
-            raise OperandTypeError("Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic))
+            raise OperandTypeError(
+                "Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic)
+            )
         raw_post_byte = 0x00
+        post_byte_choices = []
         size = self.instruction.mode.ind_sz
+        max_size = size
         additional = NoneValue()
         additional_needs_resolution = False
 
@@ -607,25 +656,37 @@ class IndexedOperand(Operand):
             additional = self.left
 
             if "PCR" in self.right:
-                # TODO: all address symbols resolve to 16-bit offsets, need to find a way to calculate 8-bit offsets
                 if additional_needs_resolution:
-                    size += 2
-                    raw_post_byte |= 0x8D
+                    # Effective address loading is always 16-bit regardless of actual size
+                    if self.instruction.mnemonic in ["LEAX", "LEAY", "LEAS", "LEAU"]:
+                        raw_post_byte |= 0x8D
+                        size += 2
+                        max_size += 2
+                    else:
+                        raw_post_byte |= 0x00
+                        post_byte_choices = [0x8C, 0x8D]
+                        max_size += 2
                 else:
                     size += additional.byte_len()
+                    max_size = size
                     raw_post_byte |= 0x8D if additional.byte_len() == 2 else 0x8C
             else:
                 if additional.int <= 0x1F:
                     raw_post_byte |= additional.int
                 else:
                     size += additional.byte_len()
+                    max_size = size
                     raw_post_byte |= 0x89 if additional.byte_len() == 2 else 0x88
 
-        return CodePackage(op_code=NumericValue(self.instruction.mode.ind),
-                           post_byte=NumericValue(raw_post_byte),
-                           additional=additional,
-                           size=size,
-                           additional_needs_resolution=additional_needs_resolution)
+        return CodePackage(
+            op_code=NumericValue(self.instruction.mode.ind),
+            post_byte=NumericValue(raw_post_byte),
+            additional=additional,
+            size=size,
+            additional_needs_resolution=additional_needs_resolution,
+            post_byte_choices=post_byte_choices,
+            max_size=max_size,
+        )
 
 
 # E N D   O F   F I L E #######################################################
