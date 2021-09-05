@@ -10,9 +10,9 @@ import re
 
 from copy import copy
 
-from cocoasm.exceptions import ParseError, TranslationError
+from cocoasm.exceptions import ParseError, TranslationError, ValueTypeError
 from cocoasm.instruction import INSTRUCTIONS, CodePackage
-from cocoasm.operands import Operand, OperandType, BadInstructionOperand, ExtendedOperand, DirectOperand
+from cocoasm.operands import Operand, OperandType, BadInstructionOperand, ExtendedOperand
 from cocoasm.values import ValueType, NumericValue
 
 # C O N S T A N T S ###########################################################
@@ -110,25 +110,31 @@ class Statement(object):
             if not self.instruction:
                 self.original_operand = BadInstructionOperand(data.group("operands"), self.instruction)
                 self.comment = data.group("comment")
-                raise ParseError("[{}] invalid mnemonic".format(self.mnemonic), self)
+                raise ParseError("[{}] invalid mnemonic".format(self.mnemonic), line)
             if self.instruction.is_string_define:
                 original_operand = data.group("operands")
                 if data.group("comment"):
                     original_operand = "{} {}".format(data.group("operands"), data.group("comment").strip())
                 starting_symbol = original_operand[0]
                 ending_location = original_operand.find(starting_symbol, 1)
-                self.operand = Operand.create_from_str(original_operand[0:ending_location + 1].strip(), self.instruction)
+                self.operand = Operand.create_from_str(
+                    original_operand[0:ending_location + 1].strip(),
+                    self.instruction
+                )
                 self.original_operand = copy(self.operand)
                 self.comment = original_operand[ending_location + 2:].strip() or ""
                 self.is_empty = False
             else:
-                self.operand = Operand.create_from_str(data.group("operands"), self.instruction)
-                self.original_operand = copy(self.operand)
-                self.comment = data.group("comment").strip() or ""
-                self.is_empty = False
+                try:
+                    self.operand = Operand.create_from_str(data.group("operands"), self.instruction)
+                    self.original_operand = copy(self.operand)
+                    self.comment = data.group("comment").strip() or ""
+                    self.is_empty = False
+                except ValueTypeError:
+                    raise ParseError("Invalid operand value", line)
             return
 
-        raise ParseError("Could not parse line [{}]".format(line), self)
+        raise ParseError("Could not parse line".format(line), line)
 
     def set_address(self, address):
         """

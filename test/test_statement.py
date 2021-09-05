@@ -80,7 +80,10 @@ class TestStatement(unittest.TestCase):
     def test_parse_failure(self):
         with self.assertRaises(ParseError) as context:
             Statement("failure_to_parse")
-        self.assertEqual("'Could not parse line [failure_to_parse]'", str(context.exception))
+        self.assertEqual(
+            "failure_to_parse",
+            str(context.exception.statement)
+        )
 
     def test_str_correct(self):
         statement = Statement("LABEL JMP $FFFF ; comment")
