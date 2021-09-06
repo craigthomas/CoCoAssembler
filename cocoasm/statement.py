@@ -10,7 +10,7 @@ import re
 
 from copy import copy
 
-from cocoasm.exceptions import ParseError, TranslationError, ValueTypeError
+from cocoasm.exceptions import ParseError, TranslationError, ValueTypeError, OperandTypeError
 from cocoasm.instruction import INSTRUCTIONS, CodePackage
 from cocoasm.operands import Operand, OperandType, BadInstructionOperand, ExtendedOperand
 from cocoasm.values import ValueType, NumericValue
@@ -170,6 +170,10 @@ class Statement(object):
         try:
             self.code_pkg = self.operand.translate()
         except ValueError as error:
+            raise TranslationError(str(error), self)
+        except OperandTypeError as error:
+            raise TranslationError(str(error), self)
+        except ValueTypeError as error:
             raise TranslationError(str(error), self)
 
     def check_types(self):

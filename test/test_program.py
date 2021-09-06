@@ -121,7 +121,7 @@ class TestProgram(unittest.TestCase):
         self.assertEqual(
             [
                 call("test"),
-                call("line: $                 LABEL   JMP $FFFF                          ; comment                                 ")
+                call("$                 LABEL   JMP $FFFF                          ; comment                                 ")
             ],
             print_mock.mock_calls
         )
