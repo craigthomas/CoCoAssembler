@@ -49,6 +49,10 @@ def parse_arguments():
     parser.add_argument(
         "--append", action="store_true", help="appends to an existing cassette or disk file if it exists"
     )
+    parser.add_argument(
+        "--width", metavar="N", help="the width of the console for printing results (default=100)",
+        default=100, type=int,
+    )
     return parser.parse_args()
 
 
@@ -58,7 +62,7 @@ def main(args):
 
     :param args: the command-line arguments
     """
-    program = Program()
+    program = Program(width=args.width)
     program.process(args.filename)
     coco_file = CoCoFile(
         name=program.name or args.name,

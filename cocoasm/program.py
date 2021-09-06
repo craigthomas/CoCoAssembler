@@ -8,7 +8,7 @@ This file contains the main Program class for the CoCo Assembler.
 
 import sys
 
-from cocoasm.exceptions import TranslationError, ParseError
+from cocoasm.exceptions import TranslationError, ParseError, ValueTypeError
 from cocoasm.statement import Statement
 from cocoasm.values import AddressValue, ValueType, NoneValue
 
@@ -21,12 +21,13 @@ class Program(object):
     contains a list of statements. Additionally, a Program keeps track of all
     the user-defined symbols in the program.
     """
-    def __init__(self):
+    def __init__(self, width=100):
         self.symbol_table = dict()
         self.statements = []
         self.address = 0x0
         self.origin = NoneValue()
         self.name = None
+        self.width = width
 
     def process(self, filename):
         """
@@ -50,8 +51,7 @@ class Program(object):
         """
         self.statements = self.parse_file(filename)
 
-    @staticmethod
-    def parse_file(filename):
+    def parse_file(self, filename):
         """
         Parses all of the lines in a file, and transforms each line into
         a Statement. Returns a list of all the statements in the file.
@@ -62,11 +62,14 @@ class Program(object):
         if not filename:
             return statements
 
-        with open(filename) as infile:
-            for line in infile:
-                statement = Statement(line)
-                if not statement.is_empty and not statement.is_comment_only:
-                    statements.append(statement)
+        try:
+            with open(filename) as infile:
+                for line in infile:
+                    statement = Statement(line)
+                    if not statement.is_empty and not statement.is_comment_only:
+                        statements.append(statement)
+        except ParseError as error:
+            self.throw_error(error)
 
         return statements
 
@@ -115,7 +118,10 @@ class Program(object):
                 self.save_symbol(index, statement)
 
             for index, statement in enumerate(self.statements):
-                statement.resolve_symbols(self.symbol_table)
+                try:
+                    statement.resolve_symbols(self.symbol_table)
+                except ValueTypeError as error:
+                    raise TranslationError(str(error), statement)
 
             for index, statement in enumerate(self.statements):
                 statement.translate()
@@ -184,17 +190,16 @@ class Program(object):
         """
         print("-- Assembled Statements --")
         for index, statement in enumerate(self.statements):
-            print("{}".format(statement))
+            print("{}".format(str(statement).ljust(self.width)))
 
-    @staticmethod
-    def throw_error(error):
+    def throw_error(self, error):
         """
         Prints out an error message.
 
         :param error: the error message to throw
         """
         print(error.value)
-        print("line: {}".format(str(error.statement)))
+        print("{}".format(str(error.statement).ljust(self.width)))
         sys.exit(1)
 
 # E N D   O F   F I L E #######################################################
