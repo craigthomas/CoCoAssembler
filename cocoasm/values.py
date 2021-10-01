@@ -15,6 +15,11 @@ from cocoasm.exceptions import ValueTypeError
 
 # C O N S T A N T S ###########################################################
 
+# Pattern to recognize a character value
+CHAR_REGEX = re.compile(
+    r"^\'(?P<value>[a-zA-Z0-9><'\";:,.#?$%^&*()=!+-/])$"
+)
+
 # Pattern to recognize a hex value
 HEX_REGEX = re.compile(
     r"^\$(?P<value>[0-9a-fA-F]+)$"
@@ -232,6 +237,11 @@ class NumericValue(Value):
                 raise ValueTypeError("integer value cannot exceed 65535")
             return
 
+        data = CHAR_REGEX.match(value)
+        if data:
+            self.int = ord(data.group("value"))
+            return
+
         data = HEX_REGEX.match(value)
         if data:
             if len(data.group("value")) > 4:
@@ -246,7 +256,7 @@ class NumericValue(Value):
                 raise ValueTypeError("integer value cannot exceed 65535")
             return
 
-        raise ValueTypeError("[{}] is neither integer or hex value".format(value))
+        raise ValueTypeError("[{}] is not valid integer, character literal, or hex value".format(value))
 
     def hex(self, size=0):
         if self.size_hint:

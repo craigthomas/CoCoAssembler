@@ -85,6 +85,10 @@ class TestValue(unittest.TestCase):
         result = Value.create_from_byte(b"\xDE\xAD")
         self.assertEqual(result.int, 0xDEAD)
 
+    def test_create_from_string_character_literal_works_correctly(self):
+        result = Value.create_from_str("'A")
+        self.assertEqual(65, result.int)
+
 
 class TestNumericValue(unittest.TestCase):
     """
@@ -126,7 +130,10 @@ class TestNumericValue(unittest.TestCase):
     def test_numeric_raises_exception_on_invalid_strings(self):
         with self.assertRaises(ValueTypeError) as context:
             NumericValue("this is not a valid string")
-        self.assertEqual("[this is not a valid string] is neither integer or hex value", str(context.exception))
+        self.assertEqual(
+            "[this is not a valid string] is not valid integer, character literal, or hex value",
+            str(context.exception)
+        )
 
     def test_numeric_hex_len_correctly_calculated(self):
         result = NumericValue("$DEAD")
@@ -159,6 +166,25 @@ class TestNumericValue(unittest.TestCase):
     def test_numeric_hex_len_is_correct(self):
         result = NumericValue("$01")
         self.assertEqual(2, result.hex_len())
+
+    def test_numeric_from_character_literal_word_character_is_correct(self):
+        for char_val in range(65, 91):
+            result = NumericValue("'{}".format(chr(char_val)))
+            self.assertEqual(char_val, result.int)
+
+        for char_val in range(97, 123):
+            result = NumericValue("'{}".format(chr(char_val)))
+            self.assertEqual(char_val, result.int)
+
+    def test_numeric_from_character_literal_punctuation_is_correct(self):
+        for char_val in range(33, 64):
+            result = NumericValue("'{}".format(chr(char_val)))
+            self.assertEqual(char_val, result.int)
+
+    def test_numeric_from_character_literal_raises_on_invalid_character_literal(self):
+        with self.assertRaises(ValueTypeError) as context:
+            NumericValue("'~")
+        self.assertEqual("['~] is not valid integer, character literal, or hex value", str(context.exception))
 
 
 class TestStringValue(unittest.TestCase):
