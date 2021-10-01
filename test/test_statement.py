@@ -134,6 +134,18 @@ class TestStatement(unittest.TestCase):
         statement5.fix_addresses(statements, 4)
         self.assertEqual("F9", statement5.code_pkg.additional.hex())
 
+    def test_translate_correct_when_character_literal_present(self):
+        statement1 = Statement("    LDA #'X ; Load character X into register A")
+        statement1.translate()
+        self.assertEqual(0x86, statement1.code_pkg.op_code.int)
+        self.assertEqual(88, statement1.code_pkg.additional.int)
+
+    def test_translate_correct_when_character_literal_punctuation_present(self):
+        statement1 = Statement("    LDA #'> ; Load character > into register A")
+        statement1.translate()
+        self.assertEqual(0x86, statement1.code_pkg.op_code.int)
+        self.assertEqual(62, statement1.code_pkg.additional.int)
+
 # M A I N #####################################################################
 
 

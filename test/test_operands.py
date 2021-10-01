@@ -548,6 +548,18 @@ class TestImmediateOperand(unittest.TestCase):
         result = operand.resolve_symbols(symbol_table=symbol_table)
         self.assertEqual("02", result.value.hex())
 
+    def test_immediate_character_literal_correct(self):
+        operand = ImmediateOperand("#'A", self.instruction)
+        result = operand.translate()
+        self.assertEqual(0x3A, result.op_code.int)
+        self.assertEqual(65, result.additional.int)
+
+    def test_immediate_character_literal_punctuation_correct(self):
+        operand = ImmediateOperand("#'>", self.instruction)
+        result = operand.translate()
+        self.assertEqual(0x3A, result.op_code.int)
+        self.assertEqual(62, result.additional.int)
+
 
 class TestIndexedOperand(unittest.TestCase):
     """
