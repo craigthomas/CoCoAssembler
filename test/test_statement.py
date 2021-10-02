@@ -146,6 +146,18 @@ class TestStatement(unittest.TestCase):
         self.assertEqual(0x86, statement1.code_pkg.op_code.int)
         self.assertEqual(62, statement1.code_pkg.additional.int)
 
+    def test_translate_correct_when_8_bit_binary_string_present(self):
+        statement1 = Statement("    LDA #%10101010 ; Load value 170 into register A")
+        statement1.translate()
+        self.assertEqual(0x86, statement1.code_pkg.op_code.int)
+        self.assertEqual(170, statement1.code_pkg.additional.int)
+
+    def test_translate_correct_when_16_bit_binary_string_present(self):
+        statement1 = Statement("    LDD #%1010101010101010 ; Load value 43690 into register D")
+        statement1.translate()
+        self.assertEqual(0xCC, statement1.code_pkg.op_code.int)
+        self.assertEqual(43690, statement1.code_pkg.additional.int)
+
 # M A I N #####################################################################
 
 

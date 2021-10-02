@@ -186,6 +186,19 @@ class TestNumericValue(unittest.TestCase):
             NumericValue("'~")
         self.assertEqual("['~] is not valid integer, character literal, or hex value", str(context.exception))
 
+    def test_numeric_from_binary_string_is_correct(self):
+        result = NumericValue("%10101010")
+        self.assertEqual(170, result.int)
+
+    def test_numeric_from_16_bit_binary_string_is_correct(self):
+        result = NumericValue("%1010101010101010")
+        self.assertEqual(43690, result.int)
+
+    def test_numeric_from_binary_string_throws_exception_when_too_long(self):
+        with self.assertRaises(ValueTypeError) as context:
+            NumericValue("%10101010101010101")
+        self.assertEqual("binary pattern 10101010101010101 must be 8 or 16 bits long", str(context.exception))
+
 
 class TestStringValue(unittest.TestCase):
     """
