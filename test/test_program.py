@@ -137,6 +137,30 @@ class TestProgram(unittest.TestCase):
         )
 
     @patch('builtins.print')
+    def test_binary_string_regression(self, print_mock):
+        statements = [
+            Statement("  NAM LITERAL"),
+            Statement("  ORG $0600"),
+            Statement("START LDA #%10101010"),
+            Statement("  END START"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        program.print_statements()
+        self.assertEqual(
+            [
+                call("-- Assembled Statements --"),
+                call("$0000                         NAM LITERAL                        ;                                         "),
+                call("$0600                         ORG $0600                          ;                                         "),
+                call("$0600 86AA            START   LDA #%10101010                     ;                                         "),
+                call("$0602                         END START                          ;                                         "),
+
+            ],
+            print_mock.mock_calls
+        )
+
+    @patch('builtins.print')
     def test_throw_error_works_correctly(self, print_mock):
         statement = Statement("LABEL JMP $FFFF ; comment")
         program = Program()

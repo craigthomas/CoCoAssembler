@@ -15,6 +15,11 @@ from cocoasm.exceptions import ValueTypeError
 
 # C O N S T A N T S ###########################################################
 
+# Pattern to recognize a binary value
+BINARY_REGEX = re.compile(
+    r"^%(?P<value>[01]+)$"
+)
+
 # Pattern to recognize a character value
 CHAR_REGEX = re.compile(
     r"^\'(?P<value>[a-zA-Z0-9><'\";:,.#?$%^&*()=!+-/])$"
@@ -240,6 +245,14 @@ class NumericValue(Value):
         data = CHAR_REGEX.match(value)
         if data:
             self.int = ord(data.group("value"))
+            return
+
+        data = BINARY_REGEX.match(value)
+        if data:
+            bit_length = len(data.group("value"))
+            if bit_length != 8 and bit_length != 16:
+                raise ValueTypeError("binary pattern {} must be 8 or 16 bits long".format(data.group("value")))
+            self.int = int(data.group("value"), 2)
             return
 
         data = HEX_REGEX.match(value)
