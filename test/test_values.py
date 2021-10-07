@@ -11,6 +11,7 @@ import unittest
 from cocoasm.values import NumericValue, StringValue, NoneValue, SymbolValue, \
     AddressValue, ValueType, Value, ExpressionValue
 from cocoasm.instruction import Instruction, Mode
+from cocoasm.operand_type import OperandType
 from cocoasm.exceptions import ValueTypeError
 
 # C L A S S E S ###############################################################
@@ -88,6 +89,26 @@ class TestValue(unittest.TestCase):
     def test_create_from_string_character_literal_works_correctly(self):
         result = Value.create_from_str("'A")
         self.assertEqual(65, result.int)
+
+    def test_create_from_string_8_bit_immediate_instruction_size_correct(self):
+        instruction = Instruction(mnemonic="ZZZ", mode=Mode(imm=0xDE, imm_sz=2))
+        result = Value.create_from_str("$01", instruction)
+        self.assertEqual(None, result.size_hint)
+
+    def test_create_from_string_16_bit_immediate_instruction_size_correct(self):
+        instruction = Instruction(mnemonic="ZZZ", mode=Mode(imm=0xDE, imm_sz=2), is_16_bit=True)
+        result = Value.create_from_str("$01", instruction, operand_type=OperandType.IMMEDIATE)
+        self.assertEqual(4, result.size_hint)
+
+    def test_create_from_string_8_bit_immediate_instruction_size_correct_string_literal(self):
+        instruction = Instruction(mnemonic="ZZZ", mode=Mode(imm=0xDE, imm_sz=2))
+        result = Value.create_from_str("'A", instruction)
+        self.assertEqual(None, result.size_hint)
+
+    def test_create_from_string_16_bit_immediate_instruction_size_correct_string_literal(self):
+        instruction = Instruction(mnemonic="ZZZ", mode=Mode(imm=0xDE, imm_sz=2), is_16_bit=True)
+        result = Value.create_from_str("'A", instruction, operand_type=OperandType.IMMEDIATE)
+        self.assertEqual(4, result.size_hint)
 
 
 class TestNumericValue(unittest.TestCase):

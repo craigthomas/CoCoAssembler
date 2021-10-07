@@ -77,6 +77,7 @@ class Instruction(NamedTuple):
     is_long_branch: bool = False
     is_origin: bool = False
     is_name: bool = False
+    is_16_bit: bool = False
 
 
 INSTRUCTIONS = [
@@ -85,7 +86,7 @@ INSTRUCTIONS = [
     Instruction(mnemonic="ADCB", mode=Mode(imm=0xC9, imm_sz=2, dir=0xD9, dir_sz=2, ind=0xE9, ind_sz=2, ext=0xF9, ext_sz=3)),
     Instruction(mnemonic="ADDA", mode=Mode(imm=0x8B, imm_sz=2, dir=0x9B, dir_sz=2, ind=0xAB, ind_sz=2, ext=0xBB, ext_sz=3)),
     Instruction(mnemonic="ADDB", mode=Mode(imm=0xCB, imm_sz=2, dir=0xDB, dir_sz=2, ind=0xEB, ind_sz=2, ext=0xFB, ext_sz=3)),
-    Instruction(mnemonic="ADDD", mode=Mode(imm=0xC3, imm_sz=3, dir=0xD3, dir_sz=2, ind=0xE3, ind_sz=2, ext=0xF3, ext_sz=3)),
+    Instruction(mnemonic="ADDD", mode=Mode(imm=0xC3, imm_sz=3, dir=0xD3, dir_sz=2, ind=0xE3, ind_sz=2, ext=0xF3, ext_sz=3), is_16_bit=True),
     Instruction(mnemonic="ANDA", mode=Mode(imm=0x84, imm_sz=2, dir=0x94, dir_sz=2, ind=0xA4, ind_sz=2, ext=0xB4, ext_sz=3)),
     Instruction(mnemonic="ANDB", mode=Mode(imm=0xC4, imm_sz=2, dir=0xD4, dir_sz=2, ind=0xE4, ind_sz=2, ext=0xF4, ext_sz=3)),
     Instruction(mnemonic="ANDCC", mode=Mode(imm=0x1C, imm_sz=2)),
@@ -102,7 +103,7 @@ INSTRUCTIONS = [
     Instruction(mnemonic="CLR", mode=Mode(dir=0x0F, dir_sz=2, ind=0x6F, ind_sz=2, ext=0x7F, ext_sz=3)),
     Instruction(mnemonic="CMPA", mode=Mode(imm=0x81, imm_sz=2, dir=0x91, dir_sz=2, ind=0xA1, ind_sz=2, ext=0xB1, ext_sz=3)),
     Instruction(mnemonic="CMPB", mode=Mode(imm=0xC1, imm_sz=2, dir=0xD1, dir_sz=2, ind=0xE1, ind_sz=2, ext=0xF1, ext_sz=3)),
-    Instruction(mnemonic="CMPX", mode=Mode(imm=0x8C, imm_sz=3, dir=0x9C, dir_sz=2, ind=0xAC, ind_sz=2, ext=0xBC, ext_sz=3)),
+    Instruction(mnemonic="CMPX", mode=Mode(imm=0x8C, imm_sz=3, dir=0x9C, dir_sz=2, ind=0xAC, ind_sz=2, ext=0xBC, ext_sz=3), is_16_bit=True),
     Instruction(mnemonic="COMA", mode=Mode(inh=0x43, inh_sz=1)),
     Instruction(mnemonic="COMB", mode=Mode(inh=0x53, inh_sz=1)),
     Instruction(mnemonic="COM", mode=Mode(dir=0x03, dir_sz=2, ind=0x63, ind_sz=2, ext=0x73, ext_sz=3)),
@@ -121,9 +122,9 @@ INSTRUCTIONS = [
     Instruction(mnemonic="JSR", mode=Mode(dir=0x9D, dir_sz=2, ind=0xAD, ind_sz=2, ext=0xBD, ext_sz=3)),
     Instruction(mnemonic="LDA", mode=Mode(imm=0x86, imm_sz=2, dir=0x96, dir_sz=2, ind=0xA6, ind_sz=2, ext=0xB6, ext_sz=3)),
     Instruction(mnemonic="LDB", mode=Mode(imm=0xC6, imm_sz=2, dir=0xD6, dir_sz=2, ind=0xE6, ind_sz=2, ext=0xF6, ext_sz=3)),
-    Instruction(mnemonic="LDD", mode=Mode(imm=0xCC, imm_sz=3, dir=0xDC, dir_sz=2, ind=0xEC, ind_sz=2, ext=0xFC, ext_sz=3)),
-    Instruction(mnemonic="LDU", mode=Mode(imm=0xCE, imm_sz=3, dir=0xDE, dir_sz=2, ind=0xEE, ind_sz=2, ext=0xFE, ext_sz=3)),
-    Instruction(mnemonic="LDX", mode=Mode(imm=0x8E, imm_sz=3, dir=0x9E, dir_sz=2, ind=0xAE, ind_sz=2, ext=0xBE, ext_sz=3)),
+    Instruction(mnemonic="LDD", mode=Mode(imm=0xCC, imm_sz=3, dir=0xDC, dir_sz=2, ind=0xEC, ind_sz=2, ext=0xFC, ext_sz=3), is_16_bit=True),
+    Instruction(mnemonic="LDU", mode=Mode(imm=0xCE, imm_sz=3, dir=0xDE, dir_sz=2, ind=0xEE, ind_sz=2, ext=0xFE, ext_sz=3), is_16_bit=True),
+    Instruction(mnemonic="LDX", mode=Mode(imm=0x8E, imm_sz=3, dir=0x9E, dir_sz=2, ind=0xAE, ind_sz=2, ext=0xBE, ext_sz=3), is_16_bit=True),
     Instruction(mnemonic="LEAS", mode=Mode(ind=0x32, ind_sz=2)),
     Instruction(mnemonic="LEAU", mode=Mode(ind=0x33, ind_sz=2)),
     Instruction(mnemonic="LEAX", mode=Mode(ind=0x30, ind_sz=2)),
@@ -164,7 +165,7 @@ INSTRUCTIONS = [
     Instruction(mnemonic="STX", mode=Mode(dir=0x9F, dir_sz=2, ind=0xAF, ind_sz=2, ext=0xBF, ext_sz=3)),
     Instruction(mnemonic="SUBA", mode=Mode(imm=0x80, imm_sz=2, dir=0x90, dir_sz=2, ind=0xA0, ind_sz=2, ext=0xB0, ext_sz=3)),
     Instruction(mnemonic="SUBB", mode=Mode(imm=0xC0, imm_sz=2, dir=0xD0, dir_sz=2, ind=0xE0, ind_sz=2, ext=0xF0, ext_sz=3)),
-    Instruction(mnemonic="SUBD", mode=Mode(imm=0x83, imm_sz=3, dir=0x93, dir_sz=2, ind=0xA3, ind_sz=2, ext=0xB3, ext_sz=3)),
+    Instruction(mnemonic="SUBD", mode=Mode(imm=0x83, imm_sz=3, dir=0x93, dir_sz=2, ind=0xA3, ind_sz=2, ext=0xB3, ext_sz=3), is_16_bit=True),
     Instruction(mnemonic="SWI", mode=Mode(inh=0x3F, imm_sz=1)),
     Instruction(mnemonic="SYNC", mode=Mode(inh=0x13, imm_sz=1)),
     Instruction(mnemonic="TFR", mode=Mode(imm=0x1F, imm_sz=2), is_special=True),
@@ -173,12 +174,12 @@ INSTRUCTIONS = [
     Instruction(mnemonic="TST", mode=Mode(dir=0x0D, dir_sz=2, ind=0x6D, ind_sz=2, ext=0x7D, ext_sz=3)),
 
     # Extended operations
-    Instruction(mnemonic="CMPD", mode=Mode(imm=0x1083, imm_sz=4, dir=0x1093, dir_sz=3, ind=0x10A3, ind_sz=3, ext=0x10B3, ext_sz=4)),
-    Instruction(mnemonic="CMPS", mode=Mode(imm=0x118C, imm_sz=4, dir=0x119C, dir_sz=3, ind=0x11AC, ind_sz=3, ext=0x11BC, ext_sz=4)),
-    Instruction(mnemonic="CMPU", mode=Mode(imm=0x1183, imm_sz=4, dir=0x1193, dir_sz=3, ind=0x11A3, ind_sz=3, ext=0x11B3, ext_sz=4)),
-    Instruction(mnemonic="LDS", mode=Mode(imm=0x10CE, imm_sz=4, dir=0x10DE, dir_sz=3, ind=0x10EE, ind_sz=3, ext=0x10FE, ext_sz=4)),
-    Instruction(mnemonic="CMPY", mode=Mode(imm=0x108C, imm_sz=4, dir=0x109C, dir_sz=3, ind=0x10AC, ind_sz=3, ext=0x10BC, ext_sz=4)),
-    Instruction(mnemonic="LDY", mode=Mode(imm=0x108E, imm_sz=4, dir=0x109E, dir_sz=3, ind=0x10AE, ind_sz=3, ext=0x10BE, ext_sz=4)),
+    Instruction(mnemonic="CMPD", mode=Mode(imm=0x1083, imm_sz=4, dir=0x1093, dir_sz=3, ind=0x10A3, ind_sz=3, ext=0x10B3, ext_sz=4), is_16_bit=True),
+    Instruction(mnemonic="CMPS", mode=Mode(imm=0x118C, imm_sz=4, dir=0x119C, dir_sz=3, ind=0x11AC, ind_sz=3, ext=0x11BC, ext_sz=4), is_16_bit=True),
+    Instruction(mnemonic="CMPU", mode=Mode(imm=0x1183, imm_sz=4, dir=0x1193, dir_sz=3, ind=0x11A3, ind_sz=3, ext=0x11B3, ext_sz=4), is_16_bit=True),
+    Instruction(mnemonic="LDS", mode=Mode(imm=0x10CE, imm_sz=4, dir=0x10DE, dir_sz=3, ind=0x10EE, ind_sz=3, ext=0x10FE, ext_sz=4), is_16_bit=True),
+    Instruction(mnemonic="CMPY", mode=Mode(imm=0x108C, imm_sz=4, dir=0x109C, dir_sz=3, ind=0x10AC, ind_sz=3, ext=0x10BC, ext_sz=4), is_16_bit=True),
+    Instruction(mnemonic="LDY", mode=Mode(imm=0x108E, imm_sz=4, dir=0x109E, dir_sz=3, ind=0x10AE, ind_sz=3, ext=0x10BE, ext_sz=4), is_16_bit=True),
     Instruction(mnemonic="STS", mode=Mode(dir=0x10DF, dir_sz=3, ind=0x10EF, ind_sz=3, ext=0x10FF, ext_sz=4)),
     Instruction(mnemonic="STY", mode=Mode(dir=0x109F, dir_sz=3, ind=0x10AF, ind_sz=3, ext=0x10BF, ext_sz=4)),
     Instruction(mnemonic="SWI2", mode=Mode(inh=0x103F, inh_sz=2)),
