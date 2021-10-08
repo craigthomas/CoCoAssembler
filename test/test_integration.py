@@ -140,6 +140,19 @@ class TestIntegration(unittest.TestCase):
         program.translate_statements()
         self.assertEqual([0x39], program.get_binary_array())
 
+    def test_assembly_line_regex_with_at_symbols_in_operands_and_labels(self):
+        statements = [
+            Statement("         ORG $0100           ;"),
+            Statement("START    LDA #$01            ;"),
+            Statement("         LDA X@              ;"),
+            Statement("X@       FCB 0               ;"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0x86, 0x01, 0xB6, 0x01, 0x05, 0x00], program.get_binary_array())
+
+
 # M A I N #####################################################################
 
 
