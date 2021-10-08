@@ -11,6 +11,7 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 
+from cocoasm.operand_type import OperandType
 from cocoasm.exceptions import ValueTypeError
 
 # C O N S T A N T S ###########################################################
@@ -140,15 +141,18 @@ class Value(ABC):
         """
 
     @classmethod
-    def create_from_str(cls, value, instruction=None):
+    def create_from_str(cls, value, instruction=None, operand_type=None):
         """
         Parses the value by trying to instantiate various Value classes.
 
         :param value: the string value to parse
         :param instruction: the instruction
+        :param operand_type: the type of the operand
         :return: the Value class parsed
         """
         try:
+            if instruction and instruction.is_16_bit and operand_type == OperandType.IMMEDIATE:
+                return NumericValue(value, size_hint=4)
             return NumericValue(value)
         except ValueTypeError:
             pass

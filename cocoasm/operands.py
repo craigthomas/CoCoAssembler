@@ -9,10 +9,10 @@ A Color Computer Assembler - see the README.md file for details.
 import re
 
 from abc import ABC, abstractmethod
-from enum import Enum
 
 from cocoasm.values import NoneValue, ValueType, Value, NumericValue
 from cocoasm.instruction import CodePackage
+from cocoasm.operand_type import OperandType
 from cocoasm.exceptions import OperandTypeError, ValueTypeError
 
 # C O N S T A N T S ###########################################################
@@ -46,23 +46,6 @@ UNKNOWN_REGEX = re.compile(
 REGISTERS = ["A", "B", "D", "X", "Y", "U", "S", "CC", "DP", "PC"]
 
 # C L A S S E S ###############################################################
-
-
-class OperandType(Enum):
-    """
-    The OperandType enumeration stores what kind of operand we have parsed.
-    """
-    UNKNOWN = 0
-    INHERENT = 1
-    IMMEDIATE = 2
-    INDEXED = 3
-    EXTENDED_INDIRECT = 4
-    EXTENDED = 5
-    DIRECT = 6
-    RELATIVE = 7
-    SYMBOL = 8
-    PSEUDO = 9
-    SPECIAL = 10
 
 
 class Operand(ABC):
@@ -367,7 +350,7 @@ class ImmediateOperand(Operand):
         match = IMMEDIATE_REGEX.match(self.operand_string)
         if not match:
             raise OperandTypeError("[{}] is not an immediate value".format(operand_string))
-        self.value = Value.create_from_str(match.group("value"), instruction)
+        self.value = Value.create_from_str(match.group("value"), instruction, operand_type=self.type)
 
     def translate(self):
         if not self.instruction.mode.imm:
