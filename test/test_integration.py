@@ -131,6 +131,15 @@ class TestIntegration(unittest.TestCase):
         program.translate_statements()
         self.assertEqual([0x30, 0x9D, 0x00, 0x02, 0x96, 0xFF, 0x39], program.get_binary_array())
 
+    def test_assembly_line_regex_with_inherent_operands(self):
+        statements = [
+            Statement("     RTS            ;"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0x39], program.get_binary_array())
+
 # M A I N #####################################################################
 
 
