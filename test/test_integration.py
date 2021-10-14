@@ -152,6 +152,25 @@ class TestIntegration(unittest.TestCase):
         program.translate_statements()
         self.assertEqual([0x86, 0x01, 0xB6, 0x01, 0x05, 0x00], program.get_binary_array())
 
+    def test_explicit_direct_addressing_operand(self):
+        statements = [
+            Statement("         ORG $0100           ;"),
+            Statement("START    LDA <$01            ;"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0x96, 0x01], program.get_binary_array())
+
+    def test_explicit_extended_addressing_operand(self):
+        statements = [
+            Statement("         ORG $0100           ;"),
+            Statement("START    LDA >$0001            ;"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xB6, 0x00, 0x01], program.get_binary_array())
 
 # M A I N #####################################################################
 

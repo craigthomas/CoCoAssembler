@@ -97,6 +97,16 @@ class Operand(ABC):
             pass
 
         try:
+            return ExplicitDirectOperand(operand_string, instruction)
+        except OperandTypeError:
+            pass
+
+        try:
+            return ExplicitExtendedOperand(operand_string, instruction)
+        except OperandTypeError:
+            pass
+
+        try:
             return UnknownOperand(operand_string, instruction)
         except OperandTypeError:
             pass
@@ -396,6 +406,35 @@ class DirectOperand(Operand):
         )
 
 
+class ExplicitDirectOperand(Operand):
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
+        self.type = OperandType.EXPLICIT_DIRECT
+        self.operand_string = operand_string
+        match = DIRECT_REGEX.match(self.operand_string)
+        if not match:
+            raise OperandTypeError("[{}] does not explicitly signal a direct operand".format(operand_string))
+        self.value = Value.create_from_str(match.group("value"), instruction)
+
+        # If we have a numeric, we can run a check here for direct value size
+        if self.value.is_type(ValueType.NUMERIC) and self.value.byte_len() != 1:
+            raise OperandTypeError("[{}] is not a direct value".format(self.operand_string))
+
+        self.type = OperandType.DIRECT
+
+    def translate(self):
+        if not self.instruction.mode.dir:
+            raise OperandTypeError(
+                "Instruction [{}] does not support direct addressing".format(self.instruction.mnemonic)
+            )
+        return CodePackage(
+            op_code=NumericValue(self.instruction.mode.dir),
+            additional=self.value,
+            size=self.instruction.mode.dir_sz,
+            max_size=self.instruction.mode.dir_sz,
+        )
+
+
 class ExtendedOperand(Operand):
     def __init__(self, operand_string, instruction, value=None):
         super().__init__(instruction)
@@ -409,6 +448,30 @@ class ExtendedOperand(Operand):
             self.value = Value.create_from_str(match.group("value"), instruction)
         else:
             self.value = Value.create_from_str(operand_string, instruction)
+
+    def translate(self):
+        if not self.instruction.mode.ext:
+            raise OperandTypeError(
+                "Instruction [{}] does not support extended addressing".format(self.instruction.mnemonic)
+            )
+        return CodePackage(
+            op_code=NumericValue(self.instruction.mode.ext),
+            additional=self.value,
+            size=self.instruction.mode.ext_sz,
+            max_size=self.instruction.mode.ext_sz,
+        )
+
+
+class ExplicitExtendedOperand(Operand):
+    def __init__(self, operand_string, instruction, value=None):
+        super().__init__(instruction)
+        self.type = OperandType.EXPLICIT_EXTENDED
+        self.operand_string = operand_string
+        match = EXTENDED_REGEX.match(self.operand_string)
+        if not match:
+            raise OperandTypeError("[{}] does not explicitly signal an extended operand")
+        self.value = Value.create_from_str(match.group("value"), instruction, operand_type=self.type)
+        self.type = OperandType.EXTENDED
 
     def translate(self):
         if not self.instruction.mode.ext:
