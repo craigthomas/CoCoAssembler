@@ -21,10 +21,12 @@ class OperandType(Enum):
     INDEXED = 3
     EXTENDED_INDIRECT = 4
     EXTENDED = 5
-    DIRECT = 6
-    RELATIVE = 7
-    SYMBOL = 8
-    PSEUDO = 9
-    SPECIAL = 10
+    EXPLICIT_EXTENDED = 6
+    DIRECT = 7
+    EXPLICIT_DIRECT = 8
+    RELATIVE = 9
+    SYMBOL = 10
+    PSEUDO = 11
+    SPECIAL = 12
 
 # E N D   O F   F I L E #######################################################

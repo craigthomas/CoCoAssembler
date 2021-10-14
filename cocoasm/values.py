@@ -153,6 +153,8 @@ class Value(ABC):
         try:
             if instruction and instruction.is_16_bit and operand_type == OperandType.IMMEDIATE:
                 return NumericValue(value, size_hint=4)
+            if operand_type == OperandType.EXPLICIT_EXTENDED:
+                return NumericValue(value, size_hint=4)
             return NumericValue(value)
         except ValueTypeError:
             pass

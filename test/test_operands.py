@@ -11,7 +11,7 @@ import unittest
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
     OperandType, IndexedOperand, RelativeOperand, ExtendedIndexedOperand, \
     Operand, ExtendedOperand, PseudoOperand, SpecialOperand, DirectOperand, \
-    BadInstructionOperand
+    BadInstructionOperand, ExplicitExtendedOperand, ExplicitDirectOperand
 from cocoasm.instruction import Instruction, Mode
 from cocoasm.values import NumericValue, AddressValue, ValueType
 from cocoasm.exceptions import OperandTypeError
@@ -1154,6 +1154,46 @@ class TestDirectOperand(unittest.TestCase):
         self.assertEqual(3, code_pkg.size)
 
 
+class TestExplicitDirectOperand(unittest.TestCase):
+    """
+    A test class for the ExplicitDirectOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="SUBA", mode=Mode(dir=0xB0, dir_sz=3))
+
+    def test_explicit_direct_type_correct(self):
+        result = ExplicitDirectOperand("<$FF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.DIRECT))
+        self.assertEqual("FF", result.value.hex())
+
+    def test_explicit_direct_raises_if_not_direct(self):
+        with self.assertRaises(OperandTypeError) as context:
+            ExplicitDirectOperand("$FF", self.instruction)
+        self.assertEqual("[$FF] does not explicitly signal a direct operand", str(context.exception))
+
+    def test_explicit_direct_raises_if_byte_lenth_too_long(self):
+        with self.assertRaises(OperandTypeError) as context:
+            ExplicitDirectOperand("<$FFFF", self.instruction)
+        self.assertEqual("[<$FFFF] is not a direct value", str(context.exception))
+
+    def test_explicit_direct_raises_on_translate_not_direct_instruction(self):
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(imm=0xB0, imm_sz=3))
+        operand = DirectOperand("<$FF", instruction)
+        with self.assertRaises(OperandTypeError) as context:
+            operand.translate()
+        self.assertEqual("Instruction [SUBA] does not support direct addressing", str(context.exception))
+
+    def test_explicit_direct_translate_correct(self):
+        operand = DirectOperand("<$FF", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("B0", code_pkg.op_code.hex())
+        self.assertEqual("FF", code_pkg.additional.hex())
+        self.assertEqual(3, code_pkg.size)
+
+
 class TestExtendedOperand(unittest.TestCase):
     """
     A test class for the ExtendedOperand class.
@@ -1186,6 +1226,35 @@ class TestExtendedOperand(unittest.TestCase):
         self.assertEqual("FFFF", operand.value)
 
     def test_extended_force_extended_mode_correct(self):
+        result = ExtendedOperand(">$FFFF", self.instruction)
+        self.assertTrue(result.is_type(OperandType.EXTENDED))
+        self.assertEqual("FFFF", result.value.hex())
+
+
+class TestExplicitExtendedOperand(unittest.TestCase):
+    """
+    A test class for the ExplicitExtendedOperand class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        self.instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3))
+
+    def test_explicit_extended_translate_raises_if_instruction_not_extended(self):
+        instruction = Instruction(mnemonic="SUBA", mode=Mode(rel=0x3A, rel_sz=1))
+        with self.assertRaises(OperandTypeError) as context:
+            operand = ExplicitExtendedOperand(">$FFFF", instruction)
+            operand.translate()
+        self.assertEqual("Instruction [SUBA] does not support extended addressing", str(context.exception))
+
+    def test_explicit_extended_translates_correct(self):
+        operand = ExplicitExtendedOperand(">$FFFF", self.instruction)
+        code_pkg = operand.translate()
+        self.assertEqual("B0", code_pkg.op_code.hex())
+        self.assertEqual("FFFF", code_pkg.additional.hex())
+
+    def test_explicit_extended_force_extended_mode_correct(self):
         result = ExtendedOperand(">$FFFF", self.instruction)
         self.assertTrue(result.is_type(OperandType.EXTENDED))
         self.assertEqual("FFFF", result.value.hex())
