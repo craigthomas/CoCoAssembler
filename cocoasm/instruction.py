@@ -1,5 +1,5 @@
 """
-Copyright (C) 2019-2020 Craig Thomas
+Copyright (C) 2022 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -78,6 +78,7 @@ class Instruction(NamedTuple):
     is_origin: bool = False
     is_name: bool = False
     is_16_bit: bool = False
+    is_lea: bool = False
 
 
 INSTRUCTIONS = [
@@ -125,10 +126,10 @@ INSTRUCTIONS = [
     Instruction(mnemonic="LDD", mode=Mode(imm=0xCC, imm_sz=3, dir=0xDC, dir_sz=2, ind=0xEC, ind_sz=2, ext=0xFC, ext_sz=3), is_16_bit=True),
     Instruction(mnemonic="LDU", mode=Mode(imm=0xCE, imm_sz=3, dir=0xDE, dir_sz=2, ind=0xEE, ind_sz=2, ext=0xFE, ext_sz=3), is_16_bit=True),
     Instruction(mnemonic="LDX", mode=Mode(imm=0x8E, imm_sz=3, dir=0x9E, dir_sz=2, ind=0xAE, ind_sz=2, ext=0xBE, ext_sz=3), is_16_bit=True),
-    Instruction(mnemonic="LEAS", mode=Mode(ind=0x32, ind_sz=2)),
-    Instruction(mnemonic="LEAU", mode=Mode(ind=0x33, ind_sz=2)),
-    Instruction(mnemonic="LEAX", mode=Mode(ind=0x30, ind_sz=2)),
-    Instruction(mnemonic="LEAY", mode=Mode(ind=0x31, ind_sz=2)),
+    Instruction(mnemonic="LEAS", mode=Mode(ind=0x32, ind_sz=2), is_lea=True),
+    Instruction(mnemonic="LEAU", mode=Mode(ind=0x33, ind_sz=2), is_lea=True),
+    Instruction(mnemonic="LEAX", mode=Mode(ind=0x30, ind_sz=2), is_lea=True),
+    Instruction(mnemonic="LEAY", mode=Mode(ind=0x31, ind_sz=2), is_lea=True),
     Instruction(mnemonic="LSLA", mode=Mode(inh=0x48, inh_sz=1)),
     Instruction(mnemonic="LSLB", mode=Mode(inh=0x58, inh_sz=1)),
     Instruction(mnemonic="LSL", mode=Mode(dir=0x08, dir_sz=2, ind=0x68, ind_sz=2, ext=0x78, ext_sz=3)),
