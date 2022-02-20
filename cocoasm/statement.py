@@ -12,8 +12,8 @@ from copy import copy
 
 from cocoasm.exceptions import ParseError, TranslationError, ValueTypeError, OperandTypeError
 from cocoasm.instruction import INSTRUCTIONS, CodePackage
-from cocoasm.operands import Operand, OperandType, BadInstructionOperand, ExtendedOperand
-from cocoasm.values import ValueType, NumericValue
+from cocoasm.operands import Operand, BadInstructionOperand
+from cocoasm.values import NumericValue
 
 # C O N S T A N T S ###########################################################
 
@@ -147,7 +147,7 @@ class Statement(object):
         :param address: the address to set for the statement
         :return: the address that was set or returned
         """
-        if not self.code_pkg.address.is_type(ValueType.NONE):
+        if not self.code_pkg.address.is_none():
             return self.code_pkg.address.int
         self.code_pkg.address = NumericValue(address)
         return self.code_pkg.address.int
@@ -159,7 +159,6 @@ class Statement(object):
         """
         try:
             self.operand = self.operand.resolve_symbols(symbol_table)
-            self.check_types()
         except ValueError as error:
             raise TranslationError(str(error), self)
 
@@ -175,24 +174,6 @@ class Statement(object):
             raise TranslationError(str(error), self)
         except ValueTypeError as error:
             raise TranslationError(str(error), self)
-
-    def check_types(self):
-        if self.operand.is_type(OperandType.DIRECT):
-            if self.operand.value.is_type(ValueType.NUMERIC):
-                if self.operand.value.byte_len() == 2:
-                    self.operand = ExtendedOperand(
-                        self.operand.operand_string,
-                        self.operand.instruction,
-                        self.operand.value,
-                    )
-                    return
-
-            # TODO: Add in ability to check direct page register here - extended operands may be direct instead
-
-        if self.operand.is_type(OperandType.EXTENDED):
-            if self.operand.value.is_type(ValueType.NUMERIC):
-                if self.operand.value.byte_len() == 1:
-                    raise TranslationError("[{}] is not an extended value".format(self.operand.operand_string), self)
 
     def fix_pcr_relative_addresses(self, statements, this_index):
         """
@@ -213,32 +194,38 @@ class Statement(object):
         :param statements: the full set of statements that make up the program
         :param this_index: the index that this instruction occurs at
         """
-        if self.code_pkg.additional_needs_resolution and self.code_pkg.post_byte_choices:
+        if not self.code_pkg.additional_needs_resolution or not self.code_pkg.post_byte_choices:
+            return
+
+        if self.operand.left.is_address_expression():
+            relative_index = self.operand.left.extract_address_index_from_expression()
+        else:
             relative_index = self.code_pkg.additional.int
-            if relative_index > this_index:
-                total_size = 0
-                raw_post_byte = self.code_pkg.post_byte.int
-                for x in range(this_index, relative_index):
-                    total_size += statements[x].code_pkg.max_size
-                if total_size <= 255:
-                    self.code_pkg.size += 1
-                    raw_post_byte |= self.code_pkg.post_byte_choices[0]
-                else:
-                    self.code_pkg.size += 2
-                    raw_post_byte |= self.code_pkg.post_byte_choices[1]
-                self.code_pkg.post_byte = NumericValue(raw_post_byte)
+
+        if relative_index > this_index:
+            total_size = 0
+            raw_post_byte = self.code_pkg.post_byte.int
+            for x in range(this_index, relative_index):
+                total_size += statements[x].code_pkg.max_size
+            if total_size <= 255:
+                self.code_pkg.size += 1
+                raw_post_byte |= self.code_pkg.post_byte_choices[0]
             else:
-                total_size = 0
-                raw_post_byte = self.code_pkg.post_byte.int
-                for x in range(relative_index, this_index):
-                    total_size += statements[x].code_pkg.max_size
-                if total_size <= 255:
-                    self.code_pkg.size += 1
-                    raw_post_byte |= self.code_pkg.post_byte_choices[0]
-                else:
-                    self.code_pkg.size += 2
-                    raw_post_byte |= self.code_pkg.post_byte_choices[1]
-                self.code_pkg.post_byte = NumericValue(raw_post_byte)
+                self.code_pkg.size += 2
+                raw_post_byte |= self.code_pkg.post_byte_choices[1]
+            self.code_pkg.post_byte = NumericValue(raw_post_byte)
+        else:
+            total_size = 0
+            raw_post_byte = self.code_pkg.post_byte.int
+            for x in range(relative_index, this_index):
+                total_size += statements[x].code_pkg.max_size
+            if total_size <= 255:
+                self.code_pkg.size += 1
+                raw_post_byte |= self.code_pkg.post_byte_choices[0]
+            else:
+                self.code_pkg.size += 2
+                raw_post_byte |= self.code_pkg.post_byte_choices[1]
+            self.code_pkg.post_byte = NumericValue(raw_post_byte)
 
     def fix_addresses(self, statements, this_index):
         """
@@ -252,7 +239,7 @@ class Statement(object):
         :param statements: the full set of statements that make up the program
         :param this_index: the index that this instruction occurs at
         """
-        if self.operand.is_type(OperandType.RELATIVE):
+        if self.operand.is_relative():
             base_value = 0x101 if self.instruction.is_short_branch else 0x10001
             branch_index = self.code_pkg.additional.int
             size_hint = 2 if self.instruction.is_short_branch else 4
@@ -268,17 +255,36 @@ class Statement(object):
                 self.code_pkg.additional = NumericValue(length, size_hint=size_hint)
             return
 
-        if self.operand.value.is_type(ValueType.ADDRESS):
+        if self.operand.value.is_address_expression():
+            self.code_pkg.additional = self.operand.value.calculate_address_offset(statements)
+
+        if self.operand.is_indexed() or self.operand.is_extended_indexed():
+            if self.operand.left and self.operand.left.is_address_expression() and self.code_pkg.additional_needs_resolution:
+                start_address = statements[this_index].code_pkg.address.int
+                offset = self.operand.left.calculate_address_offset(statements).int
+                # TODO: fix offsets that are negative
+                jump_distance = start_address - offset if offset < start_address else offset - start_address
+                if jump_distance < 256:
+                    self.code_pkg.additional = NumericValue(offset, size_hint=2)
+                    self.code_pkg.post_byte = NumericValue(self.code_pkg.post_byte_choices[0] | self.code_pkg.post_byte.int)
+                    self.code_pkg.size += 1
+                else:
+                    self.code_pkg.additional = NumericValue(offset, size_hint=4)
+                    self.code_pkg.post_byte = NumericValue(self.code_pkg.post_byte_choices[1] | self.code_pkg.post_byte.int)
+                    self.code_pkg.size += 2
+                self.code_pkg.additional_needs_resolution = False
+
+        if self.operand.value.is_address():
             self.code_pkg.additional = statements[self.operand.value.int].code_pkg.address
 
         if self.code_pkg.additional_needs_resolution:
             start_address = statements[this_index].code_pkg.address
             relative_address = statements[self.code_pkg.additional.int].code_pkg.address
             size_hint = 2
+            # TODO: offsets that are less than the current index need to be converted to negatives
             if relative_address.int > start_address.int:
                 jump_amount = relative_address.int - start_address.int
-                # Effective address loading is always 16-bit regardless of actual size
-                if jump_amount > 255 or self.instruction.mnemonic in ["LEAX", "LEAY", "LEAS", "LEAU"]:
+                if jump_amount > 255:
                     size_hint = 4
                 self.code_pkg.additional = NumericValue(
                     0x00 + jump_amount - self.code_pkg.size,
@@ -287,8 +293,7 @@ class Statement(object):
             else:
                 jump_amount = start_address.int - relative_address.int
                 base_offset = 0x100 if jump_amount <= 255 else 0x10000
-                # Effective address loading is always 16-bit regardless of actual size
-                if base_offset == 0x10000 or self.instruction.mnemonic in ["LEAX", "LEAY", "LEAS", "LEAU"]:
+                if base_offset == 0x10000:
                     size_hint = 4
                 self.code_pkg.additional = NumericValue(
                     base_offset - jump_amount - self.code_pkg.size,

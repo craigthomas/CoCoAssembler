@@ -1,5 +1,5 @@
 """
-Copyright (C) 2019-2020 Craig Thomas
+Copyright (C) 2022 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 This file contains the main Program class for the CoCo Assembler.
@@ -140,7 +140,7 @@ class Program(object):
 
             # Update the symbol table with the proper addresses
             for symbol, value in self.symbol_table.items():
-                if value.is_type(ValueType.ADDRESS):
+                if value.is_address():
                     self.symbol_table[symbol] = self.statements[value.int].code_pkg.address
 
             # Find the origin and name of the project

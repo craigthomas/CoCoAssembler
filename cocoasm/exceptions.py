@@ -1,5 +1,5 @@
 """
-Copyright (C) 2019-2020 Craig Thomas
+Copyright (C) 2022 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 This file contains Exceptions for the CoCo Assembler.

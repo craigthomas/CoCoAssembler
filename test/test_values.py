@@ -9,9 +9,8 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.values import NumericValue, StringValue, NoneValue, SymbolValue, \
-    AddressValue, ValueType, Value, ExpressionValue
+    AddressValue, ValueType, Value, ExpressionValue, ExplicitAddressingMode
 from cocoasm.instruction import Instruction, Mode
-from cocoasm.operand_type import OperandType
 from cocoasm.exceptions import ValueTypeError
 
 # C L A S S E S ###############################################################
@@ -35,17 +34,17 @@ class TestValue(unittest.TestCase):
 
     def test_value_create_from_str_numeric_correct(self):
         result = Value.create_from_str("$DEAD", self.instruction)
-        self.assertTrue(result.is_type(ValueType.NUMERIC))
+        self.assertTrue(result.is_numeric())
         self.assertEqual("DEAD", result.hex())
 
     def test_value_create_from_str_string_correct(self):
         result = Value.create_from_str("'$DEAD'", self.fcc_instruction)
-        self.assertTrue(result.is_type(ValueType.STRING))
+        self.assertTrue(result.is_string())
         self.assertEqual("$DEAD", result.ascii())
 
     def test_value_create_from_str_symbol_correct(self):
         result = Value.create_from_str("symbol", self.instruction)
-        self.assertTrue(result.is_type(ValueType.SYMBOL))
+        self.assertTrue(result.is_symbol())
 
     def test_value_create_from_str_raises_on_bad_string_value(self):
         with self.assertRaises(ValueTypeError) as context:
@@ -93,21 +92,23 @@ class TestValue(unittest.TestCase):
     def test_create_from_string_8_bit_immediate_instruction_size_correct(self):
         instruction = Instruction(mnemonic="ZZZ", mode=Mode(imm=0xDE, imm_sz=2))
         result = Value.create_from_str("$01", instruction)
-        self.assertEqual(None, result.size_hint)
+        self.assertEqual(2, result.size_hint)
 
     def test_create_from_string_16_bit_immediate_instruction_size_correct(self):
         instruction = Instruction(mnemonic="ZZZ", mode=Mode(imm=0xDE, imm_sz=2), is_16_bit=True)
-        result = Value.create_from_str("$01", instruction, operand_type=OperandType.IMMEDIATE)
+        result = Value.create_from_str("$01", instruction)
         self.assertEqual(4, result.size_hint)
 
     def test_create_from_string_8_bit_immediate_instruction_size_correct_string_literal(self):
         instruction = Instruction(mnemonic="ZZZ", mode=Mode(imm=0xDE, imm_sz=2))
-        result = Value.create_from_str("'A", instruction)
-        self.assertEqual(None, result.size_hint)
+        result = Value.create_from_str("#'A", instruction)
+        self.assertEqual(65, result.int)
+        self.assertEqual(2, result.size_hint)
 
     def test_create_from_string_16_bit_immediate_instruction_size_correct_string_literal(self):
         instruction = Instruction(mnemonic="ZZZ", mode=Mode(imm=0xDE, imm_sz=2), is_16_bit=True)
-        result = Value.create_from_str("'A", instruction, operand_type=OperandType.IMMEDIATE)
+        result = Value.create_from_str("#'A", instruction)
+        self.assertEqual(65, result.int)
         self.assertEqual(4, result.size_hint)
 
 
@@ -182,7 +183,7 @@ class TestNumericValue(unittest.TestCase):
 
     def test_numeric_is_type_correct(self):
         result = NumericValue("57005")
-        self.assertTrue(result.is_type(ValueType.NUMERIC))
+        self.assertTrue(result.is_numeric())
 
     def test_numeric_hex_len_is_correct(self):
         result = NumericValue("$01")
@@ -258,7 +259,7 @@ class TestStringValue(unittest.TestCase):
 
     def test_string_is_type_correct(self):
         result = StringValue('"abc"')
-        self.assertTrue(result.is_type(ValueType.STRING))
+        self.assertTrue(result.is_string())
 
 
 class TestNoneValue(unittest.TestCase):
@@ -293,7 +294,7 @@ class TestNoneValue(unittest.TestCase):
 
     def test_none_is_type_correct(self):
         result = NoneValue('"abc"')
-        self.assertTrue(result.is_type(ValueType.NONE))
+        self.assertTrue(result.is_none())
 
 
 class TestSymbolValue(unittest.TestCase):
@@ -440,13 +441,13 @@ class TestExpressionValue(unittest.TestCase):
         self.assertEqual(result.hex_len(), 2)
 
     def test_expression_symbol_right_resolves_correctly(self):
-        symbol_table = {"VAR": NumericValue("$FE")}
+        symbol_table = {"VAR": NumericValue("$FE", mode=ExplicitAddressingMode.DIRECT)}
         result = ExpressionValue("1+VAR")
         result = result.resolve(symbol_table)
         self.assertEqual(result.hex(), "FF")
 
     def test_expression_symbol_left_resolves_correctly(self):
-        symbol_table = {"VAR": NumericValue("$FE")}
+        symbol_table = {"VAR": NumericValue("$FE", mode=ExplicitAddressingMode.DIRECT)}
         result = ExpressionValue("VAR+1")
         result = result.resolve(symbol_table)
         self.assertEqual(result.hex(), "FF")

@@ -10,17 +10,12 @@ import re
 
 from abc import ABC, abstractmethod
 
-from cocoasm.values import NoneValue, ValueType, Value, NumericValue
+from cocoasm.values import NoneValue, Value, NumericValue, DirectNumericValue, ExtendedNumericValue
 from cocoasm.instruction import CodePackage
 from cocoasm.operand_type import OperandType
 from cocoasm.exceptions import OperandTypeError, ValueTypeError
 
 # C O N S T A N T S ###########################################################
-
-# Pattern to recognize an immediate value
-IMMEDIATE_REGEX = re.compile(
-    r"^#(?P<value>.*)"
-)
 
 # Pattern to recognize a direct value
 DIRECT_REGEX = re.compile(
@@ -82,11 +77,6 @@ class Operand(ABC):
             pass
 
         try:
-            return ImmediateOperand(operand_string, instruction)
-        except OperandTypeError:
-            pass
-
-        try:
             return ExtendedIndexedOperand(operand_string, instruction)
         except OperandTypeError:
             pass
@@ -97,12 +87,7 @@ class Operand(ABC):
             pass
 
         try:
-            return ExplicitDirectOperand(operand_string, instruction)
-        except OperandTypeError:
-            pass
-
-        try:
-            return ExplicitExtendedOperand(operand_string, instruction)
+            return ImmediateOperand(operand_string, instruction)
         except OperandTypeError:
             pass
 
@@ -113,14 +98,35 @@ class Operand(ABC):
 
         raise OperandTypeError("[{}] unknown operand type".format(operand_string))
 
-    def is_type(self, operand_type):
-        """
-        Returns True if the type of this operand class is the type being compared.
+    def is_unknown(self):
+        return self.type == OperandType.UNKNOWN
 
-        :param operand_type: the OperandType to check
-        :return: True if the OperandType values match, False otherwise
-        """
-        return self.type == operand_type
+    def is_relative(self):
+        return self.type == OperandType.RELATIVE
+
+    def is_pseudo(self):
+        return self.type == OperandType.PSEUDO
+
+    def is_special(self):
+        return self.type == OperandType.SPECIAL
+
+    def is_immediate(self):
+        return self.type == OperandType.IMMEDIATE
+
+    def is_inherent(self):
+        return self.type == OperandType.INHERENT
+
+    def is_extended(self):
+        return self.type == OperandType.EXTENDED
+
+    def is_direct(self):
+        return self.type == OperandType.DIRECT
+
+    def is_indexed(self):
+        return self.type == OperandType.INDEXED
+
+    def is_extended_indexed(self):
+        return self.type == OperandType.EXTENDED_INDIRECT
 
     def resolve_symbols(self, symbol_table):
         """
@@ -131,18 +137,16 @@ class Operand(ABC):
         :param symbol_table: the symbol table to search
         :return: self, or a new Operand class type with a resolved value
         """
+        old_value = self.value
         self.value = self.value.resolve(symbol_table)
 
-        if self.value.is_type(ValueType.ADDRESS):
-            if self.is_type(OperandType.UNKNOWN):
-                return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
+        if not self.is_unknown():
+            return self
 
-        if self.value.is_type(ValueType.NUMERIC):
-            if self.is_type(OperandType.UNKNOWN):
-                operand = DirectOperand if self.value.hex_len() == 2 else ExtendedOperand
-                return operand(self.operand_string, self.instruction, value=self.value)
+        if self.value.is_numeric() and (self.value.is_direct() or old_value.is_explicit_direct()):
+            return DirectOperand(self.operand_string, self.instruction, DirectNumericValue(self.value.int))
 
-        return self
+        return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
 
     @abstractmethod
     def translate(self):
@@ -155,7 +159,7 @@ class Operand(ABC):
 
 
 class BadInstructionOperand(Operand):
-    def __init__(self, operand_string, instruction, value=None):
+    def __init__(self, operand_string, instruction):
         super().__init__(operand_string, instruction)
         self.operand_string = operand_string
         self.original_operand = operand_string
@@ -171,12 +175,10 @@ class UnknownOperand(Operand):
         if value:
             self.value = value
             return
-        if UNKNOWN_REGEX.search(operand_string):
-            raise OperandTypeError("[{}] invalid operand".format(operand_string))
         try:
             self.value = Value.create_from_str(operand_string, instruction)
         except ValueTypeError:
-            self.value = NoneValue()
+            raise OperandTypeError("[{}] unknown operand type".format(operand_string))
 
     def translate(self):
         return CodePackage(additional=self.value)
@@ -190,13 +192,18 @@ class PseudoOperand(Operand):
         if not instruction.is_pseudo:
             raise OperandTypeError("[{}] is not a pseudo instruction".format(instruction.mnemonic))
         self.value = NoneValue() if instruction.is_include else Value.create_from_str(operand_string, instruction)
+        if instruction.is_pseudo_define:
+            if self.operand_string.startswith("$") and len(self.operand_string) > 3:
+                self.value = ExtendedNumericValue(self.value.int)
+            elif self.value.hex_len() == 2:
+                self.value = DirectNumericValue(self.value.int)
 
     def resolve_symbols(self, symbol_table):
         return self
 
     def translate(self):
         if self.instruction.mnemonic == "FCB":
-            return CodePackage(additional=self.value, size=1, max_size=1)
+            return CodePackage(additional=NumericValue(self.value.int, size_hint=2), size=1, max_size=1)
 
         if self.instruction.mnemonic == "FDB":
             return CodePackage(additional=NumericValue(self.value.int, size_hint=4), size=2, max_size=2)
@@ -324,7 +331,7 @@ class RelativeOperand(Operand):
     def translate(self):
         return CodePackage(
             op_code=NumericValue(self.instruction.mode.rel),
-            additional=self.value if self.value.is_type(ValueType.ADDRESS) else NoneValue(),
+            additional=self.value if self.value.is_address() else NoneValue(),
             size=self.instruction.mode.rel_sz,
             max_size=self.instruction.mode.rel_sz,
         )
@@ -357,10 +364,12 @@ class ImmediateOperand(Operand):
         if value:
             self.value = value
             return
-        match = IMMEDIATE_REGEX.match(self.operand_string)
-        if not match:
+        try:
+            self.value = Value.create_from_str(self.operand_string, instruction)
+        except ValueTypeError:
             raise OperandTypeError("[{}] is not an immediate value".format(operand_string))
-        self.value = Value.create_from_str(match.group("value"), instruction, operand_type=self.type)
+        if not self.value.is_immediate():
+            raise OperandTypeError("[{}] is not an immediate value".format(operand_string))
 
     def translate(self):
         if not self.instruction.mode.imm:
@@ -383,44 +392,10 @@ class DirectOperand(Operand):
         if value:
             self.value = value
             return
-        match = DIRECT_REGEX.match(self.operand_string)
-        if match:
-            self.value = Value.create_from_str(match.group("value"), instruction)
-        else:
-            self.value = Value.create_from_str(operand_string, instruction)
 
-        # If we have a numeric, we can run a check here for direct value size
-        if self.value.is_type(ValueType.NUMERIC) and self.value.byte_len() != 1:
+        self.value = Value.create_from_str(operand_string, instruction)
+        if not self.value.is_direct() and not self.value.is_explicit_direct():
             raise OperandTypeError("[{}] is not a direct value".format(self.operand_string))
-
-    def translate(self):
-        if not self.instruction.mode.dir:
-            raise OperandTypeError(
-                "Instruction [{}] does not support direct addressing".format(self.instruction.mnemonic)
-            )
-        return CodePackage(
-            op_code=NumericValue(self.instruction.mode.dir),
-            additional=self.value,
-            size=self.instruction.mode.dir_sz,
-            max_size=self.instruction.mode.dir_sz,
-        )
-
-
-class ExplicitDirectOperand(Operand):
-    def __init__(self, operand_string, instruction, value=None):
-        super().__init__(instruction)
-        self.type = OperandType.EXPLICIT_DIRECT
-        self.operand_string = operand_string
-        match = DIRECT_REGEX.match(self.operand_string)
-        if not match:
-            raise OperandTypeError("[{}] does not explicitly signal a direct operand".format(operand_string))
-        self.value = Value.create_from_str(match.group("value"), instruction)
-
-        # If we have a numeric, we can run a check here for direct value size
-        if self.value.is_type(ValueType.NUMERIC) and self.value.byte_len() != 1:
-            raise OperandTypeError("[{}] is not a direct value".format(self.operand_string))
-
-        self.type = OperandType.DIRECT
 
     def translate(self):
         if not self.instruction.mode.dir:
@@ -462,60 +437,33 @@ class ExtendedOperand(Operand):
         )
 
 
-class ExplicitExtendedOperand(Operand):
-    def __init__(self, operand_string, instruction, value=None):
-        super().__init__(instruction)
-        self.type = OperandType.EXPLICIT_EXTENDED
-        self.operand_string = operand_string
-        match = EXTENDED_REGEX.match(self.operand_string)
-        if not match:
-            raise OperandTypeError("[{}] does not explicitly signal an extended operand")
-        self.value = Value.create_from_str(match.group("value"), instruction, operand_type=self.type)
-        self.type = OperandType.EXTENDED
-
-    def translate(self):
-        if not self.instruction.mode.ext:
-            raise OperandTypeError(
-                "Instruction [{}] does not support extended addressing".format(self.instruction.mnemonic)
-            )
-        return CodePackage(
-            op_code=NumericValue(self.instruction.mode.ext),
-            additional=self.value,
-            size=self.instruction.mode.ext_sz,
-            max_size=self.instruction.mode.ext_sz,
-        )
-
-
 class ExtendedIndexedOperand(Operand):
-    def __init__(self, operand_string, instruction, value=None):
+    def __init__(self, operand_string, instruction):
         super().__init__(instruction)
         self.type = OperandType.EXTENDED_INDIRECT
         self.operand_string = operand_string
-        self.left = None
-        self.right = None
-        if value is not None:
-            self.value = value
-            return
-        match = EXTENDED_INDIRECT_REGEX.match(self.operand_string)
-        if not match:
+        if not (self.operand_string.startswith("[") and self.operand_string.endswith("]")):
             raise OperandTypeError("[{}] is not an extended indexed value".format(operand_string))
-        parsed_value = match.group("value")
-        if "," not in parsed_value:
-            self.value = Value.create_from_str(parsed_value, self.instruction)
-        elif len(parsed_value.split(",")) == 2:
-            self.left, self.right = parsed_value.split(",")
-        else:
-            raise OperandTypeError("[{}] incorrect number of commas in extended indexed value".format(operand_string))
+        try:
+            stripped_operand_string = operand_string[1:-1]
+            self.value = Value.create_from_str(stripped_operand_string, self.instruction)
+        except ValueTypeError:
+            raise OperandTypeError("[{}] is not an extended indexed value".format(operand_string))
+        if self.value.is_leftright():
+            self.left = self.value.left
+            self.right = self.value.right
 
     def resolve_symbols(self, symbol_table):
-        if not self.value.is_type(ValueType.NONE):
+        if not self.value.is_none() and not self.value.is_leftright():
             self.value = self.value.resolve(symbol_table)
             return self
 
         if self.left and self.left != "":
             if self.left != "A" and self.left != "B" and self.left != "D":
-                self.left = Value.create_from_str(self.left, self.instruction)
-                if self.left.is_type(ValueType.SYMBOL):
+                self.left = Value.create_from_str(self.left, self.instruction, default_mode_extended=False)
+                if self.left.is_symbol():
+                    self.left = self.left.resolve(symbol_table)
+                if self.left.is_address_expression() or self.left.is_expression():
                     self.left = self.left.resolve(symbol_table)
         return self
 
@@ -526,7 +474,7 @@ class ExtendedIndexedOperand(Operand):
             )
         size = self.instruction.mode.ind_sz
 
-        if not type(self.value) == str and self.value.is_type(ValueType.ADDRESS):
+        if not type(self.value) == str and self.value.is_address():
             size += 2
             return CodePackage(
                 op_code=NumericValue(self.instruction.mode.ind),
@@ -536,7 +484,7 @@ class ExtendedIndexedOperand(Operand):
                 max_size=size,
             )
 
-        if not type(self.value) == str and self.value.is_type(ValueType.NUMERIC):
+        if not type(self.value) == str and self.value.is_numeric():
             size += 2
             return CodePackage(
                 op_code=NumericValue(self.instruction.mode.ind),
@@ -587,31 +535,33 @@ class ExtendedIndexedOperand(Operand):
             if "+" in self.right or "-" in self.right:
                 raise OperandTypeError("[{}] invalid indexed expression".format(self.operand_string))
             if type(self.left) == str:
-                self.left = NumericValue(self.left)
-            if self.left.is_type(ValueType.ADDRESS):
+                self.left = Value.create_from_str(self.left)
+
+            if self.left.is_address():
                 additional_needs_resolution = True
                 self.left = NumericValue(self.left.int)
+
+            if self.left.is_expression():
+                additional_needs_resolution = True
+
+            if self.left.is_address_expression():
+                additional_needs_resolution = True
+
             additional = self.left
 
             if "PCR" in self.right:
                 if additional_needs_resolution:
-                    # Effective address loading is always 16-bit regardless of actual size
-                    if self.instruction.mnemonic in ["LEAX", "LEAY", "LEAS", "LEAU"]:
-                        raw_post_byte |= 0x9D
-                        size += 2
-                        max_size += 2
-                    else:
-                        raw_post_byte |= 0x00
-                        post_byte_choices = [0x9C, 0x9D]
-                        max_size += 2
+                    raw_post_byte |= 0x00
+                    post_byte_choices = [0x9C, 0x9D]
+                    max_size += 2
                 else:
-                    size += additional.byte_len()
+                    size += 2 if self.left.is_extended() else 1
                     max_size = size
-                    raw_post_byte |= 0x9D if additional.byte_len() == 2 else 0x9C
+                    raw_post_byte |= 0x9D if self.left.is_extended() else 0x9C
             else:
                 size += additional.byte_len()
                 max_size = size
-                raw_post_byte |= 0x99 if additional.byte_len() == 2 else 0x98
+                raw_post_byte |= 0x99 if self.left.is_extended() else 0x98
 
         return CodePackage(
             op_code=NumericValue(self.instruction.mode.ind),
@@ -629,19 +579,22 @@ class IndexedOperand(Operand):
         super().__init__(instruction)
         self.type = OperandType.INDEXED
         self.operand_string = operand_string
-        self.right = ""
-        self.left = ""
-        if "," not in operand_string or instruction.is_string_define:
+        try:
+            self.value = Value.create_from_str(self.operand_string, self.instruction)
+        except ValueTypeError:
             raise OperandTypeError("[{}] is not an indexed value".format(operand_string))
-        if len(operand_string.split(",")) != 2:
-            raise OperandTypeError("[{}] incorrect number of commas in indexed value".format(operand_string))
-        self.left, self.right = operand_string.split(",")
+        if not self.value.is_leftright():
+            raise OperandTypeError("[{}] is not an indexed value".format(operand_string))
+        self.left = self.value.left
+        self.right = self.value.right
 
     def resolve_symbols(self, symbol_table):
         if self.left != "":
-            if self.left != "A" and self.left != "B" and self.left != "D":
-                self.left = Value.create_from_str(self.left, self.instruction)
-                if self.left.is_type(ValueType.SYMBOL):
+            if self.left not in ["A", "B", "D"]:
+                self.left = Value.create_from_str(self.left, self.instruction, default_mode_extended=False)
+                if self.left.is_symbol():
+                    self.left = self.left.resolve(symbol_table)
+                if self.left.is_address_expression() or self.left.is_expression():
                     self.left = self.left.resolve(symbol_table)
         return self
 
@@ -693,36 +646,35 @@ class IndexedOperand(Operand):
         else:
             if "+" in self.right or "-" in self.right:
                 raise OperandTypeError("[{}] invalid indexed expression".format(self.operand_string))
-            if type(self.left) == str:
-                self.left = NumericValue(self.left)
-            if self.left.is_type(ValueType.ADDRESS):
+
+            if self.left.is_address():
                 additional_needs_resolution = True
                 self.left = NumericValue(self.left.int)
+
+            if self.left.is_expression():
+                additional_needs_resolution = True
+
+            if self.left.is_address_expression():
+                additional_needs_resolution = True
 
             additional = self.left
 
             if "PCR" in self.right:
                 if additional_needs_resolution:
-                    # Effective address loading is always 16-bit regardless of actual size
-                    if self.instruction.mnemonic in ["LEAX", "LEAY", "LEAS", "LEAU"]:
-                        raw_post_byte |= 0x8D
-                        size += 2
-                        max_size += 2
-                    else:
-                        raw_post_byte |= 0x00
-                        post_byte_choices = [0x8C, 0x8D]
-                        max_size += 2
+                    raw_post_byte |= 0x00
+                    post_byte_choices = [0x8C, 0x8D]
+                    max_size += 2
                 else:
-                    size += additional.byte_len()
+                    size += 2 if self.left.is_extended() else 1
                     max_size = size
-                    raw_post_byte |= 0x8D if additional.byte_len() == 2 else 0x8C
+                    raw_post_byte |= 0x8D if self.left.is_extended() else 0x8C
             else:
                 if additional.int <= 0x1F:
                     raw_post_byte |= additional.int
                 else:
                     size += additional.byte_len()
                     max_size = size
-                    raw_post_byte |= 0x89 if additional.byte_len() == 2 else 0x88
+                    raw_post_byte |= 0x89 if self.left.is_extended() else 0x88
 
         return CodePackage(
             op_code=NumericValue(self.instruction.mode.ind),

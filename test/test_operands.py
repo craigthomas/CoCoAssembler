@@ -11,7 +11,7 @@ import unittest
 from cocoasm.operands import UnknownOperand, InherentOperand, ImmediateOperand, \
     OperandType, IndexedOperand, RelativeOperand, ExtendedIndexedOperand, \
     Operand, ExtendedOperand, PseudoOperand, SpecialOperand, DirectOperand, \
-    BadInstructionOperand, ExplicitExtendedOperand, ExplicitDirectOperand
+    BadInstructionOperand
 from cocoasm.instruction import Instruction, Mode
 from cocoasm.values import NumericValue, AddressValue, ValueType
 from cocoasm.exceptions import OperandTypeError
@@ -32,37 +32,37 @@ class TestBaseOperand(unittest.TestCase):
     def test_base_operand_create_from_str_returns_relative(self):
         instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x27, rel_sz=2), is_short_branch=True)
         operand = Operand.create_from_str("$1F", instruction)
-        self.assertTrue(operand.is_type(OperandType.RELATIVE))
+        self.assertTrue(operand.is_relative())
 
     def test_base_operand_create_from_str_returns_inherent(self):
         instruction = Instruction(mnemonic="SWI3", mode=Mode(inh=0x113F, inh_sz=2))
         operand = Operand.create_from_str("", instruction)
-        self.assertTrue(operand.is_type(OperandType.INHERENT))
+        self.assertTrue(operand.is_inherent())
 
     def test_base_operand_create_from_str_returns_immediate(self):
         instruction = Instruction(mnemonic="ORCC", mode=Mode(imm=0x1A, imm_sz=2))
         operand = Operand.create_from_str("#$01", instruction)
-        self.assertTrue(operand.is_type(OperandType.IMMEDIATE))
+        self.assertTrue(operand.is_immediate())
 
     def test_base_operand_create_from_str_returns_extended_indexed(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(ind=0x69, ind_sz=2))
         operand = Operand.create_from_str("[$2000]", instruction)
-        self.assertTrue(operand.is_type(OperandType.EXTENDED_INDIRECT))
+        self.assertTrue(operand.is_extended_indexed())
 
     def test_base_operand_create_from_str_returns_indexed(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(ind=0x69, ind_sz=2))
         operand = Operand.create_from_str(",X+", instruction)
-        self.assertTrue(operand.is_type(OperandType.INDEXED))
+        self.assertTrue(operand.is_indexed())
 
     def test_base_operand_create_from_str_returns_expression(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(ind=0x69, ind_sz=2))
         operand = Operand.create_from_str("VAL+1", instruction)
-        self.assertTrue(operand.value.is_type(ValueType.EXPRESSION))
+        self.assertTrue(operand.value.is_expression())
 
     def test_base_operand_create_from_str_returns_unknown(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(ind=0x69, ind_sz=2))
         operand = Operand.create_from_str("VAL", instruction)
-        self.assertEqual(operand.type, OperandType.UNKNOWN)
+        self.assertTrue(operand.is_unknown())
 
     def test_base_operand_create_from_str_raises(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(ind=0x69, ind_sz=2))
@@ -131,10 +131,10 @@ class TestBadInstructionOperand(unittest.TestCase):
     def test_bad_instruction_operand_translate_returns_empty_code_package(self):
         result = BadInstructionOperand("$FF", None)
         code_pkg = result.translate()
-        self.assertTrue(code_pkg.op_code.is_type(ValueType.NONE))
-        self.assertTrue(code_pkg.address.is_type(ValueType.NONE))
-        self.assertTrue(code_pkg.post_byte.is_type(ValueType.NONE))
-        self.assertTrue(code_pkg.additional.is_type(ValueType.NONE))
+        self.assertTrue(code_pkg.op_code.is_none())
+        self.assertTrue(code_pkg.address.is_none())
+        self.assertTrue(code_pkg.post_byte.is_none())
+        self.assertTrue(code_pkg.additional.is_none())
         self.assertEqual(code_pkg.size, 0)
         self.assertFalse(code_pkg.additional_needs_resolution)
 
@@ -157,7 +157,7 @@ class TestUnknownOperand(unittest.TestCase):
 
     def test_unknown_type_correct(self):
         result = UnknownOperand("blah", self.instruction)
-        self.assertTrue(result.is_type(OperandType.UNKNOWN))
+        self.assertTrue(result.is_unknown())
 
     def test_unknown_string_correct(self):
         result = UnknownOperand("blah", self.fcc_instruction)
@@ -175,9 +175,10 @@ class TestUnknownOperand(unittest.TestCase):
         self.assertEqual(0, result.post_byte.int)
         self.assertEqual(0, result.size)
 
-    def test_unknown_value_set_to_none_on_bad_operand(self):
-        operand = UnknownOperand("\\bad", self.instruction)
-        self.assertEqual(ValueType.NONE, operand.value.type)
+    def test_unknown_raises_on_bad_operand(self):
+        with self.assertRaises(OperandTypeError) as context:
+            UnknownOperand("\\bad", self.instruction)
+        self.assertEqual("[\\bad] unknown operand type", str(context.exception))
 
 
 class TestRelativeOperand(unittest.TestCase):
@@ -192,7 +193,7 @@ class TestRelativeOperand(unittest.TestCase):
 
     def test_relative_type_correct(self):
         result = RelativeOperand("$FF", self.instruction)
-        self.assertTrue(result.is_type(OperandType.RELATIVE))
+        self.assertTrue(result.is_relative())
 
     def test_relative_raises_if_instruction_not_branch(self):
         instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1))
@@ -222,7 +223,7 @@ class TestPseudoOperand(unittest.TestCase):
 
     def test_pseudo_type_correct(self):
         result = PseudoOperand("$FF", self.instruction)
-        self.assertTrue(result.is_type(OperandType.PSEUDO))
+        self.assertTrue(result.is_pseudo())
 
     def test_pseudo_raises_if_instruction_not_pseudo(self):
         instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1))
@@ -279,7 +280,7 @@ class TestSpecialOperand(unittest.TestCase):
 
     def test_special_type_correct(self):
         result = SpecialOperand("$FF", self.instruction)
-        self.assertTrue(result.is_type(OperandType.SPECIAL))
+        self.assertTrue(result.is_special())
 
     def test_special_raises_if_instruction_not_special(self):
         instruction = Instruction(mnemonic="BEQ", mode=Mode(rel=0x3A, rel_sz=1))
@@ -459,7 +460,7 @@ class TestInherentOperand(unittest.TestCase):
 
     def test_inherent_type_correct(self):
         result = InherentOperand(None, self.instruction)
-        self.assertTrue(result.is_type(OperandType.INHERENT))
+        self.assertTrue(result.is_inherent())
 
     def test_inherent_string_correct(self):
         result = InherentOperand(None, self.instruction)
@@ -502,7 +503,7 @@ class TestImmediateOperand(unittest.TestCase):
 
     def test_immediate_type_correct(self):
         result = ImmediateOperand("#blah", self.instruction)
-        self.assertTrue(result.is_type(OperandType.IMMEDIATE))
+        self.assertTrue(result.is_immediate())
 
     def test_immediate_string_correct(self):
         result = ImmediateOperand("#blah", self.instruction)
@@ -573,7 +574,7 @@ class TestIndexedOperand(unittest.TestCase):
 
     def test_indexed_type_correct(self):
         result = IndexedOperand(",X", self.instruction)
-        self.assertTrue(result.is_type(OperandType.INDEXED))
+        self.assertTrue(result.is_indexed())
 
     def test_indexed_string_correct(self):
         result = IndexedOperand(",X", self.instruction)
@@ -582,7 +583,7 @@ class TestIndexedOperand(unittest.TestCase):
     def test_indexed_raises_with_bad_value(self):
         with self.assertRaises(OperandTypeError) as context:
             IndexedOperand(",blah,", self.instruction)
-        self.assertEqual("[,blah,] incorrect number of commas in indexed value", str(context.exception))
+        self.assertEqual("[,blah,] is not an indexed value", str(context.exception))
 
     def test_indexed_raises_with_no_commas(self):
         with self.assertRaises(OperandTypeError) as context:
@@ -729,12 +730,14 @@ class TestIndexedOperand(unittest.TestCase):
 
     def test_indexed_5_bit_value_correct(self):
         operand = IndexedOperand("$1F,X", self.instruction)
+        operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("1F", code_pkg.post_byte.hex())
         self.assertEqual(2, code_pkg.size)
 
         operand = IndexedOperand("$1F,Y", self.instruction)
+        operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("3F", code_pkg.post_byte.hex())
@@ -742,6 +745,7 @@ class TestIndexedOperand(unittest.TestCase):
 
     def test_indexed_8_bit_value_correct(self):
         operand = IndexedOperand("$20,X", self.instruction)
+        operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("88", code_pkg.post_byte.hex())
@@ -750,6 +754,7 @@ class TestIndexedOperand(unittest.TestCase):
 
     def test_indexed_16_bit_value_correct(self):
         operand = IndexedOperand("$2000,X", self.instruction)
+        operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("89", code_pkg.post_byte.hex())
@@ -758,6 +763,7 @@ class TestIndexedOperand(unittest.TestCase):
 
     def test_indexed_8_bit_value_from_pc_correct(self):
         operand = IndexedOperand("$20,PCR", self.instruction)
+        operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("8C", code_pkg.post_byte.hex())
@@ -766,6 +772,7 @@ class TestIndexedOperand(unittest.TestCase):
 
     def test_indexed_16_bit_value_from_pc_correct(self):
         operand = IndexedOperand("$2000,PCR", self.instruction)
+        operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
         self.assertEqual("8D", code_pkg.post_byte.hex())
@@ -836,7 +843,7 @@ class TestExtendedIndexedOperand(unittest.TestCase):
 
     def test_extended_indexed_type_correct(self):
         result = ExtendedIndexedOperand("[,X]", self.instruction)
-        self.assertTrue(result.is_type(OperandType.EXTENDED_INDIRECT))
+        self.assertTrue(result.is_extended_indexed())
 
     def test_extended_indexed_string_correct(self):
         result = ExtendedIndexedOperand("[,X]", self.instruction)
@@ -845,7 +852,7 @@ class TestExtendedIndexedOperand(unittest.TestCase):
     def test_extended_indexed_raises_with_bad_value(self):
         with self.assertRaises(OperandTypeError) as context:
             ExtendedIndexedOperand("[,blah,]", self.instruction)
-        self.assertEqual("[[,blah,]] incorrect number of commas in extended indexed value", str(context.exception))
+        self.assertEqual("[[,blah,]] is not an extended indexed value", str(context.exception))
 
     def test_extended_indexed_raises_with_no_surrounding_braces(self):
         with self.assertRaises(OperandTypeError) as context:
@@ -1082,18 +1089,6 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         self.assertEqual("1F", code_pkg.additional.hex())
         self.assertEqual(3, code_pkg.size)
 
-    def test_extended_indexed_value_passthrough_correct(self):
-        operand = ExtendedIndexedOperand("", self.instruction, value="FFFF")
-        self.assertEqual("FFFF", operand.value)
-
-    def test_extended_indexed_translate_value_passthrough_correct(self):
-        operand = ExtendedIndexedOperand("", self.instruction, value=AddressValue(0x900))
-        code_pkg = operand.translate()
-        self.assertEqual("AF", code_pkg.op_code.hex())
-        self.assertEqual("9F", code_pkg.post_byte.hex())
-        self.assertEqual("0900", code_pkg.additional.hex())
-        self.assertEqual(4, code_pkg.size)
-
     def test_extended_indexed_resolve_symbol_correct(self):
         symbol_table = {
             "BLAH": NumericValue(2)
@@ -1121,12 +1116,12 @@ class TestDirectOperand(unittest.TestCase):
 
     def test_direct_type_correct(self):
         result = DirectOperand("$FF", self.instruction)
-        self.assertTrue(result.is_type(OperandType.DIRECT))
+        self.assertTrue(result.is_direct())
         self.assertEqual("FF", result.value.hex())
 
     def test_direct_value_passthrough_correct(self):
         result = DirectOperand("$FF", self.instruction, value=NumericValue("$FE"))
-        self.assertTrue(result.is_type(OperandType.DIRECT))
+        self.assertTrue(result.is_direct())
         self.assertEqual("FE", result.value.hex())
 
     def test_direct_raises_if_value_not_direct_length(self):
@@ -1136,7 +1131,7 @@ class TestDirectOperand(unittest.TestCase):
 
     def test_direct_force_direct_mode_correct(self):
         result = DirectOperand("<$FF", self.instruction)
-        self.assertTrue(result.is_type(OperandType.DIRECT))
+        self.assertTrue(result.is_direct())
         self.assertEqual("FF", result.value.hex())
 
     def test_direct_raises_on_translate_not_direct_instruction(self):
@@ -1147,46 +1142,6 @@ class TestDirectOperand(unittest.TestCase):
         self.assertEqual("Instruction [SUBA] does not support direct addressing", str(context.exception))
 
     def test_direct_translate_correct(self):
-        operand = DirectOperand("<$FF", self.instruction)
-        code_pkg = operand.translate()
-        self.assertEqual("B0", code_pkg.op_code.hex())
-        self.assertEqual("FF", code_pkg.additional.hex())
-        self.assertEqual(3, code_pkg.size)
-
-
-class TestExplicitDirectOperand(unittest.TestCase):
-    """
-    A test class for the ExplicitDirectOperand class.
-    """
-    def setUp(self):
-        """
-        Common setup routines needed for all unit tests.
-        """
-        self.instruction = Instruction(mnemonic="SUBA", mode=Mode(dir=0xB0, dir_sz=3))
-
-    def test_explicit_direct_type_correct(self):
-        result = ExplicitDirectOperand("<$FF", self.instruction)
-        self.assertTrue(result.is_type(OperandType.DIRECT))
-        self.assertEqual("FF", result.value.hex())
-
-    def test_explicit_direct_raises_if_not_direct(self):
-        with self.assertRaises(OperandTypeError) as context:
-            ExplicitDirectOperand("$FF", self.instruction)
-        self.assertEqual("[$FF] does not explicitly signal a direct operand", str(context.exception))
-
-    def test_explicit_direct_raises_if_byte_lenth_too_long(self):
-        with self.assertRaises(OperandTypeError) as context:
-            ExplicitDirectOperand("<$FFFF", self.instruction)
-        self.assertEqual("[<$FFFF] is not a direct value", str(context.exception))
-
-    def test_explicit_direct_raises_on_translate_not_direct_instruction(self):
-        instruction = Instruction(mnemonic="SUBA", mode=Mode(imm=0xB0, imm_sz=3))
-        operand = DirectOperand("<$FF", instruction)
-        with self.assertRaises(OperandTypeError) as context:
-            operand.translate()
-        self.assertEqual("Instruction [SUBA] does not support direct addressing", str(context.exception))
-
-    def test_explicit_direct_translate_correct(self):
         operand = DirectOperand("<$FF", self.instruction)
         code_pkg = operand.translate()
         self.assertEqual("B0", code_pkg.op_code.hex())
@@ -1206,7 +1161,7 @@ class TestExtendedOperand(unittest.TestCase):
 
     def test_extended_type_correct(self):
         result = ExtendedOperand("$FFFF", self.instruction)
-        self.assertTrue(result.is_type(OperandType.EXTENDED))
+        self.assertTrue(result.is_extended())
 
     def test_extended_translate_raises_if_instruction_not_extended(self):
         instruction = Instruction(mnemonic="SUBA", mode=Mode(rel=0x3A, rel_sz=1))
@@ -1227,37 +1182,9 @@ class TestExtendedOperand(unittest.TestCase):
 
     def test_extended_force_extended_mode_correct(self):
         result = ExtendedOperand(">$FFFF", self.instruction)
-        self.assertTrue(result.is_type(OperandType.EXTENDED))
+        self.assertTrue(result.is_extended())
         self.assertEqual("FFFF", result.value.hex())
 
-
-class TestExplicitExtendedOperand(unittest.TestCase):
-    """
-    A test class for the ExplicitExtendedOperand class.
-    """
-    def setUp(self):
-        """
-        Common setup routines needed for all unit tests.
-        """
-        self.instruction = Instruction(mnemonic="SUBA", mode=Mode(ext=0xB0, ext_sz=3))
-
-    def test_explicit_extended_translate_raises_if_instruction_not_extended(self):
-        instruction = Instruction(mnemonic="SUBA", mode=Mode(rel=0x3A, rel_sz=1))
-        with self.assertRaises(OperandTypeError) as context:
-            operand = ExplicitExtendedOperand(">$FFFF", instruction)
-            operand.translate()
-        self.assertEqual("Instruction [SUBA] does not support extended addressing", str(context.exception))
-
-    def test_explicit_extended_translates_correct(self):
-        operand = ExplicitExtendedOperand(">$FFFF", self.instruction)
-        code_pkg = operand.translate()
-        self.assertEqual("B0", code_pkg.op_code.hex())
-        self.assertEqual("FFFF", code_pkg.additional.hex())
-
-    def test_explicit_extended_force_extended_mode_correct(self):
-        result = ExtendedOperand(">$FFFF", self.instruction)
-        self.assertTrue(result.is_type(OperandType.EXTENDED))
-        self.assertEqual("FFFF", result.value.hex())
 
 # M A I N #####################################################################
 
