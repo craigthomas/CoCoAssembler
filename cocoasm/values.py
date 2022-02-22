@@ -35,6 +35,11 @@ INT_REGEX = re.compile(
     r"^(?P<value>[\d]+)$"
 )
 
+# Pattern to recognize a negative integer value
+NEG_INT_REGEX = re.compile(
+    r"^-(?P<value>[\d]+)$"
+)
+
 # Pattern to recognize a symbol value
 SYMBOL_REGEX = re.compile(
     r"^(?P<value>[a-zA-Z0-9@]+)$"
@@ -88,6 +93,7 @@ class Value(ABC):
         self.int = 0
         self.size_hint = size_hint
         self.explict_addressing_mode = mode
+        self.negative = False
         if mode == ExplicitAddressingMode.EXTENDED or mode == ExplicitAddressingMode.EXPLICIT_EXTENDED:
             self.size_hint = 4
 
@@ -164,6 +170,9 @@ class Value(ABC):
     def is_address_expression(self):
         return self.type == ValueType.ADDRESS_EXPRESSION
 
+    def is_negative(self):
+        return self.negative
+
     def resolve(self, symbol_table):
         """
         Attempts to resolve the proper value of the object given the supplied symbol table
@@ -186,6 +195,22 @@ class Value(ABC):
         Returns the full length of the hex representation.
 
         :return: the full number of hex characters
+        """
+
+    @abstractmethod
+    def is_8_bit(self):
+        """
+        Returns True if the value is an 8-bit integer.
+
+        :return: True if the value is an 8-bit integer
+        """
+
+    @abstractmethod
+    def is_16_bit(self):
+        """
+        Returns True if the value is a 16-bit integer.
+
+        :return: True if the value is a 16-bit integer
         """
 
     @classmethod
@@ -277,6 +302,12 @@ class NoneValue(Value):
     def hex_len(self):
         return 0
 
+    def is_8_bit(self):
+        return False
+
+    def is_16_bit(self):
+        return False
+
 
 class StringValue(Value):
     """
@@ -298,6 +329,12 @@ class StringValue(Value):
     def hex_len(self):
         return len(self.hex())
 
+    def is_8_bit(self):
+        return False
+
+    def is_16_bit(self):
+        return False
+
 
 class LeftRightValue(Value):
     """
@@ -318,6 +355,12 @@ class LeftRightValue(Value):
 
     def hex_len(self):
         return 0
+
+    def is_8_bit(self):
+        return False
+
+    def is_16_bit(self):
+        return False
 
 
 class NumericValue(Value):
@@ -375,7 +418,21 @@ class NumericValue(Value):
             self.post_init_direct_check()
             return
 
+        data = NEG_INT_REGEX.match(value)
+        if data:
+            self.int = int(data.group("value"), 10)
+            if self.int > 32768:
+                raise ValueTypeError("integer value cannot be below -32768")
+            self.negative = True
+            return
+
         raise ValueTypeError("[{}] is not valid integer, character literal, or hex value".format(value))
+
+    def get_negative(self):
+        if not self.negative:
+            return self.int
+
+        return self.int | 0x80 if self.int < 128 else self.int | 0x8000
 
     def hex(self, size=0):
         if self.size_hint and size == 0:
@@ -401,6 +458,15 @@ class NumericValue(Value):
 
         if self.explict_addressing_mode == ExplicitAddressingMode.NONE:
             self.explict_addressing_mode = ExplicitAddressingMode.EXTENDED
+
+    def is_4_bit(self):
+        return self.int <= 16 if self.negative else self.int <= 15
+
+    def is_8_bit(self):
+        return self.int <= 128 if self.negative else self.int <= 127
+
+    def is_16_bit(self):
+        return not self.is_4_bit() and not self.is_8_bit()
 
 
 class DirectNumericValue(NumericValue):
@@ -441,6 +507,12 @@ class SymbolValue(Value):
         if symbol.is_numeric():
             return NumericValue(symbol.int)
 
+    def is_8_bit(self):
+        return False
+
+    def is_16_bit(self):
+        return False
+
 
 class AddressValue(Value):
     """
@@ -460,6 +532,12 @@ class AddressValue(Value):
 
     def hex_len(self):
         return len(hex(self.int)[2:])
+
+    def is_8_bit(self):
+        return False
+
+    def is_16_bit(self):
+        return True
 
 
 class ExpressionValue(Value):
@@ -546,5 +624,11 @@ class ExpressionValue(Value):
             return NumericValue(address / additional_value, size_hint=4, mode=ExplicitAddressingMode.EXTENDED)
 
         raise ValueError("[{}] cannot calculate offset address".format(self.value))
+
+    def is_8_bit(self):
+        return False
+
+    def is_16_bit(self):
+        return False
 
 # E N D   O F   F I L E #######################################################
