@@ -510,7 +510,7 @@ class ExtendedIndexedOperand(Operand):
         if "S" in self.right:
             raw_post_byte |= 0x60
 
-        if self.left == "":
+        if self.left == "" or (not type(self.left) == str and self.left.is_numeric() and self.left.int == 0):
             if "-" in self.right or "+" in self.right:
                 if self.right == "X+" or self.right == "Y+" or self.right == "U+" or self.right == "S+":
                     raise OperandTypeError("[{}] not allowed as an extended indirect value".format(self.right))
@@ -559,9 +559,26 @@ class ExtendedIndexedOperand(Operand):
                     max_size = size
                     raw_post_byte |= 0x9D if self.left.is_extended() else 0x9C
             else:
-                size += additional.byte_len()
-                max_size = size
-                raw_post_byte |= 0x99 if self.left.is_extended() else 0x98
+                if additional.is_negative():
+                    if additional.is_8_bit():
+                        raw_post_byte |= 0x98
+                        additional = 0x100 - additional.int
+                        additional = NumericValue(additional)
+                    else:
+                        raw_post_byte |= 0x99
+                        additional = 0x10000 - additional.int
+                        additional = NumericValue(additional)
+                elif additional.is_8_bit():
+                    raw_post_byte |= 0x98
+                    size += 1
+                elif additional.is_16_bit():
+                    raw_post_byte |= 0x99
+                    size += 2
+                    additional = NumericValue(additional.int, size_hint=4)
+                else:
+                    size += additional.byte_len()
+                    max_size = size
+                    raw_post_byte |= 0x99 if self.left.is_extended() else 0x98
 
         return CodePackage(
             op_code=NumericValue(self.instruction.mode.ind),
@@ -620,7 +637,7 @@ class IndexedOperand(Operand):
         if "S" in self.right:
             raw_post_byte |= 0x60
 
-        if self.left == "":
+        if self.left == "" or (not type(self.left) == str and self.left.is_numeric() and self.left.int == 0):
             raw_post_byte |= 0x80
             if "-" in self.right or "+" in self.right:
                 if "+" in self.right:
@@ -669,8 +686,29 @@ class IndexedOperand(Operand):
                     max_size = size
                     raw_post_byte |= 0x8D if self.left.is_extended() else 0x8C
             else:
-                if additional.int <= 0x1F:
+                if additional.is_negative():
+                    if additional.is_4_bit():
+                        raw_post_byte |= 0x10
+                        raw_post_byte |= 0x10 - additional.int
+                        additional = NoneValue()
+                    elif additional.is_8_bit():
+                        raw_post_byte |= 0x88
+                        additional = 0x100 - additional.int
+                        additional = NumericValue(additional)
+                    else:
+                        raw_post_byte |= 0x89
+                        additional = 0x10000 - additional.int
+                        additional = NumericValue(additional)
+                elif additional.is_4_bit():
                     raw_post_byte |= additional.int
+                    additional = NoneValue()
+                elif additional.is_8_bit():
+                    raw_post_byte |= 0x88
+                    size += 1
+                elif additional.is_16_bit():
+                    raw_post_byte |= 0x89
+                    size += 2
+                    additional = NumericValue(additional.int, size_hint=4)
                 else:
                     size += additional.byte_len()
                     max_size = size

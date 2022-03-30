@@ -221,6 +221,19 @@ class TestNumericValue(unittest.TestCase):
             NumericValue("%10101010101010101")
         self.assertEqual("binary pattern 10101010101010101 must be 8 or 16 bits long", str(context.exception))
 
+    def test_numeric_is_4_bit_zero_value(self):
+        result = NumericValue("0")
+        self.assertTrue(result.is_4_bit())
+
+    def test_numeric_is_4_bit_max_positive(self):
+        result = NumericValue("15")
+        self.assertEqual(15, result.int)
+        self.assertTrue(result.is_4_bit())
+
+    def test_numeric_is_4_bit_max_negative(self):
+        result = NumericValue("-16")
+        self.assertTrue(result.is_4_bit())
+
 
 class TestStringValue(unittest.TestCase):
     """
@@ -459,6 +472,27 @@ class TestExpressionValue(unittest.TestCase):
             result.resolve({})
         self.assertEqual("[VAR+1] unresolved expression", str(context.exception))
 
+    def test_is_8_bit_correct(self):
+        result = NumericValue("127")
+        self.assertTrue(result.is_8_bit())
+        self.assertFalse(result.is_16_bit())
+
+    def test_is_16_bit_correct(self):
+        result = NumericValue("256")
+        self.assertFalse(result.is_8_bit())
+        self.assertTrue(result.is_16_bit())
+
+    def test_negative_value_is_negative(self):
+        result = NumericValue("-1")
+        self.assertTrue(result.is_negative())
+
+    def test_negative_value_get_negative_correct_8_bit(self):
+        result = NumericValue("-1")
+        self.assertEqual(0x81, result.get_negative())
+
+    def test_negative_value_get_negative_correct_16_bit(self):
+        result = NumericValue("-256")
+        self.assertEqual(0x8100, result.get_negative())
 
 # M A I N #####################################################################
 

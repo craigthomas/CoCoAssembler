@@ -728,19 +728,19 @@ class TestIndexedOperand(unittest.TestCase):
             operand.translate()
         self.assertEqual("[$1F,X+] invalid indexed expression", str(context.exception))
 
-    def test_indexed_5_bit_value_correct(self):
-        operand = IndexedOperand("$1F,X", self.instruction)
+    def test_indexed_4_bit_value_correct(self):
+        operand = IndexedOperand("$F,X", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
-        self.assertEqual("1F", code_pkg.post_byte.hex())
+        self.assertEqual("0F", code_pkg.post_byte.hex())
         self.assertEqual(2, code_pkg.size)
 
-        operand = IndexedOperand("$1F,Y", self.instruction)
+        operand = IndexedOperand("$F,Y", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
-        self.assertEqual("3F", code_pkg.post_byte.hex())
+        self.assertEqual("2F", code_pkg.post_byte.hex())
         self.assertEqual(2, code_pkg.size)
 
     def test_indexed_8_bit_value_correct(self):
@@ -810,19 +810,19 @@ class TestIndexedOperand(unittest.TestCase):
         self.assertEqual(2, code_pkg.size)
 
     def test_indexed_resolve_left_side_not_symbol_correct(self):
-        operand = IndexedOperand("$1F,X", self.instruction)
+        operand = IndexedOperand("$F,X", self.instruction)
         operand = operand.resolve_symbols({})
         code_pkg = operand.translate()
         self.assertEqual("AF", code_pkg.op_code.hex())
-        self.assertEqual("1F", code_pkg.post_byte.hex())
+        self.assertEqual("0F", code_pkg.post_byte.hex())
         self.assertEqual(2, code_pkg.size)
 
     def test_indexed_resolve_left_side_symbol_correct(self):
-        symbol_table = {'blah': NumericValue("$1F")}
+        symbol_table = {'blah': NumericValue("$F")}
         operand = IndexedOperand("blah,X", self.instruction)
         operand = operand.resolve_symbols(symbol_table)
         code_pkg = operand.translate()
-        self.assertEqual("1F", code_pkg.post_byte.hex())
+        self.assertEqual("0F", code_pkg.post_byte.hex())
 
     def test_indexed_translate_left_address_requires_additional_resolution(self):
         operand = IndexedOperand("$1F,X", self.instruction)

@@ -523,6 +523,225 @@ class TestIntegration(unittest.TestCase):
         program.translate_statements()
         self.assertEqual([0x9E, 0x88], program.get_binary_array())
 
+    def test_negative_one_offset_in_indexed_mode(self):
+        statements = [
+            Statement("      STD -1,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x1F], program.get_binary_array())
+
+    def test_negative_5_bit_offset_max_in_indexed_mode(self):
+        statements = [
+            Statement("      STD -16,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x10], program.get_binary_array())
+
+    def test_positive_5_bit_offset_max_in_indexed_mode(self):
+        statements = [
+            Statement("      STD 15,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x0F], program.get_binary_array())
+
+    def test_negative_8_bit_offset_in_indexed_mode(self):
+        statements = [
+            Statement("      STD -17,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x88, 0xEF], program.get_binary_array())
+
+    def test_positive_8_bit_offset_in_indexed_mode(self):
+        statements = [
+            Statement("      STD 17,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x88, 0x11], program.get_binary_array())
+
+    def test_negative_8_bit_offset_max_in_indexed_mode(self):
+        statements = [
+            Statement("      STD -128,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x88, 0x80], program.get_binary_array())
+
+    def test_positive_8_bit_offset_max_in_indexed_mode(self):
+        statements = [
+            Statement("      STD 127,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x88, 0x7F], program.get_binary_array())
+
+    def test_negative_16_bit_offset_in_indexed_mode(self):
+        statements = [
+            Statement("      STD -130,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x89, 0xFF, 0x7E], program.get_binary_array())
+
+    def test_positive_16_bit_offset_in_indexed_mode(self):
+        statements = [
+            Statement("      STD 130,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x89, 0x00, 0x82], program.get_binary_array())
+
+    def test_negative_16_bit_offset_max_in_indexed_mode(self):
+        statements = [
+            Statement("      STD -32768,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x89, 0x80, 0x00], program.get_binary_array())
+
+    def test_positive_16_bit_offset_max_in_indexed_mode(self):
+        statements = [
+            Statement("      STD 32767,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x89, 0x7F, 0xFF], program.get_binary_array())
+
+    def test_zero_offset_in_indexed_mode(self):
+        statements = [
+            Statement("      STD 0,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x84], program.get_binary_array())
+
+    def test_zero_offset_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [0,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x94], program.get_binary_array())
+
+    def test_negative_one_offset_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [-1,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        # Should default to 8-bit handling
+        self.assertEqual([0xED, 0x98, 0xFF], program.get_binary_array())
+
+    def test_negative_4_bit_offset_max_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [-16,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        # Should default to 8-bit handling
+        self.assertEqual([0xED, 0x98, 0xF0], program.get_binary_array())
+
+    def test_positive_4_bit_offset_max_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [15,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        # Should default to 8-bit handling
+        self.assertEqual([0xED, 0x98, 0x0F], program.get_binary_array())
+
+    def test_negative_8_bit_offset_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [-17,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x98, 0xEF], program.get_binary_array())
+
+    def test_positive_8_bit_offset_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [17,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x98, 0x11], program.get_binary_array())
+
+    def test_negative_8_bit_offset_max_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [-128,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x98, 0x80], program.get_binary_array())
+
+    def test_positive_8_bit_offset_max_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [127,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x98, 0x7F], program.get_binary_array())
+
+    def test_negative_16_bit_offset_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [-130,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x99, 0xFF, 0x7E], program.get_binary_array())
+
+    def test_positive_16_bit_offset_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [130,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x99, 0x00, 0x82], program.get_binary_array())
+
+    def test_negative_16_bit_offset_max_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [-32768,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x99, 0x80, 0x00], program.get_binary_array())
+
+    def test_positive_16_bit_offset_max_in_extended_indexed_mode(self):
+        statements = [
+            Statement("      STD [32767,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xED, 0x99, 0x7F, 0xFF], program.get_binary_array())
+
 # M A I N #####################################################################
 
 
