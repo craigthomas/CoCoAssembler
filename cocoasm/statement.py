@@ -259,20 +259,23 @@ class Statement(object):
             self.code_pkg.additional = self.operand.value.calculate_address_offset(statements)
 
         if self.operand.is_indexed() or self.operand.is_extended_indexed():
-            if self.operand.left and self.operand.left.is_address_expression() and self.code_pkg.additional_needs_resolution:
-                start_address = statements[this_index].code_pkg.address.int
-                offset = self.operand.left.calculate_address_offset(statements).int
-                # TODO: fix offsets that are negative
-                jump_distance = start_address - offset if offset < start_address else offset - start_address
-                if jump_distance < 256:
-                    self.code_pkg.additional = NumericValue(offset, size_hint=2)
-                    self.code_pkg.post_byte = NumericValue(self.code_pkg.post_byte_choices[0] | self.code_pkg.post_byte.int)
-                    self.code_pkg.size += 1
-                else:
-                    self.code_pkg.additional = NumericValue(offset, size_hint=4)
-                    self.code_pkg.post_byte = NumericValue(self.code_pkg.post_byte_choices[1] | self.code_pkg.post_byte.int)
-                    self.code_pkg.size += 2
-                self.code_pkg.additional_needs_resolution = False
+            if self.operand.left:
+                if type(self.operand.left) == str:
+                    pass
+                elif self.operand.left.is_address_expression() and self.code_pkg.additional_needs_resolution:
+                    start_address = statements[this_index].code_pkg.address.int
+                    offset = self.operand.left.calculate_address_offset(statements).int
+                    # TODO: fix offsets that are negative
+                    jump_distance = start_address - offset if offset < start_address else offset - start_address
+                    if jump_distance < 256:
+                        self.code_pkg.additional = NumericValue(offset, size_hint=2)
+                        self.code_pkg.post_byte = NumericValue(self.code_pkg.post_byte_choices[0] | self.code_pkg.post_byte.int)
+                        self.code_pkg.size += 1
+                    else:
+                        self.code_pkg.additional = NumericValue(offset, size_hint=4)
+                        self.code_pkg.post_byte = NumericValue(self.code_pkg.post_byte_choices[1] | self.code_pkg.post_byte.int)
+                        self.code_pkg.size += 2
+                    self.code_pkg.additional_needs_resolution = False
 
         if self.operand.value.is_address():
             self.code_pkg.additional = statements[self.operand.value.int].code_pkg.address

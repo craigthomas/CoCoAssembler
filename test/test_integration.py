@@ -742,6 +742,24 @@ class TestIntegration(unittest.TestCase):
         program.translate_statements()
         self.assertEqual([0xED, 0x99, 0x7F, 0xFF], program.get_binary_array())
 
+    def test_string_in_lhs_of_indexed_expression(self):
+        statements = [
+            Statement("      LDA B,X")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xA6, 0x85], program.get_binary_array())
+
+    def test_string_in_lhs_of_extended_indexed_expression(self):
+        statements = [
+            Statement("      LDA [B,X]")
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xA6, 0x95], program.get_binary_array())
+
 # M A I N #####################################################################
 
 
