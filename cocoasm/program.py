@@ -10,7 +10,7 @@ import sys
 
 from cocoasm.exceptions import TranslationError, ParseError, ValueTypeError
 from cocoasm.statement import Statement
-from cocoasm.values import AddressValue, ValueType, NoneValue
+from cocoasm.values import AddressValue, NoneValue
 
 # C L A S S E S ###############################################################
 
@@ -126,9 +126,10 @@ class Program(object):
             for index, statement in enumerate(self.statements):
                 statement.translate()
 
-            # Check for any PCR indexed addresses, and flag them
-            for index, statement in enumerate(self.statements):
-                statement.fix_pcr_relative_addresses(self.statements, index)
+            while not self.all_sizes_fixed():
+                for index, statement in enumerate(self.statements):
+                    if not statement.fixed_size:
+                        statement.determine_pcr_relative_sizes(self.statements, index)
 
             address = 0
             for index, statement in enumerate(self.statements):
@@ -175,6 +176,16 @@ class Program(object):
                     hex_byte = "{}{}".format(additional[index], additional[index + 1])
                     machine_codes.append(int(hex_byte, 16))
         return machine_codes
+
+    def all_sizes_fixed(self):
+        """
+        Checks to see if all of the statements have fixed sizes. Returns
+        True if all the sizes are fixed, False otherwise.
+        """
+        for statement in self.statements:
+            if not statement.fixed_size:
+                return False
+        return True
 
     def print_symbol_table(self):
         """

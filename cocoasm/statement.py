@@ -56,6 +56,8 @@ class Statement(object):
         self.comment = None
         self.mnemonic = ""
         self.state = None
+        self.fixed_size = True
+        self.pcr_size_hint = 2
         self.code_pkg = CodePackage()
         self.parse_line(line)
 
@@ -168,6 +170,7 @@ class Statement(object):
         """
         try:
             self.code_pkg = self.operand.translate()
+            self.fixed_size = not (self.code_pkg.additional_needs_resolution or self.code_pkg.post_byte_choices)
         except ValueError as error:
             raise TranslationError(str(error), self)
         except OperandTypeError as error:
@@ -175,57 +178,67 @@ class Statement(object):
         except ValueTypeError as error:
             raise TranslationError(str(error), self)
 
-    def fix_pcr_relative_addresses(self, statements, this_index):
+    def determine_pcr_relative_sizes(self, statements, this_index):
         """
-        Once all of the statements have been translated, then we need to
-        check whether program counter relative indexed statements can
-        be 8-bit, or if they must be 16-bit. This operation changes the
-        size of a code package depending on how many steps away a statement
-        is. To calculate the relative offset, we use a cheat - since we
-        don't yet know how big any of the PCR statements are, we count the
-        size of each instruction between the PCR statement using the code
-        package's max_size. This tells us potentially how large the statements
-        will be. If they are bigger than an 8-bit value, then we can default
-        to a 16-bit offset. There may be edge cases where this heuristic may fail,
-        most notably when there is a PCR statement that has not yet been resolved
-        to be 8-bit, and would change the max_size calculation to be a valid
-        8-bit offset value instead.
+        Given a PCR relative operation, determine whether we have an 8-bit or 16-bit offset
+        from the program counter. Mark the correct size for the statement when complete,
+        so that other program counter relative checks can complete.
 
         :param statements: the full set of statements that make up the program
         :param this_index: the index that this instruction occurs at
         """
-        if not self.code_pkg.additional_needs_resolution or not self.code_pkg.post_byte_choices:
-            return
+        # TODO: implement detection of 5-bit offsets as an optimization
+        min_size = 0
+        max_size = 0
+        positive_range = True
 
+        rel_index = self.code_pkg.additional.int
         if self.operand.left.is_address_expression():
-            relative_index = self.operand.left.extract_address_index_from_expression()
-        else:
-            relative_index = self.code_pkg.additional.int
+            rel_index = self.operand.left.extract_address_index_from_expression()
 
-        if relative_index > this_index:
-            total_size = 0
-            raw_post_byte = self.code_pkg.post_byte.int
-            for x in range(this_index, relative_index):
-                total_size += statements[x].code_pkg.max_size
-            if total_size <= 255:
+        range_count = range(this_index, rel_index)
+        if rel_index < this_index:
+            positive_range = False
+            range_count = range(rel_index, this_index)
+
+        for x in range_count:
+            max_size += statements[x].code_pkg.max_size
+            min_size += statements[x].code_pkg.size
+
+        raw_post_byte = self.code_pkg.post_byte.int
+        max_size += 2
+        min_size += 2
+
+        if positive_range:
+            if min_size <= 127 and max_size <= 127:
                 self.code_pkg.size += 1
+                self.code_pkg.max_size = self.code_pkg.size
+                self.pcr_size_hint = 2
+                self.fixed_size = True
                 raw_post_byte |= self.code_pkg.post_byte_choices[0]
-            else:
+                self.code_pkg.post_byte = NumericValue(raw_post_byte)
+            elif min_size > 127 and max_size > 127:
                 self.code_pkg.size += 2
+                self.code_pkg.max_size = self.code_pkg.size
+                self.pcr_size_hint = 4
+                self.fixed_size = True
                 raw_post_byte |= self.code_pkg.post_byte_choices[1]
-            self.code_pkg.post_byte = NumericValue(raw_post_byte)
+                self.code_pkg.post_byte = NumericValue(raw_post_byte)
         else:
-            total_size = 0
-            raw_post_byte = self.code_pkg.post_byte.int
-            for x in range(relative_index, this_index):
-                total_size += statements[x].code_pkg.max_size
-            if total_size <= 255:
+            if min_size <= 128 and max_size <= 128:
                 self.code_pkg.size += 1
+                self.code_pkg.max_size = self.code_pkg.size
+                self.pcr_size_hint = 2
+                self.fixed_size = True
                 raw_post_byte |= self.code_pkg.post_byte_choices[0]
-            else:
+                self.code_pkg.post_byte = NumericValue(raw_post_byte)
+            elif min_size > 128 and max_size > 128:
                 self.code_pkg.size += 2
+                self.code_pkg.max_size = self.code_pkg.size
+                self.pcr_size_hint = 4
+                self.fixed_size = True
                 raw_post_byte |= self.code_pkg.post_byte_choices[1]
-            self.code_pkg.post_byte = NumericValue(raw_post_byte)
+                self.code_pkg.post_byte = NumericValue(raw_post_byte)
 
     def fix_addresses(self, statements, this_index):
         """
@@ -263,18 +276,9 @@ class Statement(object):
                 if type(self.operand.left) == str:
                     pass
                 elif self.operand.left.is_address_expression() and self.code_pkg.additional_needs_resolution:
-                    start_address = statements[this_index].code_pkg.address.int
                     offset = self.operand.left.calculate_address_offset(statements).int
                     # TODO: fix offsets that are negative
-                    jump_distance = start_address - offset if offset < start_address else offset - start_address
-                    if jump_distance < 256:
-                        self.code_pkg.additional = NumericValue(offset, size_hint=2)
-                        self.code_pkg.post_byte = NumericValue(self.code_pkg.post_byte_choices[0] | self.code_pkg.post_byte.int)
-                        self.code_pkg.size += 1
-                    else:
-                        self.code_pkg.additional = NumericValue(offset, size_hint=4)
-                        self.code_pkg.post_byte = NumericValue(self.code_pkg.post_byte_choices[1] | self.code_pkg.post_byte.int)
-                        self.code_pkg.size += 2
+                    self.code_pkg.additional = NumericValue(offset, size_hint=self.pcr_size_hint)
                     self.code_pkg.additional_needs_resolution = False
 
         if self.operand.value.is_address():
@@ -283,24 +287,18 @@ class Statement(object):
         if self.code_pkg.additional_needs_resolution:
             start_address = statements[this_index].code_pkg.address
             relative_address = statements[self.code_pkg.additional.int].code_pkg.address
-            size_hint = 2
-            # TODO: offsets that are less than the current index need to be converted to negatives
             if relative_address.int > start_address.int:
                 jump_amount = relative_address.int - start_address.int
-                if jump_amount > 255:
-                    size_hint = 4
                 self.code_pkg.additional = NumericValue(
-                    0x00 + jump_amount - self.code_pkg.size,
-                    size_hint=size_hint,
+                    jump_amount - self.code_pkg.size,
+                    size_hint=self.pcr_size_hint,
                 )
             else:
                 jump_amount = start_address.int - relative_address.int
-                base_offset = 0x100 if jump_amount <= 255 else 0x10000
-                if base_offset == 0x10000:
-                    size_hint = 4
+                base_offset = 0x100 if jump_amount + 2 <= 128 else 0x10000
                 self.code_pkg.additional = NumericValue(
-                    base_offset - jump_amount - self.code_pkg.size,
-                    size_hint=size_hint,
+                    base_offset - jump_amount - statements[this_index].code_pkg.size,
+                    size_hint=self.pcr_size_hint,
                 )
 
 # E N D   O F   F I L E #######################################################
