@@ -375,6 +375,9 @@ class NumericValue(Value):
             self.int = value
             if self.int > 65535:
                 raise ValueTypeError("integer value cannot exceed 65535")
+            if self.int < 0:
+                self.negative = True
+                self.int *= -1
             self.post_init_direct_check()
             return
 
@@ -424,6 +427,7 @@ class NumericValue(Value):
             if self.int > 32768:
                 raise ValueTypeError("integer value cannot be below -32768")
             self.negative = True
+            self.post_init_direct_check()
             return
 
         raise ValueTypeError("[{}] is not valid integer, character literal, or hex value".format(value))
@@ -432,7 +436,7 @@ class NumericValue(Value):
         if not self.negative:
             return self.int
 
-        return self.int | 0x80 if self.int < 128 else self.int | 0x8000
+        return 0x100 - self.int if self.int < 256 else 0x10001 - self.int
 
     def hex(self, size=0):
         if self.size_hint and size == 0:
@@ -441,7 +445,7 @@ class NumericValue(Value):
             size = self.hex_len()
             size += 1 if size % 2 == 1 else 0
         format_specifier = "{{:0>{}X}}".format(size)
-        return format_specifier.format(self.int)
+        return format_specifier.format(self.get_negative())
 
     def hex_len(self):
         if self.size_hint is not None:

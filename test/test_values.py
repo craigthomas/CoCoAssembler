@@ -482,17 +482,33 @@ class TestExpressionValue(unittest.TestCase):
         self.assertFalse(result.is_8_bit())
         self.assertTrue(result.is_16_bit())
 
-    def test_negative_value_is_negative(self):
+    def test_negative_string_value_is_negative(self):
         result = NumericValue("-1")
+        self.assertTrue(result.is_negative())
+
+    def test_negative_int_value_is_negative(self):
+        result = NumericValue(-1)
         self.assertTrue(result.is_negative())
 
     def test_negative_value_get_negative_correct_8_bit(self):
         result = NumericValue("-1")
-        self.assertEqual(0x81, result.get_negative())
+        self.assertEqual(0xFF, result.get_negative())
 
-    def test_negative_value_get_negative_correct_16_bit(self):
-        result = NumericValue("-256")
-        self.assertEqual(0x8100, result.get_negative())
+    def test_negative_string_value_get_negative_correct_8_bit(self):
+        result = NumericValue("-1")
+        self.assertEqual(0xFF, result.get_negative())
+
+    def test_negative_int_value_get_negative_correct_8_bit(self):
+        result = NumericValue(-1)
+        self.assertEqual(0xFF, result.get_negative())
+
+    def test_negative_string_value_get_negative_correct_16_bit(self):
+        result = NumericValue("-258")
+        self.assertEqual(0xFEFF, result.get_negative())
+
+    def test_negative_int_value_get_negative_correct_16_bit(self):
+        result = NumericValue(-258)
+        self.assertEqual(0xFEFF, result.get_negative())
 
 # M A I N #####################################################################
 

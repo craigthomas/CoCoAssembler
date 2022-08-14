@@ -760,6 +760,24 @@ class TestIntegration(unittest.TestCase):
         program.translate_statements()
         self.assertEqual([0xA6, 0x95], program.get_binary_array())
 
+    def test_negative_immediate_8_bit(self):
+        statements = [
+            Statement("         CMPB #-2"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xC1, 0xFE], program.get_binary_array())
+
+    def test_negative_immediate_16_bit(self):
+        statements = [
+            Statement("         CMPX #-258"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0x8C, 0xFE, 0xFF], program.get_binary_array())
+
 # M A I N #####################################################################
 
 
