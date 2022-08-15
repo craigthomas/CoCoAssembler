@@ -47,7 +47,7 @@ class TestBaseOperand(unittest.TestCase):
     def test_base_operand_create_from_str_returns_extended_indexed(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(ind=0x69, ind_sz=2))
         operand = Operand.create_from_str("[$2000]", instruction)
-        self.assertTrue(operand.is_extended_indexed())
+        self.assertTrue(operand.is_indexed())
 
     def test_base_operand_create_from_str_returns_indexed(self):
         instruction = Instruction(mnemonic="ROL", mode=Mode(ind=0x69, ind_sz=2))
@@ -843,7 +843,7 @@ class TestExtendedIndexedOperand(unittest.TestCase):
 
     def test_extended_indexed_type_correct(self):
         result = ExtendedIndexedOperand("[,X]", self.instruction)
-        self.assertTrue(result.is_extended_indexed())
+        self.assertTrue(result.is_indexed())
 
     def test_extended_indexed_string_correct(self):
         result = ExtendedIndexedOperand("[,X]", self.instruction)

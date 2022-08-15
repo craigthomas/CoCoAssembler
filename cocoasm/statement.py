@@ -271,34 +271,17 @@ class Statement(object):
         if self.operand.value.is_address_expression():
             self.code_pkg.additional = self.operand.value.calculate_address_offset(statements)
 
-        if self.operand.is_indexed() or self.operand.is_extended_indexed():
-            if self.operand.left:
-                if type(self.operand.left) == str:
-                    pass
-                elif self.operand.left.is_address_expression() and self.code_pkg.additional_needs_resolution:
-                    offset = self.operand.left.calculate_address_offset(statements).int
-                    # TODO: fix offsets that are negative
-                    self.code_pkg.additional = NumericValue(offset, size_hint=self.pcr_size_hint)
-                    self.code_pkg.additional_needs_resolution = False
-
         if self.operand.value.is_address():
             self.code_pkg.additional = statements[self.operand.value.int].code_pkg.address
 
         if self.code_pkg.additional_needs_resolution:
-            start_address = statements[this_index].code_pkg.address
-            relative_address = statements[self.code_pkg.additional.int].code_pkg.address
-            if relative_address.int > start_address.int:
-                jump_amount = relative_address.int - start_address.int
-                self.code_pkg.additional = NumericValue(
-                    jump_amount - self.code_pkg.size,
-                    size_hint=self.pcr_size_hint,
-                )
+            if self.operand.is_indexed() and self.operand.left and self.operand.left.is_address_expression():
+                relative_address = self.operand.left.calculate_address_offset(statements).int
             else:
-                jump_amount = start_address.int - relative_address.int
-                base_offset = 0x100 if jump_amount + 2 <= 128 else 0x10000
-                self.code_pkg.additional = NumericValue(
-                    base_offset - jump_amount - statements[this_index].code_pkg.size,
-                    size_hint=self.pcr_size_hint,
-                )
+                relative_address = statements[self.code_pkg.additional.int].code_pkg.address.int
+
+            start_address = statements[this_index].code_pkg.address.int
+            jump_amount = relative_address - start_address - self.code_pkg.size
+            self.code_pkg.additional = NumericValue(jump_amount, size_hint=self.pcr_size_hint)
 
 # E N D   O F   F I L E #######################################################

@@ -123,10 +123,7 @@ class Operand(ABC):
         return self.type == OperandType.DIRECT
 
     def is_indexed(self):
-        return self.type == OperandType.INDEXED
-
-    def is_extended_indexed(self):
-        return self.type == OperandType.EXTENDED_INDIRECT
+        return self.type == OperandType.INDEXED or self.type == OperandType.EXTENDED_INDIRECT
 
     def resolve_symbols(self, symbol_table):
         """
