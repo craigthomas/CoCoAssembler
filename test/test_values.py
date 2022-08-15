@@ -504,11 +504,11 @@ class TestExpressionValue(unittest.TestCase):
 
     def test_negative_string_value_get_negative_correct_16_bit(self):
         result = NumericValue("-258")
-        self.assertEqual(0xFEFF, result.get_negative())
+        self.assertEqual(0xFEFE, result.get_negative())
 
     def test_negative_int_value_get_negative_correct_16_bit(self):
         result = NumericValue(-258)
-        self.assertEqual(0xFEFF, result.get_negative())
+        self.assertEqual(0xFEFE, result.get_negative())
 
 # M A I N #####################################################################
 

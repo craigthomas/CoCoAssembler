@@ -484,7 +484,7 @@ class TestIntegration(unittest.TestCase):
         program = Program()
         program.statements = statements
         program.translate_statements()
-        self.assertEqual([0xAF, 0x8C, 0x04, 0x12], program.get_binary_array())
+        self.assertEqual([0xAF, 0x8C, 0x01, 0x12], program.get_binary_array())
 
     def test_extended_indexed_expression_with_address_resolves_correct(self):
         statements = [
@@ -494,7 +494,7 @@ class TestIntegration(unittest.TestCase):
         program = Program()
         program.statements = statements
         program.translate_statements()
-        self.assertEqual([0xAF, 0x9C, 0x04, 0x12], program.get_binary_array())
+        self.assertEqual([0xAF, 0x9C, 0x01, 0x12], program.get_binary_array())
 
     def test_indexed_with_empty_lhs(self):
         statements = [
@@ -776,7 +776,7 @@ class TestIntegration(unittest.TestCase):
         program = Program()
         program.statements = statements
         program.translate_statements()
-        self.assertEqual([0x8C, 0xFE, 0xFF], program.get_binary_array())
+        self.assertEqual([0x8C, 0xFE, 0xFE], program.get_binary_array())
 
 # M A I N #####################################################################
 
