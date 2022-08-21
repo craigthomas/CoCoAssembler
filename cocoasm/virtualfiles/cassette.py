@@ -1,5 +1,5 @@
 """
-Copyright (C) 2019-2020 Craig Thomas
+Copyright (C) 2022 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -8,8 +8,10 @@ A Color Computer Assembler - see the README.md file for details.
 
 from enum import IntEnum
 
-from cocoasm.virtualfiles.virtualfile import VirtualFile, CoCoFile
-from cocoasm.values import Value
+from cocoasm.virtualfiles.coco_file import CoCoFile
+from cocoasm.virtualfiles.virtual_file_container import VirtualFileContainer
+from cocoasm.virtualfiles.virtual_file_exceptions import VirtualFileValidationError
+from cocoasm.values import NumericValue
 
 # C L A S S E S ###############################################################
 
@@ -25,7 +27,7 @@ class CassetteDataType(IntEnum):
     ASCII = 0xFF
 
 
-class CassetteFile(VirtualFile):
+class CassetteFile(VirtualFileContainer):
     """
     A CassetteFile contains a series of blocks that are separated by leaders
     and gaps. There are three different types of blocks:
@@ -34,133 +36,147 @@ class CassetteFile(VirtualFile):
       data block - contains the raw data for the file, may be multiple blocks
       EOF block - contains an EOF signature
 
-    CassetteFile may contain more than one file on it.
+    CassetteFile may contain more than one file on it. Each block is written into
+    an internal buffer that is simply a list of bytes.
     """
-    def __init__(self):
-        super().__init__()
-
-    def is_correct_type(self):
-        if not self.host_file:
-            raise ValueError("No file currently open")
-
-        if not self.read_mode:
-            raise ValueError("[{}] not open for reading".format(self.filename))
-
-        self.host_file.seek(0)
-
-        # First 128 bytes must be a leader of $55
-        for _ in range(128):
-            character = ord(self.host_file.read(1))
-            if character != 0x55:
-                return False
-
-        self.host_file.seek(0)
-        return True
+    def __init__(self, buffer=None):
+        super().__init__(buffer=buffer)
 
     def list_files(self, filenames=None):
-        files = []
+        """
+        Extracts a list of CoCoFile objects from the cassette file.
 
+        :param filenames: the list of filenames to include if specified
+        :return: a list of CoCoFile objects
+        """
+        files = []
         while True:
-            coco_file = self.read_file(self.host_file)
+            coco_file = self.read_file()
             if not coco_file:
                 return files
 
             if not filenames or coco_file.name in filenames:
                 files.append(coco_file)
 
-    def save_to_host_file(self, coco_file):
-        data = []
-        self.write_leader(data)
-        self.append_header(data, coco_file, CassetteFileType.OBJECT_FILE, CassetteDataType.BINARY)
-        self.write_leader(data)
-        self.append_data_blocks(data, coco_file.data)
-        self.append_eof(data)
-        self.host_file.write(bytearray(data))
+    def add_file(self, coco_file):
+        """
+        Adds a file to the buffer of the cassette data.
 
-    @staticmethod
-    def read_leader(file):
+        :param coco_file: the CoCoFile object to add
+        """
+        self.write_leader()
+        self.append_header(coco_file, CassetteFileType.OBJECT_FILE, CassetteDataType.BINARY)
+        self.write_leader()
+        self.append_data_blocks(coco_file.data)
+        self.append_eof()
+
+    def read_leader(self):
         """
         Reads a cassette leader. Should consist of 128 bytes of the value $55.
-        Raises a ValueError if there is a problem.
-
-        :param file: the file object to read from
+        Raises a ValueError if there is a problem. Returns True if the leader is okay.
         """
-        for _ in range(128):
-            value = Value.create_from_byte(file.read(1))
-            if value.hex() != "55":
-                raise ValueError("[{}] invalid leader byte".format(value.hex()))
+        if len(self.buffer) < 128:
+            raise VirtualFileValidationError("Leader on tape is less than 128 bytes")
 
-    @staticmethod
-    def write_leader(buffer):
+        for pointer in range(128):
+            value = NumericValue(self.buffer[pointer])
+            if value.hex() != "55":
+                raise VirtualFileValidationError("[{}] invalid leader byte".format(value.hex()))
+
+        self.buffer = self.buffer[128:]
+        return True
+
+    def write_leader(self):
         """
         Appends a cassette leader of character $55 to the buffer. The leader is
         always 128 bytes long consisting of value $55.
-
-        :param buffer: the buffer to add the leader to
         """
         for _ in range(128):
-            buffer.append(0x55)
+            self.buffer.append(0x55)
 
-    @staticmethod
-    def seek_sequence(file, sequence):
+    def validate_sequence(self, sequence):
         """
-        Reads the file until the specified sequence is found. Returns
-        True if the sequence is found. The internal file byte pointer will
-        point to the first byte beyond the sequence. If an EOF occurs,
-        will return False.
+        Ensures that the next group of bytes read matches the sequence specified.
+        Advances the buffer down the object
 
-        :param file: the file object to read from
-        :param sequence: the sequence of values to search for
-        :return: True if the sequence is found, False otherwise
+        :param sequence: an array-like list of bytes to read in the sequence
+        :return: True if the bytes follow the sequence specified, false otherwise
         """
-        sequence_length = len(sequence)
-        while True:
-            last_values = []
-            try:
-                for _ in range(sequence_length):
-                    last_values.append(Value.create_from_byte(file.read(1)).hex())
-            except ValueError:
+        if len(self.buffer) < len(sequence):
+            raise VirtualFileValidationError("Not enough bytes in buffer to validate sequence")
+
+        for pointer in range(len(sequence)):
+            byte_read = NumericValue(self.buffer[0])
+            if byte_read.int != sequence[pointer]:
                 return False
+            self.buffer = self.buffer[1:]
+        return True
 
-            if last_values == sequence:
-                return True
+    def read_coco_file_name(self):
+        """
+        Reads the filename from the tape data.
 
-            file.seek(-(sequence_length - 1), 1)
+        :return: the string representation of the filename
+        """
+        raw_file_name = []
+        for pointer in range(8):
+            raw_file_name.append(self.buffer[pointer])
+        self.buffer = self.buffer[8:]
+        coco_file_name = bytearray(raw_file_name).decode("utf-8")
+        return coco_file_name
 
-    @staticmethod
-    def read_file(file):
+    def read_file(self):
         """
         Reads a cassette file, and returns a CoCoFile object with the
         information for the next file contained on the cassette file.
 
-        :param file: the file object to read from
         :return: a CoCoFile with header information
         """
-        if not CassetteFile.seek_sequence(file, ["55", "3C", "00"]):
+        # Make sure there is data to read
+        if len(self.buffer) == 0:
             return None
 
-        # Skip length byte
-        file.read(1)
+        # Validate and skip over tape leader
+        self.read_leader()
 
-        # Extract file meta-data
-        name = file.read(8).decode("utf-8")
-        file_type = Value.create_from_byte(file.read(1))
-        data_type = Value.create_from_byte(file.read(1))
-        gaps = Value.create_from_byte(file.read(1))
-        load_addr = Value.create_from_byte(file.read(2))
-        exec_addr = Value.create_from_byte(file.read(2))
+        # Validate header block
+        if not self.validate_sequence([0x55, 0x3C, 0x00]):
+            raise VirtualFileValidationError("Cassette header does not start with $55 $3C $00")
+
+        # Length byte
+        self.buffer = self.buffer[1:]
+
+        # Extract file name
+        coco_file_name = self.read_coco_file_name()
+
+        # Get the file type
+        file_type = NumericValue(self.buffer[0])
+        data_type = NumericValue(self.buffer[1])
+        gaps = NumericValue(self.buffer[2])
+
+        load_addr_int = int(self.buffer[3])
+        load_addr_int = load_addr_int << 8
+        load_addr_int |= int(self.buffer[4])
+        load_addr = NumericValue(load_addr_int)
+
+        exec_addr_int = int(self.buffer[5])
+        exec_addr_int = exec_addr_int << 8
+        exec_addr_int |= int(self.buffer[6])
+        exec_addr = NumericValue(exec_addr_int)
 
         # Advance two spaces to move past the header
-        file.read(2)
-        file.read(2)
+        self.buffer = self.buffer[9:]
 
-        data = CassetteFile.read_blocks(file)
+        # Skip over 128 byte leader
+        self.read_leader()
+
+        data = self.read_blocks()
+
         if not data:
-            print("Data blocks not found for file {}".format(name))
             return None
 
         return CoCoFile(
-            name=name,
+            name=coco_file_name,
             type=file_type,
             data_type=data_type,
             gaps=gaps,
@@ -169,38 +185,39 @@ class CassetteFile(VirtualFile):
             data=data
         )
 
-    @staticmethod
-    def read_blocks(file):
+    def read_blocks(self):
         """
-        Reads all of the data blocks that exist in the file.
+        Read all of the blocks that make up a file until an EOF block is found, or
+        an error occurs.
 
-        :param file: the file object to read from
-        :return: an array of bytes read from the file
+        :return: an array-like object with all of the file data bytes read in order
         """
         data = []
 
         while True:
-            if not CassetteFile.seek_sequence(file, ["55", "3C"]):
-                print("Data or EOF block not found")
-                return []
+            if not self.validate_sequence([0x55, 0x3C]):
+                raise VirtualFileValidationError("Data or EOF block validation failed")
 
-            block_type = Value.create_from_byte(file.read(1))
+            block_type = NumericValue(self.buffer[0])
+            self.buffer = self.buffer[1:]
+
             if block_type.hex() == "FF":
-                file.read(3)
+                # Skip over length byte, checksum, and final $55
+                self.buffer = self.buffer[3:]
                 return data
 
             elif block_type.hex() == "01":
-                data_len = Value.create_from_byte(file.read(1))
-                for _ in range(data_len.int):
-                    data.append(Value.create_from_byte(file.read(1)).int)
-
-                file.read(2)
+                data_length = NumericValue(self.buffer[0]).int
+                self.buffer = self.buffer[1:]
+                for ptr in range(data_length):
+                    data.append(self.buffer[ptr])
+                # Skip over block size, and checksum
+                self.buffer = self.buffer[data_length:]
+                self.buffer = self.buffer[2:]
             else:
-                print("Unknown block type found: {}".format(block_type.hex()))
-                return []
+                raise VirtualFileValidationError("Unknown block type found: {}".format(block_type.hex()))
 
-    @staticmethod
-    def append_header(buffer, coco_file, file_type, data_type):
+    def append_header(self, coco_file, file_type, data_type):
         """
         The header of a cassette file is 21 bytes long:
           byte 1 = $55 (fixed value)
@@ -216,108 +233,102 @@ class CassetteFile(VirtualFile):
           byte 20 = $XX (checksum - sum of bytes 3 to 19, 8-bit, ignore carries)
           byte 21 = $55 (fixed value)
 
-        :param buffer: the buffer to append the header to
         :param coco_file: the CoCoFile to append to cassette
         :param file_type: the CassetteFileType to save as
         :param data_type: the CassetteDataType to save as
         """
         # Standard header
-        buffer.append(0x55)
-        buffer.append(0x3C)
-        buffer.append(0x00)
-        buffer.append(0x0F)
+        self.buffer.append(0x55)
+        self.buffer.append(0x3C)
+        self.buffer.append(0x00)
+        self.buffer.append(0x0F)
         checksum = 0x0F
 
         # Filename and type
-        checksum += CassetteFile.append_name(coco_file.name, buffer)
-        buffer.append(file_type)
-        buffer.append(data_type)
+        checksum += self.append_name(coco_file.name)
+        self.buffer.append(file_type)
+        self.buffer.append(data_type)
         checksum += file_type
         checksum += data_type
 
         # No gaps in blocks
-        buffer.append(0x00)
+        self.buffer.append(0x00)
 
         # The loading and execution addresses
-        buffer.append(coco_file.load_addr.high_byte())
-        buffer.append(coco_file.load_addr.low_byte())
-        buffer.append(coco_file.exec_addr.high_byte())
-        buffer.append(coco_file.exec_addr.low_byte())
+        self.buffer.append(coco_file.load_addr.high_byte())
+        self.buffer.append(coco_file.load_addr.low_byte())
+        self.buffer.append(coco_file.exec_addr.high_byte())
+        self.buffer.append(coco_file.exec_addr.low_byte())
         checksum += coco_file.load_addr.high_byte()
         checksum += coco_file.load_addr.low_byte()
         checksum += coco_file.exec_addr.high_byte()
         checksum += coco_file.exec_addr.low_byte()
 
         # Checksum byte
-        buffer.append(checksum & 0xFF)
+        self.buffer.append(checksum & 0xFF)
 
         # Final standard byte
-        buffer.append(0x55)
+        self.buffer.append(0x55)
 
-    @staticmethod
-    def append_name(name, buffer):
+    def append_name(self, name):
         """
         Appends the name of the file to the cassette header block. The name may only
         be 8 characters long. It is left padded by $00 values. The buffer is modified
         in-place.
 
         :param name: the name of the file as saved to the cassette
-        :param buffer: the buffer to write to
         """
         checksum = 0
         for index in range(8):
             if len(name) > index:
-                buffer.append(ord(name[index]))
+                self.buffer.append(ord(name[index]))
                 checksum += ord(name[index])
             else:
-                buffer.append(0x20)
+                self.buffer.append(0x20)
                 checksum += 0x20
         return checksum
 
-    @staticmethod
-    def append_data_blocks(buffer, raw_bytes):
+    def append_data_blocks(self, raw_bytes):
         """
         Appends one or more data blocks to the buffer. Will continue to add
         data blocks to the buffer until the raw_bytes buffer is empty. The
         buffer is modified in-place.
 
-        :param buffer: the buffer to append to
         :param raw_bytes: the raw bytes of data to add to the data block
         """
         if len(raw_bytes) == 0:
             return
 
         # Header of data block
-        buffer.append(0x55)
-        buffer.append(0x3C)
-        buffer.append(0x01)
+        self.buffer.append(0x55)
+        self.buffer.append(0x3C)
+        self.buffer.append(0x01)
 
         # Length of data block
         if len(raw_bytes) < 255:
-            buffer.append(len(raw_bytes))
+            self.buffer.append(len(raw_bytes))
         else:
-            buffer.append(0xFF)
+            self.buffer.append(0xFF)
 
         # Data to write
         checksum = 0x01
         if len(raw_bytes) < 255:
             checksum += len(raw_bytes)
             for index in range(len(raw_bytes)):
-                buffer.append(raw_bytes[index])
+                self.buffer.append(raw_bytes[index])
                 checksum += raw_bytes[index]
-            buffer.append(checksum & 0xFF)
-            buffer.append(0x55)
+            self.buffer.append(checksum & 0xFF)
+            self.buffer.append(0x55)
         else:
             checksum += 0xFF
             for index in range(255):
-                buffer.append(raw_bytes[index])
+                self.buffer.append(raw_bytes[index])
                 checksum += raw_bytes[index]
-            buffer.append(checksum & 0xFF)
-            buffer.append(0x55)
-            CassetteFile.append_data_blocks(buffer, raw_bytes[255:])
+            self.buffer.append(checksum & 0xFF)
+            self.buffer.append(0x55)
+            self.append_data_blocks(raw_bytes[255:])
 
-    @staticmethod
-    def append_eof(buffer):
+    def append_eof(self):
         """
         Appends an EOF block to a buffer. The block is 6 bytes long:
 
@@ -329,14 +340,13 @@ class CassetteFile(VirtualFile):
           byte 6 = $55 (fixed value)
 
         The buffer is modified in-place.
-
-        :param buffer: the buffer to write the EOF block to
         """
-        buffer.append(0x55)
-        buffer.append(0x3C)
-        buffer.append(0xFF)
-        buffer.append(0x00)
-        buffer.append(0xFF)
-        buffer.append(0x55)
+        self.buffer.append(0x55)
+        self.buffer.append(0x3C)
+        self.buffer.append(0xFF)
+        self.buffer.append(0x00)
+        self.buffer.append(0xFF)
+        self.buffer.append(0x55)
+
 
 # E N D   O F   F I L E #######################################################

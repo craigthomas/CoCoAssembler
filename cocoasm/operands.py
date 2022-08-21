@@ -265,8 +265,7 @@ class SpecialOperand(Operand):
             if registers[1] not in REGISTERS:
                 raise OperandTypeError("[{}] unknown register".format(registers[1]))
 
-            post_byte |= 0x00 if registers[0] == "D" else 0x00
-            post_byte |= 0x00 if registers[1] == "D" else 0x00
+            # Implicit is that a value of 0x00 means register D
 
             post_byte |= 0x10 if registers[0] == "X" else 0x00
             post_byte |= 0x01 if registers[1] == "X" else 0x00
@@ -471,7 +470,7 @@ class ExtendedIndexedOperand(Operand):
             )
         size = self.instruction.mode.ind_sz
 
-        if not type(self.value) == str and self.value.is_address():
+        if type(self.value) != str and self.value.is_address():
             size += 2
             return CodePackage(
                 op_code=NumericValue(self.instruction.mode.ind),
@@ -481,7 +480,7 @@ class ExtendedIndexedOperand(Operand):
                 max_size=size,
             )
 
-        if not type(self.value) == str and self.value.is_numeric():
+        if type(self.value) != str and self.value.is_numeric():
             size += 2
             return CodePackage(
                 op_code=NumericValue(self.instruction.mode.ind),
@@ -507,7 +506,7 @@ class ExtendedIndexedOperand(Operand):
         if "S" in self.right:
             raw_post_byte |= 0x60
 
-        if self.left == "" or (not type(self.left) == str and self.left.is_numeric() and self.left.int == 0):
+        if self.left == "" or (type(self.left) != str and self.left.is_numeric() and self.left.int == 0):
             if "-" in self.right or "+" in self.right:
                 if self.right == "X+" or self.right == "Y+" or self.right == "U+" or self.right == "S+":
                     raise OperandTypeError("[{}] not allowed as an extended indirect value".format(self.right))
@@ -603,13 +602,12 @@ class IndexedOperand(Operand):
         self.right = self.value.right
 
     def resolve_symbols(self, symbol_table):
-        if self.left != "":
-            if self.left not in ["A", "B", "D"]:
-                self.left = Value.create_from_str(self.left, self.instruction, default_mode_extended=False)
-                if self.left.is_symbol():
-                    self.left = self.left.resolve(symbol_table)
-                if self.left.is_address_expression() or self.left.is_expression():
-                    self.left = self.left.resolve(symbol_table)
+        if self.left != "" and self.left not in ["A", "B", "D"]:
+            self.left = Value.create_from_str(self.left, self.instruction, default_mode_extended=False)
+            if self.left.is_symbol():
+                self.left = self.left.resolve(symbol_table)
+            if self.left.is_address_expression() or self.left.is_expression():
+                self.left = self.left.resolve(symbol_table)
         return self
 
     def translate(self):
@@ -634,7 +632,7 @@ class IndexedOperand(Operand):
         if "S" in self.right:
             raw_post_byte |= 0x60
 
-        if self.left == "" or (not type(self.left) == str and self.left.is_numeric() and self.left.int == 0):
+        if self.left == "" or (type(self.left) != str and self.left.is_numeric() and self.left.int == 0):
             raw_post_byte |= 0x80
             if "-" in self.right or "+" in self.right:
                 if "+" in self.right:

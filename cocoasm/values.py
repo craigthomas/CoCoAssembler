@@ -47,7 +47,7 @@ SYMBOL_REGEX = re.compile(
 
 # Patten to recognize an expression
 EXPRESSION_REGEX = re.compile(
-    r"^(?P<left>[$]*[\d\w]+)(?P<operation>[+\-/*])(?P<right>[$]*[\d\w]+)$"
+    r"^(?P<left>[$]*\w+)(?P<operation>[+\-/*])(?P<right>[$]*\w+)$"
 )
 
 # C L A S S E S  ##############################################################
@@ -136,9 +136,6 @@ class Value(ABC):
 
     def is_extended(self):
         return self.explict_addressing_mode == ExplicitAddressingMode.EXTENDED
-
-    def is_extended_indirect(self):
-        return self.explict_addressing_mode == ExplicitAddressingMode.EXTENDED_INDIRECT
 
     def is_explicit_direct(self):
         return self.explict_addressing_mode == ExplicitAddressingMode.EXPLICIT_DIRECT
@@ -318,7 +315,7 @@ class StringValue(Value):
         super().__init__(value)
         self.hex_array = []
         self.type = ValueType.STRING
-        if not value[-1] == value[0]:
+        if value[-1] != value[0]:
             raise ValueTypeError("string must begin and end with same delimiter")
         self.original_string = value[1:-1]
         self.hex_array = ["{:X}".format(ord(x)) for x in value[1:-1]]
@@ -396,7 +393,7 @@ class NumericValue(Value):
             self.int = int(data.group("value"), 2)
             if bit_length == 8 and size_hint is None:
                 self.size_hint = 2
-                if not self.explict_addressing_mode == ExplicitAddressingMode.IMMEDIATE:
+                if self.explict_addressing_mode != ExplicitAddressingMode.IMMEDIATE:
                     self.explict_addressing_mode = ExplicitAddressingMode.DIRECT
             return
 
@@ -407,7 +404,7 @@ class NumericValue(Value):
             self.int = int(data.group("value"), 16)
             if len(data.group("value")) == 2 and size_hint is None:
                 self.size_hint = 2
-                if not self.explict_addressing_mode == ExplicitAddressingMode.IMMEDIATE:
+                if self.explict_addressing_mode != ExplicitAddressingMode.IMMEDIATE:
                     self.explict_addressing_mode = ExplicitAddressingMode.DIRECT
             if self.explict_addressing_mode == ExplicitAddressingMode.NONE:
                 self.explict_addressing_mode = ExplicitAddressingMode.EXTENDED
@@ -620,14 +617,12 @@ class ExpressionValue(Value):
         address = statements[address_index].code_pkg.address.int
         if self.operation == "+":
             return NumericValue(address + additional_value, size_hint=4, mode=ExplicitAddressingMode.EXTENDED)
-        if self.operation == "-":
+        elif self.operation == "-":
             return NumericValue(address - additional_value, size_hint=4, mode=ExplicitAddressingMode.EXTENDED)
-        if self.operation == "*":
+        elif self.operation == "*":
             return NumericValue(address * additional_value, size_hint=4, mode=ExplicitAddressingMode.EXTENDED)
-        if self.operation == "/":
-            return NumericValue(address / additional_value, size_hint=4, mode=ExplicitAddressingMode.EXTENDED)
-
-        raise ValueError("[{}] cannot calculate offset address".format(self.value))
+        else:
+            return NumericValue(int(address / additional_value), size_hint=4, mode=ExplicitAddressingMode.EXTENDED)
 
     def is_8_bit(self):
         return False
