@@ -1046,6 +1046,16 @@ class TestExtendedIndexedOperand(unittest.TestCase):
         self.assertEqual("2000", code_pkg.additional.hex())
         self.assertEqual(4, code_pkg.size)
 
+    def test_extended_indexed_16_bit_value_symbol_correct(self):
+        operand = ExtendedIndexedOperand("[FOO]", self.instruction)
+        symbol_table = {'FOO': AddressValue("1")}
+        operand.resolve_symbols(symbol_table)
+        code_pkg = operand.translate()
+        self.assertEqual("AF", code_pkg.op_code.hex())
+        self.assertEqual("9F", code_pkg.post_byte.hex())
+        self.assertEqual("01", code_pkg.additional.hex())
+        self.assertEqual(4, code_pkg.size)
+
     def test_extended_resolve_left_side_empty_correct(self):
         operand = ExtendedIndexedOperand("[,X]", self.instruction)
         operand = operand.resolve_symbols({})

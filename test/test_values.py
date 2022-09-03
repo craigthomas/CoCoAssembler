@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.values import NumericValue, StringValue, NoneValue, SymbolValue, \
-    AddressValue, ValueType, Value, ExpressionValue, ExplicitAddressingMode
+    AddressValue, Value, ExpressionValue, ExplicitAddressingMode, LeftRightValue
 from cocoasm.instruction import Instruction, Mode
 from cocoasm.exceptions import ValueTypeError
 
@@ -234,6 +234,48 @@ class TestNumericValue(unittest.TestCase):
         result = NumericValue("-16")
         self.assertTrue(result.is_4_bit())
 
+    def test_numeric_raises_when_negative_too_large(self):
+        with self.assertRaises(ValueTypeError):
+            NumericValue("-1000000")
+
+    def test_numeric_is_8_bit_correct(self):
+        result = NumericValue("127")
+        self.assertTrue(result.is_8_bit())
+        self.assertFalse(result.is_16_bit())
+
+    def test_numeric_is_16_bit_correct(self):
+        result = NumericValue("256")
+        self.assertFalse(result.is_8_bit())
+        self.assertTrue(result.is_16_bit())
+
+    def test_numeric_negative_string_value_is_negative(self):
+        result = NumericValue("-1")
+        self.assertTrue(result.is_negative())
+
+    def test_numeric_negative_int_value_is_negative(self):
+        result = NumericValue(-1)
+        self.assertTrue(result.is_negative())
+
+    def test_numeric_negative_value_get_negative_correct_8_bit(self):
+        result = NumericValue("-1")
+        self.assertEqual(0xFF, result.get_negative())
+
+    def test_numeric_negative_string_value_get_negative_correct_8_bit(self):
+        result = NumericValue("-1")
+        self.assertEqual(0xFF, result.get_negative())
+
+    def test_numeric_negative_int_value_get_negative_correct_8_bit(self):
+        result = NumericValue(-1)
+        self.assertEqual(0xFF, result.get_negative())
+
+    def test_numeric_negative_string_value_get_negative_correct_16_bit(self):
+        result = NumericValue("-258")
+        self.assertEqual(0xFEFE, result.get_negative())
+
+    def test_numeric_negative_int_value_get_negative_correct_16_bit(self):
+        result = NumericValue(-258)
+        self.assertEqual(0xFEFE, result.get_negative())
+
 
 class TestStringValue(unittest.TestCase):
     """
@@ -274,6 +316,14 @@ class TestStringValue(unittest.TestCase):
         result = StringValue('"abc"')
         self.assertTrue(result.is_string())
 
+    def test_string_is_8_bit_correct(self):
+        result = StringValue('"test string"')
+        self.assertFalse(result.is_8_bit())
+
+    def test_string_is_16_bit_correct(self):
+        result = StringValue('"test string"')
+        self.assertFalse(result.is_16_bit())
+
 
 class TestNoneValue(unittest.TestCase):
     """
@@ -308,6 +358,14 @@ class TestNoneValue(unittest.TestCase):
     def test_none_is_type_correct(self):
         result = NoneValue('"abc"')
         self.assertTrue(result.is_none())
+
+    def test_none_is_8_bit_correct(self):
+        result = NoneValue('"test string"')
+        self.assertFalse(result.is_8_bit())
+
+    def test_none_is_16_bit_correct(self):
+        result = NoneValue('"test string"')
+        self.assertFalse(result.is_16_bit())
 
 
 class TestSymbolValue(unittest.TestCase):
@@ -373,6 +431,14 @@ class TestSymbolValue(unittest.TestCase):
         result.value = NumericValue("$AB")
         self.assertEqual(1, result.byte_len())
 
+    def test_symbol_is_8_bit_correct(self):
+        result = SymbolValue('symbol')
+        self.assertFalse(result.is_8_bit())
+
+    def test_symbol_is_16_bit_correct(self):
+        result = SymbolValue('symbol')
+        self.assertFalse(result.is_16_bit())
+
 
 class TestAddressValue(unittest.TestCase):
     """
@@ -400,9 +466,49 @@ class TestAddressValue(unittest.TestCase):
         result = AddressValue('16')
         self.assertEqual(2, result.hex_len())
 
-    def test_symbol_byte_len_correct(self):
+    def test_address_byte_len_correct(self):
         result = AddressValue('16')
         self.assertEqual(1, result.byte_len())
+
+    def test_address_is_8_bit_correct(self):
+        result = AddressValue('16')
+        self.assertFalse(result.is_8_bit())
+
+    def test_address_is_16_bit_correct(self):
+        result = AddressValue('16')
+        self.assertTrue(result.is_16_bit())
+
+
+class TestLeftRightValue(unittest.TestCase):
+    """
+    A test class for the LeftRightValue class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        pass
+
+    def test_left_right_hex_correct(self):
+        result = LeftRightValue('test,string')
+        self.assertEqual("", result.hex())
+
+    def test_left_right_parse_correct(self):
+        result = LeftRightValue('test,string')
+        self.assertEqual("test", result.left)
+        self.assertEqual("string", result.right)
+
+    def test_left_right_hex_len_correct(self):
+        result = LeftRightValue('test,string')
+        self.assertEqual(0, result.hex_len())
+
+    def test_left_right_is_8_bit_correct(self):
+        result = LeftRightValue('test,string')
+        self.assertFalse(result.is_8_bit())
+
+    def test_left_right_is_16_bit_correct(self):
+        result = LeftRightValue('test,string')
+        self.assertFalse(result.is_16_bit())
 
 
 class TestExpressionValue(unittest.TestCase):
@@ -465,6 +571,30 @@ class TestExpressionValue(unittest.TestCase):
         result = result.resolve(symbol_table)
         self.assertEqual(result.hex(), "FF")
 
+    def test_expression_resolve_symbol_addition_works_correctly(self):
+        symbol_table = {"VAR": NumericValue("$02", mode=ExplicitAddressingMode.DIRECT)}
+        result = ExpressionValue("VAR+3")
+        result = result.resolve(symbol_table)
+        self.assertEqual(result.int, 5)
+
+    def test_expression_resolve_symbol_multiplication_works_correctly(self):
+        symbol_table = {"VAR": NumericValue("$02", mode=ExplicitAddressingMode.DIRECT)}
+        result = ExpressionValue("VAR*3")
+        result = result.resolve(symbol_table)
+        self.assertEqual(result.int, 6)
+
+    def test_expression_resolve_symbol_subtraction_works_correctly(self):
+        symbol_table = {"VAR": NumericValue("$03", mode=ExplicitAddressingMode.DIRECT)}
+        result = ExpressionValue("VAR-2")
+        result = result.resolve(symbol_table)
+        self.assertEqual(result.int, 1)
+
+    def test_expression_resolve_numeric_only_division_works_correctly(self):
+        symbol_table = {"VAR": NumericValue("$04", mode=ExplicitAddressingMode.DIRECT)}
+        result = ExpressionValue("VAR/2")
+        result = result.resolve(symbol_table)
+        self.assertEqual(result.int, 2)
+
     def test_expression_raises_when_not_numeric_or_address_for_resolve(self):
         result = ExpressionValue("VAR+1")
         result.left = NoneValue()
@@ -472,43 +602,22 @@ class TestExpressionValue(unittest.TestCase):
             result.resolve({})
         self.assertEqual("[VAR+1] unresolved expression", str(context.exception))
 
-    def test_is_8_bit_correct(self):
-        result = NumericValue("127")
-        self.assertTrue(result.is_8_bit())
+    def test_expression_left_extended_correct(self):
+        result = ExpressionValue("$FFEE+1")
+        self.assertTrue(result.is_extended())
+
+    def test_expression_right_extended_correct(self):
+        result = ExpressionValue("1+$FFEE")
+        self.assertTrue(result.is_extended())
+
+    def test_expression_is_8_bit_correct(self):
+        result = ExpressionValue("$FFEE+1")
+        self.assertFalse(result.is_8_bit())
+
+    def test_expression_is_16_bit_correct(self):
+        result = ExpressionValue("$FFEE+1")
         self.assertFalse(result.is_16_bit())
 
-    def test_is_16_bit_correct(self):
-        result = NumericValue("256")
-        self.assertFalse(result.is_8_bit())
-        self.assertTrue(result.is_16_bit())
-
-    def test_negative_string_value_is_negative(self):
-        result = NumericValue("-1")
-        self.assertTrue(result.is_negative())
-
-    def test_negative_int_value_is_negative(self):
-        result = NumericValue(-1)
-        self.assertTrue(result.is_negative())
-
-    def test_negative_value_get_negative_correct_8_bit(self):
-        result = NumericValue("-1")
-        self.assertEqual(0xFF, result.get_negative())
-
-    def test_negative_string_value_get_negative_correct_8_bit(self):
-        result = NumericValue("-1")
-        self.assertEqual(0xFF, result.get_negative())
-
-    def test_negative_int_value_get_negative_correct_8_bit(self):
-        result = NumericValue(-1)
-        self.assertEqual(0xFF, result.get_negative())
-
-    def test_negative_string_value_get_negative_correct_16_bit(self):
-        result = NumericValue("-258")
-        self.assertEqual(0xFEFE, result.get_negative())
-
-    def test_negative_int_value_get_negative_correct_16_bit(self):
-        result = NumericValue(-258)
-        self.assertEqual(0xFEFE, result.get_negative())
 
 # M A I N #####################################################################
 

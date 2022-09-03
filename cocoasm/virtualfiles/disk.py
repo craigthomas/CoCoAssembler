@@ -6,7 +6,7 @@ A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
-from cocoasm.virtualfiles.virtualfile import VirtualFile, CoCoFile
+from cocoasm.virtualfiles.virtual_file import VirtualFile, CoCoFile
 from cocoasm.values import Value
 from typing import NamedTuple
 
@@ -61,7 +61,7 @@ class DiskFile(VirtualFile):
 
         # Move through elements in the Directory Table and read them into CoCoFile objects
         self.host_file.seek(DiskFile.DIR_OFFSET, 0)
-        for file_number in range(0, 72):
+        for _ in range(0, 72):
             next_byte = Value.create_from_byte(self.host_file.peek(1)[:1])
             if next_byte.hex() == "00" or next_byte.hex() == "FF":
                 self.host_file.seek(32, 1)

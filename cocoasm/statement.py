@@ -10,7 +10,7 @@ import re
 
 from copy import copy
 
-from cocoasm.exceptions import ParseError, TranslationError, ValueTypeError, OperandTypeError
+from cocoasm.exceptions import ParseError, TranslationError, OperandTypeError
 from cocoasm.instruction import INSTRUCTIONS, CodePackage
 from cocoasm.operands import Operand, BadInstructionOperand
 from cocoasm.values import NumericValue
@@ -25,7 +25,7 @@ COMMENT_LINE_REGEX = re.compile(r"^\s*;\s*(?P<comment>.*)$")
 
 # Pattern to parse a single line
 ASM_LINE_REGEX = re.compile(
-    r"^(?P<label>[\w@]*)\s+(?P<mnemonic>\w*)\s+(?P<operands>[\w\[\]><'\"@:,.#?$%^&*()=!+\-/]*)\s*[;]*(?P<comment>.*)$"
+    r"^(?P<label>[\w@]*)\s+(?P<mnemonic>\w*)\s+(?P<operands>[\w\[\]><'\"@:,.#?$%^&*()=!+\-/]*)\s*;*(?P<comment>.*)$"
 )
 
 # Pattern to recognize a direct value
@@ -76,6 +76,17 @@ class Statement(object):
             self.comment.ljust(40, ' '),
             # self.operand.type
         )
+
+    def __eq__(self, other):
+        return self.is_empty == other.is_empty and \
+            self.is_comment_only == other.is_comment_only and \
+            self.instruction == other.instruction and \
+            self.label == other.label and \
+            self.comment == other.comment and \
+            self.mnemonic == other.mnemonic and \
+            self.state == other.state and \
+            self.fixed_size == other.fixed_size and \
+            self.pcr_size_hint == other.pcr_size_hint
 
     def get_include_filename(self):
         """
@@ -132,11 +143,11 @@ class Statement(object):
                     self.original_operand = copy(self.operand)
                     self.comment = data.group("comment").strip() or ""
                     self.is_empty = False
-                except ValueTypeError:
-                    raise ParseError("Invalid operand value", line)
+                except OperandTypeError as error:
+                    raise ParseError(str(error), line)
             return
 
-        raise ParseError("Could not parse line".format(line), line)
+        raise ParseError("Could not parse line", line)
 
     def set_address(self, address):
         """
@@ -161,7 +172,7 @@ class Statement(object):
         """
         try:
             self.operand = self.operand.resolve_symbols(symbol_table)
-        except ValueError as error:
+        except Exception as error:
             raise TranslationError(str(error), self)
 
     def translate(self):
@@ -171,11 +182,7 @@ class Statement(object):
         try:
             self.code_pkg = self.operand.translate()
             self.fixed_size = not (self.code_pkg.additional_needs_resolution or self.code_pkg.post_byte_choices)
-        except ValueError as error:
-            raise TranslationError(str(error), self)
-        except OperandTypeError as error:
-            raise TranslationError(str(error), self)
-        except ValueTypeError as error:
+        except Exception as error:
             raise TranslationError(str(error), self)
 
     def determine_pcr_relative_sizes(self, statements, this_index):

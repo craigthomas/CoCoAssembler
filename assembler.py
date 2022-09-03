@@ -7,11 +7,13 @@ A Color Computer Assembler - see the README.md file for details.
 # I M P O R T S ###############################################################
 
 import argparse
+import sys
 
+from cocoasm.exceptions import TranslationError, ParseError
 from cocoasm.program import Program
-from cocoasm.virtualfiles.virtualfile import CoCoFile
-from cocoasm.virtualfiles.binary import BinaryFile
-from cocoasm.virtualfiles.cassette import CassetteFile
+from cocoasm.virtualfiles.virtual_file import VirtualFileType, VirtualFile
+from cocoasm.virtualfiles.source_file import SourceFile, SourceFileType
+from cocoasm.virtualfiles.coco_file import CoCoFile
 
 # F U N C T I O N S ###########################################################
 
@@ -56,14 +58,34 @@ def parse_arguments():
     return parser.parse_args()
 
 
+def throw_error(error):
+    """
+    Prints out an error message.
+
+    :param error: the error message to throw
+    """
+    print(error.value)
+    print("{}".format(str(error.statement)))
+    sys.exit(1)
+
+
 def main(args):
     """
     Runs the assembler with the specified arguments.
 
     :param args: the command-line arguments
     """
-    program = Program(width=args.width)
-    program.process(args.filename)
+    source_file = SourceFile(args.filename)
+    source_file.read_file()
+    program = Program()
+
+    try:
+        program.process(source_file.get_buffer())
+    except TranslationError as error:
+        throw_error(error)
+    except ParseError as error:
+        throw_error(error)
+
     coco_file = CoCoFile(
         name=program.name or args.name,
         load_addr=program.origin,
@@ -72,18 +94,25 @@ def main(args):
     )
 
     if args.symbols:
-        program.print_symbol_table()
+        print("-- Symbol Table --")
+        for symbol in program.get_symbol_table():
+            print(symbol)
 
     if args.print:
-        program.print_statements()
+        print("-- Assembled Statements --")
+        for statement in program.get_statements():
+            print(statement)
 
     if args.bin_file:
         try:
-            binary_file = BinaryFile()
-            binary_file.open_host_file_for_write(args.bin_file, append=args.append)
-            binary_file.save_to_host_file(coco_file)
-            binary_file.close_host_file()
-        except ValueError as error:
+            virtual_file = VirtualFile(
+                SourceFile(args.bin_file, file_type=SourceFileType.BINARY),
+                VirtualFileType.BINARY
+            )
+            virtual_file.open_virtual_file()
+            virtual_file.add_coco_file(coco_file)
+            virtual_file.save_virtual_file(append_mode=args.append)
+        except Exception as error:
             print("Unable to save binary file:")
             print(error)
 
@@ -92,11 +121,14 @@ def main(args):
             print("No name for the program specified, not creating cassette file")
             return
         try:
-            cas_file = CassetteFile()
-            cas_file.open_host_file_for_write(args.cas_file, append=args.append)
-            cas_file.save_to_host_file(coco_file)
-            cas_file.close_host_file()
-        except ValueError as error:
+            virtual_file = VirtualFile(
+                SourceFile(args.cas_file, file_type=SourceFileType.BINARY),
+                VirtualFileType.CASSETTE
+            )
+            virtual_file.open_virtual_file()
+            virtual_file.add_coco_file(coco_file)
+            virtual_file.save_virtual_file(append_mode=args.append)
+        except Exception as error:
             print("Unable to save cassette file:")
             print(error)
 

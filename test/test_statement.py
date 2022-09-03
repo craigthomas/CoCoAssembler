@@ -10,7 +10,7 @@ import unittest
 
 from cocoasm.statement import Statement
 from cocoasm.values import NumericValue, AddressValue
-from cocoasm.exceptions import ParseError
+from cocoasm.exceptions import ParseError, OperandTypeError, TranslationError
 
 # C L A S S E S ###############################################################
 
@@ -58,6 +58,17 @@ class TestStatement(unittest.TestCase):
         with self.assertRaises(ParseError) as context:
             Statement("    FOO $FFEE ; non-existent mnemonic")
         self.assertEqual("'[FOO] invalid mnemonic'", str(context.exception))
+
+    def test_parse_line_raises_with_bad_operand(self):
+        with self.assertRaises(ParseError) as context:
+            Statement("    STA ^10000000000/ ; bad operand")
+        self.assertEqual("'[^10000000000/] unknown operand type'", str(context.exception))
+
+    def test_translate_raises_with_operand_error(self):
+        statement = Statement("   LDA ; valid statement")
+        with self.assertRaises(TranslationError) as context:
+            statement.translate()
+        self.assertEqual("'Instruction [LDA] requires an operand'", str(context.exception))
 
     def test_parse_full_line_correct(self):
         statement = Statement("LABEL JMP $FFFF ; comment")
@@ -157,6 +168,11 @@ class TestStatement(unittest.TestCase):
         statement1.translate()
         self.assertEqual(0xCC, statement1.code_pkg.op_code.int)
         self.assertEqual(43690, statement1.code_pkg.additional.int)
+
+    def test_statement_equality(self):
+        statement1 = Statement("LABEL LDD $FFEE ; comment")
+        statement2 = Statement("LABEL LDD $FFEE ; comment")
+        self.assertEqual(statement1, statement2)
 
 # M A I N #####################################################################
 

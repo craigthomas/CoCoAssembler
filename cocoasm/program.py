@@ -6,11 +6,10 @@ This file contains the main Program class for the CoCo Assembler.
 """
 # I M P O R T S ###############################################################
 
-import sys
-
-from cocoasm.exceptions import TranslationError, ParseError, ValueTypeError
+from cocoasm.exceptions import TranslationError, ValueTypeError
 from cocoasm.statement import Statement
 from cocoasm.values import AddressValue, NoneValue
+from cocoasm.virtualfiles.source_file import SourceFile
 
 # C L A S S E S ###############################################################
 
@@ -21,59 +20,38 @@ class Program(object):
     contains a list of statements. Additionally, a Program keeps track of all
     the user-defined symbols in the program.
     """
-    def __init__(self, width=100):
+    def __init__(self):
         self.symbol_table = dict()
         self.statements = []
         self.address = 0x0
         self.origin = NoneValue()
         self.name = None
-        self.width = width
 
-    def process(self, filename):
+    def process(self, source_file):
         """
         Processes a filename for assembly.
 
-        :param filename: the name of the file to process
+        :param source_file: the source file to process
         """
-        try:
-            self.parse(filename)
-            self.translate_statements()
-        except TranslationError as error:
-            self.throw_error(error)
-        except ParseError as error:
-            self.throw_error(error)
+        self.statements = self.parse(source_file)
+        self.translate_statements()
 
-    def parse(self, filename):
+    @classmethod
+    def parse(cls, contents):
         """
         Parses a single file and saves the set of statements.
 
-        :param filename: the name of the file to process
-        """
-        self.statements = self.parse_file(filename)
-
-    def parse_file(self, filename):
-        """
-        Parses all of the lines in a file, and transforms each line into
-        a Statement. Returns a list of all the statements in the file.
-
-        :param filename: the name of the file to parse
+        :param contents: a list of strings, each string represents one line of assembly
         """
         statements = []
-        if not filename:
-            return statements
-
-        try:
-            with open(filename) as infile:
-                for line in infile:
-                    statement = Statement(line)
-                    if not statement.is_empty and not statement.is_comment_only:
-                        statements.append(statement)
-        except ParseError as error:
-            self.throw_error(error)
-
+        for line in contents:
+            statement = Statement(line)
+            if not statement.is_empty and not statement.is_comment_only:
+                statements.append(statement)
         return statements
 
-    def process_mnemonics(self, statements):
+    @classmethod
+    def process_mnemonics(cls, statements):
         """
         Given a list of statements, processes the mnemonics on each statement, and
         assigns each statement an Instruction object. If the statement is the
@@ -85,8 +63,14 @@ class Program(object):
         """
         processed_statements = []
         for statement in statements:
-            include = self.process_mnemonics(self.parse_file(statement.get_include_filename()))
-            processed_statements.extend(include if include else [statement])
+            include_filename = statement.get_include_filename()
+            if include_filename:
+                include_source = SourceFile(include_filename)
+                include_source.read_file()
+                include = cls.process_mnemonics(cls.parse(include_source.get_buffer()))
+                processed_statements.extend(include)
+            else:
+                processed_statements.extend([statement])
         return processed_statements
 
     def save_symbol(self, index, statement):
@@ -112,46 +96,40 @@ class Program(object):
         Translates all the parsed statements into their respective
         opcodes.
         """
-        try:
-            self.statements = self.process_mnemonics(self.statements)
+        self.statements = self.process_mnemonics(self.statements)
+        for index, statement in enumerate(self.statements):
+            self.save_symbol(index, statement)
+
+        for index, statement in enumerate(self.statements):
+            statement.resolve_symbols(self.symbol_table)
+
+        for index, statement in enumerate(self.statements):
+            statement.translate()
+
+        while not self.all_sizes_fixed():
             for index, statement in enumerate(self.statements):
-                self.save_symbol(index, statement)
+                if not statement.fixed_size:
+                    statement.determine_pcr_relative_sizes(self.statements, index)
 
-            for index, statement in enumerate(self.statements):
-                try:
-                    statement.resolve_symbols(self.symbol_table)
-                except ValueTypeError as error:
-                    raise TranslationError(str(error), statement)
+        address = 0
+        for index, statement in enumerate(self.statements):
+            address = statement.set_address(address)
+            address += statement.code_pkg.size
 
-            for index, statement in enumerate(self.statements):
-                statement.translate()
+        for index, statement in enumerate(self.statements):
+            statement.fix_addresses(self.statements, index)
 
-            while not self.all_sizes_fixed():
-                for index, statement in enumerate(self.statements):
-                    if not statement.fixed_size:
-                        statement.determine_pcr_relative_sizes(self.statements, index)
+        # Update the symbol table with the proper addresses
+        for symbol, value in self.symbol_table.items():
+            if value.is_address():
+                self.symbol_table[symbol] = self.statements[value.int].code_pkg.address
 
-            address = 0
-            for index, statement in enumerate(self.statements):
-                address = statement.set_address(address)
-                address += statement.code_pkg.size
-
-            for index, statement in enumerate(self.statements):
-                statement.fix_addresses(self.statements, index)
-
-            # Update the symbol table with the proper addresses
-            for symbol, value in self.symbol_table.items():
-                if value.is_address():
-                    self.symbol_table[symbol] = self.statements[value.int].code_pkg.address
-
-            # Find the origin and name of the project
-            for statement in self.statements:
-                if statement.instruction.is_origin:
-                    self.origin = statement.code_pkg.address
-                if statement.instruction.is_name:
-                    self.name = statement.operand.operand_string
-        except TranslationError as error:
-            self.throw_error(error)
+        # Find the origin and name of the project
+        for statement in self.statements:
+            if statement.instruction.is_origin:
+                self.origin = statement.code_pkg.address
+            if statement.instruction.is_name:
+                self.name = statement.operand.operand_string
 
     def get_binary_array(self):
         """
@@ -187,30 +165,22 @@ class Program(object):
                 return False
         return True
 
-    def print_symbol_table(self):
+    def get_symbol_table(self):
         """
-        Prints out the symbol table and any values contained within it.
+        Returns a list of strings. Each string contains one entry from the symbol table.
         """
-        print("-- Symbol Table --")
+        lines = []
         for symbol, value in self.symbol_table.items():
-            print("${} {}".format(value.hex().ljust(4, ' '), symbol))
+            lines.append("${} {}".format(value.hex().ljust(4, ' '), symbol))
+        return lines
 
-    def print_statements(self):
+    def get_statements(self):
         """
-        Prints out the assembled statements.
+        Returns a list of strings. Each string represents one assembled statement
         """
-        print("-- Assembled Statements --")
+        lines = []
         for index, statement in enumerate(self.statements):
-            print("{}".format(str(statement).ljust(self.width)))
-
-    def throw_error(self, error):
-        """
-        Prints out an error message.
-
-        :param error: the error message to throw
-        """
-        print(error.value)
-        print("{}".format(str(error.statement).ljust(self.width)))
-        sys.exit(1)
+            lines.append("{}".format(str(statement)))
+        return lines
 
 # E N D   O F   F I L E #######################################################
