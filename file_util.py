@@ -95,7 +95,7 @@ def main(args):
                     print("Saved as {}".format(bin_file_name))
 
     except Exception as error:
-        print(error)
+        raise Exception(error)
 
 
 # M A I N #####################################################################
