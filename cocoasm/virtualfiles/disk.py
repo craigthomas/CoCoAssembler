@@ -1,16 +1,25 @@
 """
-Copyright (C) 2019-2020 Craig Thomas
+Copyright (C) 2022 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
 """
 # I M P O R T S ###############################################################
 
-from cocoasm.virtualfiles.virtual_file import VirtualFile, CoCoFile
-from cocoasm.values import Value
 from typing import NamedTuple
 
+from cocoasm.virtualfiles.coco_file import CoCoFile
+from cocoasm.virtualfiles.virtual_file_container import VirtualFileContainer
+from cocoasm.values import Value, NumericValue
+from cocoasm.virtualfiles.virtual_file_exceptions import VirtualFileValidationError
+
 # C L A S S E S ###############################################################
+
+
+class DiskConstants(object):
+    FAT_OFFSET = 78592
+    DIR_OFFSET = 78848
+    HALF_TRACK_LEN = 2304
 
 
 class Preamble(NamedTuple):
@@ -32,56 +41,98 @@ class Postamble(NamedTuple):
     exec_addr: Value = None
 
 
-class DiskFile(VirtualFile):
-    FAT_OFFSET = 78592
-    DIR_OFFSET = 78848
-    HALF_TRACK_LEN = 2304
+class DiskFile(VirtualFileContainer):
+    def __init__(self, buffer=None):
+        super().__init__(buffer=buffer)
 
-    def __init__(self):
-        super().__init__()
-        self.raw_data = []
+    def read_sequence(self, pointer, length, decode=False):
+        """
+        Reads a sequence of bytes of the specified length and returns a list like
+        object that contains the sequence read.
 
-    def is_correct_type(self):
-        if not self.host_file:
-            raise ValueError("No file currently open")
+        :param pointer: the byte number in to the buffer to start the read
+        :param length: the number of bytes to read
+        :param decode: whether to UTF-8 decode the resultant data
+        :return: a list like object of the bytes read
+        """
+        sequence = []
+        if length > len(self.buffer) or (len(self.buffer[pointer:]) < length):
+            raise VirtualFileValidationError("Unable to read sequence of length {}".format(length))
 
-        if not self.read_mode:
-            raise ValueError("[{}] not open for reading".format(self.filename))
+        for file_name_pointer in range(pointer, pointer + length):
+            sequence.append(self.buffer[file_name_pointer])
+        return bytearray(sequence).decode("utf-8") if decode else sequence
 
-        self.host_file.seek(0, 2)
-        size = self.host_file.tell()
-        return True if size == 161280 else False
+    def read_word(self, pointer):
+        """
+        Reads a 16-bit value from the buffer starting at the specified
+        pointer offset.
+
+        :param pointer: the offset into the buffer to read from
+        :return: the NumericValue read
+        """
+        if len(self.buffer) < 2 or (len(self.buffer[pointer:]) < 2):
+            raise VirtualFileValidationError("Unable to read word - insufficient bytes in buffer")
+
+        word_int = int(self.buffer[pointer])
+        word_int = word_int << 8
+        word_int |= int(self.buffer[pointer + 1])
+        return NumericValue(word_int)
+
+    def validate_sequence(self, pointer, sequence):
+        """
+        Ensures that the next group of bytes read matches the sequence specified.
+        Advances the buffer down the object
+
+        :param pointer: a pointer into the data of the file
+        :param sequence: an array-like list of bytes to read in the sequence
+        :return: True if the bytes follow the sequence specified, false otherwise
+        """
+        if len(self.buffer[pointer:]) < len(sequence):
+            raise VirtualFileValidationError("Not enough bytes in buffer to validate sequence")
+
+        for sequence_pointer in range(len(sequence)):
+            byte_read = NumericValue(self.buffer[pointer + sequence_pointer])
+            if byte_read.int != sequence[sequence_pointer]:
+                return False
+        return True
 
     def list_files(self, filenames=None):
         files = []
 
         # Read the File Allocation Table
-        self.host_file.seek(DiskFile.FAT_OFFSET, 0)
-        fat = self.host_file.read(256)
+        fat = self.buffer[DiskConstants.FAT_OFFSET:DiskConstants.FAT_OFFSET + 256]
 
         # Move through elements in the Directory Table and read them into CoCoFile objects
-        self.host_file.seek(DiskFile.DIR_OFFSET, 0)
+        pointer = DiskConstants.DIR_OFFSET
         for _ in range(0, 72):
-            next_byte = Value.create_from_byte(self.host_file.peek(1)[:1])
+            next_byte = NumericValue(self.buffer[pointer])
             if next_byte.hex() == "00" or next_byte.hex() == "FF":
-                self.host_file.seek(32, 1)
+                pointer += 32
             else:
-                name = "{}".format(self.host_file.read(8).decode("utf-8").replace(" ", ""))
-                extension = "{}".format(self.host_file.read(3).decode("utf-8"))
-                file_type = Value.create_from_byte(self.host_file.read(1))
-                data_type = Value.create_from_byte(self.host_file.read(1))
-                starting_granule = Value.create_from_byte(self.host_file.read(1))
-                current_location = self.host_file.tell()
-                preamble = DiskFile.read_preamble(self.host_file, starting_granule.int)
-                file_data = self.read_data(
-                    self.host_file,
+                name = "{}".format(self.read_sequence(pointer, 8, decode=True).replace(" ", ""))
+                pointer += 8
+                extension = "{}".format(self.read_sequence(pointer, 3, decode=True))
+                pointer += 3
+                file_type = NumericValue(self.buffer[pointer])
+                pointer += 1
+                data_type = NumericValue(self.buffer[pointer])
+                pointer += 1
+                starting_granule = NumericValue(self.buffer[pointer])
+                pointer += 1
+
+                preamble = self.read_preamble(starting_granule.int)
+
+                file_data, pointer = self.read_data(
                     starting_granule.int,
+                    fat,
                     has_preamble=True,
                     data_length=preamble.data_length.int,
-                    fat=fat,
                 )
-                postamble = DiskFile.read_postamble(self.host_file)
-                self.host_file.seek(current_location, 0)
+
+                postamble = self.read_postamble(pointer)
+                pointer += 5
+
                 coco_file = CoCoFile(
                     name=name,
                     extension=extension,
@@ -93,26 +144,24 @@ class DiskFile(VirtualFile):
                     ignore_gaps=True
                 )
                 files.append(coco_file)
-                self.host_file.seek(19, 1)
+                pointer += 19
 
         return files
 
-    @classmethod
-    def seek_granule(cls, file, granule):
+    @staticmethod
+    def seek_granule(granule):
         """
-        Seeks to the specified granule in the disk image. Modifies the file
-        object pointer to start at the specified granule.
+        Returns a pointer to the start of the specified granule in the buffer.
 
-        :param file: the file object to use
         :param granule: the granule to seek to
+        :return: a pointer to the specified granule
         """
-        granule_offset = DiskFile.HALF_TRACK_LEN * granule
+        granule_offset = DiskConstants.HALF_TRACK_LEN * granule
         if granule > 33:
-            granule_offset += DiskFile.HALF_TRACK_LEN * 2
-        file.seek(granule_offset, 0)
+            granule_offset += DiskConstants.HALF_TRACK_LEN * 2
+        return granule_offset
 
-    @classmethod
-    def read_preamble(cls, file, starting_granule):
+    def read_preamble(self, starting_granule):
         """
         Reads the preamble data for the file. The preamble is a collection of 5
         bytes at the start of a binary file:
@@ -121,21 +170,19 @@ class DiskFile(VirtualFile):
             byte 1,2 - the data length of the file
             byte 3,4 - the load address for the file
 
-        :param file: the file object to modify
         :param starting_granule: the granule number that contains the preamble
         :return: a populated Preamble object
         """
-        DiskFile.seek_granule(file, starting_granule)
-        preamble_flag = Value.create_from_byte(file.read(1))
-        if preamble_flag.hex() != "00":
-            raise ValueError("Invalid preamble flag {}".format(preamble_flag.hex()))
+        pointer = self.seek_granule(starting_granule)
+        if not self.validate_sequence(pointer, [0x00]):
+            raise VirtualFileValidationError("Invalid preamble flag")
+
         return Preamble(
-            data_length=Value.create_from_byte(file.read(2)),
-            load_addr=Value.create_from_byte(file.read(2))
+            data_length=self.read_word(pointer + 1),
+            load_addr=self.read_word(pointer + 3),
         )
 
-    @classmethod
-    def read_postamble(cls, file):
+    def read_postamble(self, pointer):
         """
         Reads the postamble of a binary file. The postamble is a collection of
         5 bytes as follows:
@@ -144,53 +191,55 @@ class DiskFile(VirtualFile):
             byte 1,2 - always $00, $00
             byte 3,4 - the exec address of the binary file
 
-        :param file: the file object to modify
+        :param pointer: a pointer to the postamble data
         :return: a populated Postamble object
         """
-        postamble_flag = Value.create_from_byte(file.read(1))
-        if postamble_flag.hex() != "FF":
-            raise ValueError("Invalid first postamble flag {}".format(postamble_flag.hex()))
-        postamble_flag = Value.create_from_byte(file.read(2))
-        if postamble_flag.hex() != "00":
-            raise ValueError("Invalid second postamble flag {}".format(postamble_flag.hex()))
+        if not self.validate_sequence(pointer, [0xFF, 0x00, 0x00]):
+            raise VirtualFileValidationError("Invalid postamble flags")
+
         return Postamble(
-            exec_addr=Value.create_from_byte(file.read(2)),
+            exec_addr=self.read_word(pointer + 3),
         )
 
-    @classmethod
-    def read_data(cls, file, starting_granule, has_preamble=False, data_length=0, fat=[]):
+    def read_data(self, starting_granule, fat, has_preamble=False, data_length=0):
         """
         Reads a collection of data from a disk image.
 
-        :param file: the file object containing data to read from
         :param starting_granule: the starting granule for the file
         :param has_preamble: whether there is a preamble to be read
         :param data_length: the length of data to read
         :param fat: the File Allocation Table data for the disk
-        :return: the raw data from the specified file
+        :return: the raw data from the specified file and the pointer to the end of the file
         """
-        DiskFile.seek_granule(file, starting_granule)
+        pointer = self.seek_granule(starting_granule)
         file_data = []
-        chunk_size = DiskFile.HALF_TRACK_LEN
+        chunk_size = DiskConstants.HALF_TRACK_LEN
+
+        if len(self.buffer[pointer:]) < data_length:
+            raise VirtualFileValidationError("Unable to read data - insufficient bytes in buffer")
 
         # Skip over preamble if it exists
         if has_preamble:
-            file.read(5)
+            pointer += 5
             chunk_size -= 5
 
         # Check to see if we are reading more than one granule
         if data_length > chunk_size:
             for _ in range(chunk_size):
-                file_data.append(Value.create_from_byte(file.read(1)).int)
+                file_data.append(self.buffer[pointer])
                 data_length -= 1
+                pointer += 1
             next_granule = fat[starting_granule]
-            file_data.extend(DiskFile.read_data(file, next_granule, data_length=data_length, fat=fat))
+            granule_data, pointer = self.read_data(next_granule, fat, data_length=data_length, has_preamble=False)
+            file_data.extend(granule_data)
         else:
             for _ in range(data_length):
-                file_data.append(Value.create_from_byte(file.read(1)).int)
-        return file_data
+                file_data.append(self.buffer[pointer])
+                pointer += 1
+        return file_data, pointer
 
-    def save_to_host_file(self, coco_file):
+    def add_file(self, coco_file):
         pass
+
 
 # E N D   O F   F I L E #######################################################

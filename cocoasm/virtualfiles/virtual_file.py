@@ -11,6 +11,7 @@ import os
 from enum import Enum
 
 from cocoasm.virtualfiles.cassette import CassetteFile
+from cocoasm.virtualfiles.disk import DiskFile
 from cocoasm.virtualfiles.binary import BinaryFile
 from cocoasm.virtualfiles.virtual_file_exceptions import VirtualFileValidationError
 
@@ -44,6 +45,12 @@ class VirtualFile(object):
         try:
             cassette_file = CassetteFile(buffer=self.source_file.get_buffer())
             return cassette_file.list_files(), VirtualFileType.CASSETTE
+        except VirtualFileValidationError:
+            pass
+
+        try:
+            disk_file = DiskFile(buffer=self.source_file.get_buffer())
+            return disk_file.list_files(), VirtualFileType.DISK
         except VirtualFileValidationError:
             pass
 
