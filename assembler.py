@@ -14,6 +14,7 @@ from cocoasm.program import Program
 from cocoasm.virtualfiles.virtual_file import VirtualFileType, VirtualFile
 from cocoasm.virtualfiles.source_file import SourceFile, SourceFileType
 from cocoasm.virtualfiles.coco_file import CoCoFile
+from cocoasm.values import NumericValue
 
 # F U N C T I O N S ###########################################################
 
@@ -90,7 +91,10 @@ def main(args):
         name=program.name or args.name,
         load_addr=program.origin,
         exec_addr=program.origin,
-        data=program.get_binary_array()
+        data=program.get_binary_array(),
+        extension="bin",
+        type=NumericValue(0x02),
+        data_type=NumericValue(0x00),
     )
 
     if args.symbols:
@@ -130,6 +134,22 @@ def main(args):
             virtual_file.save_virtual_file(append_mode=args.append)
         except Exception as error:
             print("Unable to save cassette file:")
+            print(error)
+
+    if args.dsk_file:
+        if not coco_file.name:
+            print("No name for the program specified, not creating disk file")
+            return
+        try:
+            virtual_file = VirtualFile(
+                SourceFile(args.dsk_file, file_type=SourceFileType.BINARY),
+                VirtualFileType.DISK
+            )
+            virtual_file.open_virtual_file()
+            virtual_file.add_coco_file(coco_file)
+            virtual_file.save_virtual_file(append_mode=args.append)
+        except Exception as error:
+            print("Unable to save disk file:")
             print(error)
 
 # M A I N #####################################################################

@@ -99,6 +99,18 @@ class VirtualFile(object):
             self.source_file.set_buffer(binary_file.get_buffer())
             self.source_file.write_file()
 
+        if self.virtual_file_type == VirtualFileType.DISK:
+            disk_file = DiskFile()
+            disk_file.add_files(self.coco_file_list)
+            if self.file_exists and not append_mode:
+                raise FileExistsError(
+                    "Target file [{}] already exists, use --append to overwrite".format(
+                        self.source_file.get_file_name()
+                    )
+                )
+            self.source_file.set_buffer(disk_file.get_buffer())
+            self.source_file.write_file()
+
     def add_coco_file(self, coco_file):
         """
         Adds the specified CoCoFile to the virtual image.
