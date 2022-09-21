@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022 Craig Thomas
+Copyright (C) 2013-2022 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -10,7 +10,7 @@ import unittest
 
 from cocoasm.statement import Statement
 from cocoasm.values import NumericValue, AddressValue
-from cocoasm.exceptions import ParseError, OperandTypeError, TranslationError
+from cocoasm.exceptions import ParseError, TranslationError
 
 # C L A S S E S ###############################################################
 
