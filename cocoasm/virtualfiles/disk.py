@@ -10,7 +10,7 @@ from typing import NamedTuple
 
 from cocoasm.virtualfiles.coco_file import CoCoFile
 from cocoasm.virtualfiles.virtual_file_container import VirtualFileContainer
-from cocoasm.values import Value, NumericValue
+from cocoasm.values import Value, NumericValue, NoneValue
 from cocoasm.virtualfiles.virtual_file_exceptions import VirtualFileValidationError
 
 # C L A S S E S ###############################################################
@@ -20,6 +20,20 @@ class DiskConstants(object):
     FAT_OFFSET = 78592
     DIR_OFFSET = 78848
     HALF_TRACK_LEN = 2304
+    SECTORS_PER_TRACK = 18
+    BYTES_PER_SECTOR = 256
+    TOTAL_GRANULES = 68
+    PREAMBLE_LEN = 5
+    POSTAMBLE_LEN = 5
+    IMAGE_SIZE = 161280
+
+
+class DirectoryEntry(NamedTuple):
+    file_name: str = "        "
+    extension: str = "   "
+    file_type: int = 2
+    ascii_flag: int = 0x00
+    first_granule: int = 0x00
 
 
 class Preamble(NamedTuple):
@@ -28,8 +42,8 @@ class Preamble(NamedTuple):
     on a disk image. The Preamble only contains the load address and the length
     of data for the binary file.
     """
-    load_addr: Value = None
-    data_length: Value = None
+    load_addr: Value = NoneValue()
+    data_length: Value = NoneValue()
 
 
 class Postamble(NamedTuple):
@@ -38,12 +52,14 @@ class Postamble(NamedTuple):
     on a disk image. The Postamble is stored at the end of a binary file and
     contains the exec address for the binary.
     """
-    exec_addr: Value = None
+    exec_addr: Value = NoneValue()
 
 
 class DiskFile(VirtualFileContainer):
     def __init__(self, buffer=None):
         super().__init__(buffer=buffer)
+        if buffer is None:
+            self.buffer = [0xFF] * DiskConstants.IMAGE_SIZE
 
     def read_sequence(self, pointer, length, decode=False):
         """
@@ -119,19 +135,18 @@ class DiskFile(VirtualFileContainer):
                 data_type = NumericValue(self.buffer[pointer])
                 pointer += 1
                 starting_granule = NumericValue(self.buffer[pointer])
-                pointer += 1
+                pointer += 19
 
                 preamble = self.read_preamble(starting_granule.int)
 
-                file_data, pointer = self.read_data(
+                file_data, post_pointer = self.read_data(
                     starting_granule.int,
                     fat,
                     has_preamble=True,
                     data_length=preamble.data_length.int,
                 )
 
-                postamble = self.read_postamble(pointer)
-                pointer += 5
+                postamble = self.read_postamble(post_pointer)
 
                 coco_file = CoCoFile(
                     name=name,
@@ -144,9 +159,123 @@ class DiskFile(VirtualFileContainer):
                     ignore_gaps=True
                 )
                 files.append(coco_file)
-                pointer += 19
 
         return files
+
+    def directory_entry_in_use(self, entry_number):
+        """
+        Returns True if the directory entry specified is in use, False otherwise.
+
+        :param entry_number: the directory entry number to check
+        :return: True if the entry is in use, False otherwise
+        """
+        if entry_number > 71 or entry_number < 0:
+            raise VirtualFileValidationError("Invalid directory entry number [{}]".format(entry_number))
+
+        return self.buffer[DiskConstants.DIR_OFFSET + (32 * entry_number)] not in [0x00, 0xFF]
+
+    def find_empty_directory_entry(self):
+        """
+        Returns the first directory entry number that is not in use. Will return -1
+        if all directory entry slots are in use.
+
+        :return: the first directory entry number not in use, otherwise -1 if all used
+        """
+        for entry_number in range(0, 71):
+            if not self.directory_entry_in_use(entry_number):
+                return entry_number
+        return -1
+
+    def granule_in_use(self, granule_number):
+        """
+        Returns True if the granule number specified is in use, False otherwise.
+
+        :param granule_number: the granule number to check
+        :return: True if the granule is being used, False otherwise
+        """
+        if granule_number > 67 or granule_number < 0:
+            raise VirtualFileValidationError("Invalid granule number [{}]".format(granule_number))
+
+        return self.buffer[DiskConstants.FAT_OFFSET + granule_number] != 0xFF
+
+    def find_empty_granule(self):
+        """
+        Returns the first granule number that is not in use. Will return -1 if
+        all granules are in use.
+
+        :return: the first granule number not in use, otherwise -1 if all used
+        """
+        for granule_number in range(0, 67):
+            if not self.granule_in_use(granule_number):
+                return granule_number
+        return -1
+
+    @staticmethod
+    def calculate_granules_needed(file_data):
+        """
+        Given an array that contains the actual file data to store, calculates how many
+        granules are needed on disk to store the file. The routine assumes that a 5-byte
+        preamble and 5-byte postamble will be appended to the file. A 0-byte file will
+        always take 1 granule on disk.
+
+        :param file_data: the array-like structure containing the file data
+        :return: a count of the number of granules needed for the file
+        """
+        pre_post_amble_len = DiskConstants.PREAMBLE_LEN + DiskConstants.POSTAMBLE_LEN
+        return int((len(file_data) + pre_post_amble_len) / DiskConstants.HALF_TRACK_LEN) + 1
+
+    @staticmethod
+    def calculate_sectors_needed(data_len):
+        """
+        Given the length of data that needs to be stored, calculates how many sectors are
+        needed on disk. The routine assumes that a 5-byte preamble and 5-byte postamble
+        will be appended to the file. A 0-byte file will always take 1 sector on disk.
+
+        :param data_len: the length of data to store
+        :return: the number of sectors needed to store the file on disk
+        """
+        return int(data_len / DiskConstants.BYTES_PER_SECTOR) + 1
+
+    @staticmethod
+    def calculate_last_sector_bytes_used(file_data):
+        """
+        Given an array structure that contains the data to be saved to the virtual disk,
+        calculates how many bytes will be used in the last sector of the last granule
+        for the file.
+
+        :param file_data: an array-like structure with file data in it
+        :return: the number of bytes stored in the last sector of the last granule
+        """
+        granules_needed = DiskFile.calculate_granules_needed(file_data)
+
+        file_data_len = len(file_data) + DiskConstants.PREAMBLE_LEN + DiskConstants.POSTAMBLE_LEN
+        full_granule_len = (granules_needed - 1) * DiskConstants.HALF_TRACK_LEN
+        file_data_len -= full_granule_len
+
+        # Calculate number of sectors needed, find number of bytes in last sector
+        sectors_needed = DiskFile.calculate_sectors_needed(file_data_len)
+        sectors_needed -= 1
+        file_data_len -= sectors_needed * DiskConstants.BYTES_PER_SECTOR
+        return file_data_len
+
+    @staticmethod
+    def calculate_last_granules_sectors_used(file_data):
+        """
+        Given an array-like structure that contains data to be saved to the virtual disk,
+        calculates how many sectors are used in the last granule. Note that this function
+        adds the pre- and post-amble bytes to the number of bytes used to store the file.
+
+        :param file_data: an array-like structure with file data in it
+        :return: the number of sectors used in the last granule of the file
+        """
+        granules_needed = DiskFile.calculate_granules_needed(file_data)
+
+        file_data_len = len(file_data) + DiskConstants.PREAMBLE_LEN + DiskConstants.POSTAMBLE_LEN
+        full_granule_len = (granules_needed - 1) * DiskConstants.HALF_TRACK_LEN
+        file_data_len -= full_granule_len
+
+        # Calculate number of sectors needed, find number of bytes in last sector
+        return DiskFile.calculate_sectors_needed(file_data_len)
 
     @staticmethod
     def seek_granule(granule):
@@ -220,8 +349,8 @@ class DiskFile(VirtualFileContainer):
 
         # Skip over preamble if it exists
         if has_preamble:
-            pointer += 5
-            chunk_size -= 5
+            pointer += DiskConstants.PREAMBLE_LEN
+            chunk_size -= DiskConstants.PREAMBLE_LEN
 
         # Check to see if we are reading more than one granule
         if data_length > chunk_size:
@@ -238,8 +367,218 @@ class DiskFile(VirtualFileContainer):
                 pointer += 1
         return file_data, pointer
 
+    def write_dir_entry(self, directory_entry_number, coco_file, first_granule, last_sector_bytes_used):
+        """
+        Writes a directory entry to the filesystem.
+
+        :param directory_entry_number: the directory entry number to use
+        :param coco_file: the CoCoFile object with the file data
+        :param first_granule: the first granule to write to
+        :param last_sector_bytes_used: the number of bytes used in the last sector
+        """
+        pointer = DiskConstants.DIR_OFFSET + (directory_entry_number * 32)
+        for letter in coco_file.name.ljust(8, " ").upper():
+            self.buffer[pointer] = ord(letter) if ord(letter) != 0x00 else 0x20
+            pointer += 1
+
+        for letter in coco_file.extension.ljust(3, " ").upper():
+            self.buffer[pointer] = ord(letter) if ord(letter) != 0x00 else 0x20
+            pointer += 1
+
+        self.buffer[pointer] = coco_file.type.int
+        pointer += 1
+
+        self.buffer[pointer] = coco_file.data_type.int
+        pointer += 1
+
+        self.buffer[pointer] = first_granule
+        pointer += 1
+
+        bytes_used = NumericValue(last_sector_bytes_used)
+        self.buffer[pointer] = bytes_used.high_byte()
+        pointer += 1
+        self.buffer[pointer] = bytes_used.low_byte()
+        pointer += 1
+
+        for _ in range(0, 16):
+            self.buffer[pointer] = 0x00
+            pointer += 1
+
+    def write_preamble(self, preamble, granule):
+        """
+        Given preamble data, writes the preamble to the start of the specified granule.
+
+        :param preamble: the preamble data to write
+        :param granule: the granule number to write to
+        """
+        pointer = self.seek_granule(granule)
+
+        # First byte of preamble is $00
+        self.buffer[pointer] = 0x00
+        pointer += 1
+
+        self.buffer[pointer] = preamble.data_length.high_byte()
+        pointer += 1
+        self.buffer[pointer] = preamble.data_length.low_byte()
+        pointer += 1
+
+        self.buffer[pointer] = preamble.load_addr.high_byte()
+        pointer += 1
+        self.buffer[pointer] = preamble.load_addr.low_byte()
+
+    def write_postamble(self, postamble, pointer):
+        """
+        Given postamble data, writes the postamble format into the buffer at the
+        specified pointer location.
+
+        :param postamble: the postamble data to write
+        :param pointer: a pointer into the buffer where to write the postamble data
+        """
+        if not postamble:
+            return pointer
+
+        # First three bytes of postamble is always $FF $00 $00
+        self.buffer[pointer] = 0xFF
+        pointer += 1
+        self.buffer[pointer] = 0x00
+        pointer += 1
+        self.buffer[pointer] = 0x00
+        pointer += 1
+
+        self.buffer[pointer] = postamble.exec_addr.high_byte()
+        pointer += 1
+        self.buffer[pointer] = postamble.exec_addr.low_byte()
+
+    def write_bytes_to_buffer(self, pointer, data_to_write):
+        """
+        Given a pointer into the disk buffer, and an array-like object of bytes to write
+        into the buffer, write the specified bytes into the buffer and return a pointer
+        to the byte past the end of where bytes were written.
+
+        :param pointer: a pointer into the disk buffer
+        :param data_to_write: the array-like object of bytes to write
+        :return: a pointer one byte past where the final byte was written
+        """
+        for byte_to_write in data_to_write:
+            self.buffer[pointer] = byte_to_write
+            pointer += 1
+        return pointer
+
+    def write_to_fat(self, allocated_granules, last_granule_sectors_used):
+        """
+        Given a list of granules used to store file data, writes out the granule linked
+        list to the file allocation table. Each entry in the allocated_granules list points
+        to the next granule used to store file data. The last allocated granule stores the number
+        of sectors used in the final granule. Note that the last granule information has the
+        two highest bits set in the byte, meaning that values of the final granule will
+        range from $C0 - $C9.
+
+        :param allocated_granules: the list of granules allocated to the file
+        :param last_granule_sectors_used: the number of sectors used in the last granule
+        """
+        if not allocated_granules:
+            return
+
+        # Grab a pointer into the FAT
+        pointer = DiskConstants.FAT_OFFSET
+
+        # Write the next granule number in each granule
+        if len(allocated_granules) > 1:
+            for index, current_granule in enumerate(allocated_granules[:-1]):
+                self.buffer[pointer + current_granule] = allocated_granules[index + 1]
+
+        # Write out the number of sectors used in the last granule
+        self.buffer[pointer + allocated_granules[-1]] = 0xC0 + last_granule_sectors_used
+
+    def write_to_granules(self, file_data, allocated_granules, preamble, postamble, first_granule=True):
+        """
+        Given an array-like object of data that is a file to be written to the disk, and a list of
+        granules to write data to, writes the data to the virtual disk in the granules that were
+        allocated. Both pre- and post-amble data are supplied as well.
+
+        :param file_data: an array-like object of bytes to be written to the virtual disk
+        :param allocated_granules: the list of granules to write into
+        :param preamble: the preamble data to write for the file
+        :param postamble: the postamble data to write for the file
+        :param first_granule: if True, writes the preamble to the granule
+        """
+        if not allocated_granules:
+            return
+
+        granule = allocated_granules[0]
+        allocated_granules = allocated_granules[1:]
+        pointer = self.seek_granule(granule)
+        skip_bytes = 0
+
+        if first_granule and preamble:
+            self.write_preamble(preamble, granule)
+            pointer += DiskConstants.PREAMBLE_LEN
+            skip_bytes += DiskConstants.PREAMBLE_LEN
+
+        if len(file_data) < (DiskConstants.HALF_TRACK_LEN - skip_bytes):
+            pointer = self.write_bytes_to_buffer(pointer, file_data)
+            self.write_postamble(postamble, pointer)
+        else:
+            self.write_bytes_to_buffer(pointer, file_data[:DiskConstants.HALF_TRACK_LEN])
+            self.write_to_granules(
+                file_data[DiskConstants.HALF_TRACK_LEN:],
+                allocated_granules,
+                preamble,
+                postamble,
+                first_granule=False
+            )
+
     def add_file(self, coco_file):
-        pass
+        """
+        Adds a CoCoFile object to the virtual disk. It calculates the number of granules needed,
+        allocates a directory entry and granules in the file allocation table, and then writes
+        the file data, along with pre- and post-amble data as required.
+
+        :param coco_file: the CoCoFile object to write
+        """
+        granules_needed = self.calculate_granules_needed(coco_file.data)
+
+        # Check to see if there are enough granules for allocation
+        allocated_granules = []
+        for granule in range(DiskConstants.TOTAL_GRANULES):
+            if not self.granule_in_use(granule):
+                allocated_granules.append(granule)
+                if len(allocated_granules) == granules_needed:
+                    break
+
+        if len(allocated_granules) != granules_needed:
+            raise VirtualFileValidationError("Not enough free granules to save file")
+
+        # Check to see if there is a free directory entry to save the file
+        directory_entry = self.find_empty_directory_entry()
+        if directory_entry == -1:
+            raise VirtualFileValidationError("No free directory entry to save file")
+
+        # Calculate the number of bytes used in the last sector, and the number of sectors in the last granule
+        last_sector_bytes_used = self.calculate_last_sector_bytes_used(coco_file.data)
+        last_granule_sectors_used = self.calculate_last_granules_sectors_used(coco_file.data)
+
+        # Write out the directory entry
+        self.write_dir_entry(directory_entry, coco_file, allocated_granules[0], last_sector_bytes_used)
+
+        # Generate pre- and post-amble as required
+        preamble = Preamble(
+            load_addr=coco_file.load_addr,
+            data_length=NumericValue(len(coco_file.data))
+        )
+        postamble = Postamble(
+            exec_addr=coco_file.exec_addr
+        )
+
+        # Write the granule data to disk
+        self.write_to_granules(coco_file.data, allocated_granules, preamble, postamble)
+
+        # Write out the file allocation table data
+        self.write_to_fat(allocated_granules, last_granule_sectors_used)
+
+        # Blank out data in FAT that correspond to invalid granules
+        for pointer in range(78660, 78848):
+            self.buffer[pointer] = 0x00
 
 
 # E N D   O F   F I L E #######################################################
