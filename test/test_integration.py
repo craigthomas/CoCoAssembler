@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022 Craig Thomas
+Copyright (C) 2013-2022 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 This file contains the main Program class for the CoCo Assembler.

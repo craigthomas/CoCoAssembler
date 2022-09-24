@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022 Craig Thomas
+Copyright (C) 2013-2022 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -96,6 +96,7 @@ class TestBinaryFile(unittest.TestCase):
     def test_list_files_returns_empty_list(self):
         binary_file = BinaryFile()
         self.assertEqual([], binary_file.list_files())
+
 
 # M A I N #####################################################################
 

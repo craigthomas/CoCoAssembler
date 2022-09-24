@@ -1,5 +1,5 @@
 """
-Copyright (C) 2019-2020 Craig Thomas
+Copyright (C) 2013-2022 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -589,7 +589,7 @@ class TestExpressionValue(unittest.TestCase):
         result = result.resolve(symbol_table)
         self.assertEqual(result.int, 1)
 
-    def test_expression_resolve_numeric_only_division_works_correctly(self):
+    def test_expression_resolve_symbol_plus_numeric_division_works_correctly(self):
         symbol_table = {"VAR": NumericValue("$04", mode=ExplicitAddressingMode.DIRECT)}
         result = ExpressionValue("VAR/2")
         result = result.resolve(symbol_table)
