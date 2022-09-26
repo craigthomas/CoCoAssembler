@@ -50,8 +50,10 @@ class CassetteFile(VirtualFileContainer):
         :return: a list of CoCoFile objects
         """
         files = []
+        pointer = 0
+
         while True:
-            coco_file = self.read_file()
+            coco_file, pointer = self.read_file(pointer)
             if not coco_file:
                 return files
 
@@ -64,160 +66,140 @@ class CassetteFile(VirtualFileContainer):
 
         :param coco_file: the CoCoFile object to add
         """
-        self.write_leader()
-        self.append_header(coco_file, CassetteFileType.OBJECT_FILE, CassetteDataType.BINARY)
-        self.write_leader()
+        self.append_blank()
+        self.append_leader()
+        self.append_header(coco_file)
+        self.append_blank()
+        self.append_leader()
         self.append_data_blocks(coco_file.data)
         self.append_eof()
 
-    def read_leader(self):
+    def skip_to_sequence(self, sequence, start=0):
         """
-        Reads a cassette leader. Should consist of 128 bytes of the value $55.
-        Raises a ValueError if there is a problem. Returns True if the leader is okay.
+        Returns a pointer to the internal buffer where the start of the specified sequence begins.
+        Will return -1 if the sequence does not exist.
+
+        :param sequence: the sequence to search for
+        :param start: the place in the buffer to start the search
+        :return: a pointer to the internal buffer where the sequence begins
         """
-        if len(self.buffer) < 128:
-            raise VirtualFileValidationError("Leader on tape is less than 128 bytes")
+        for pointer in range(start, start + len(self.buffer) - len(sequence) + 1):
+            if self.buffer[pointer:pointer + len(sequence)] == sequence:
+                return pointer
 
-        for pointer in range(128):
-            value = NumericValue(self.buffer[pointer])
-            if value.hex() != "55":
-                raise VirtualFileValidationError("[{}] invalid leader byte".format(value.hex()))
+        return -1
 
-        self.buffer = self.buffer[128:]
-        return True
-
-    def write_leader(self):
-        """
-        Appends a cassette leader of character $55 to the buffer. The leader is
-        always 128 bytes long consisting of value $55.
-        """
-        for _ in range(128):
-            self.buffer.append(0x55)
-
-    def validate_sequence(self, sequence):
-        """
-        Ensures that the next group of bytes read matches the sequence specified.
-        Advances the buffer down the object
-
-        :param sequence: an array-like list of bytes to read in the sequence
-        :return: True if the bytes follow the sequence specified, false otherwise
-        """
-        if len(self.buffer) < len(sequence):
-            raise VirtualFileValidationError("Not enough bytes in buffer to validate sequence")
-
-        for pointer in range(len(sequence)):
-            byte_read = NumericValue(self.buffer[0])
-            if byte_read.int != sequence[pointer]:
-                return False
-            self.buffer = self.buffer[1:]
-        return True
-
-    def read_coco_file_name(self):
+    def read_coco_file_name(self, pointer):
         """
         Reads the filename from the tape data.
 
         :return: the string representation of the filename
         """
         raw_file_name = []
-        for pointer in range(8):
-            raw_file_name.append(self.buffer[pointer])
-        self.buffer = self.buffer[8:]
+        for name_offset in range(8):
+            raw_file_name.append(self.buffer[pointer + name_offset])
         coco_file_name = bytearray(raw_file_name).decode("utf-8")
-        return coco_file_name
+        pointer += 8
+        return coco_file_name, pointer
 
-    def read_file(self):
+    def read_file(self, pointer):
         """
         Reads a cassette file, and returns a CoCoFile object with the
         information for the next file contained on the cassette file.
 
-        :return: a CoCoFile with header information
+        :param pointer: an integer index into the buffer where to start reading from
+        :return: a CoCoFile with header information, and a pointer to where the file ended
         """
-        # Make sure there is data to read
-        if len(self.buffer) == 0:
-            return None
+        # Find the next header block
+        pointer = self.skip_to_sequence([0x55, 0x3C, 0x00], start=pointer)
+        if pointer == -1:
+            return None, pointer
 
-        # Validate and skip over tape leader
-        self.read_leader()
-
-        # Validate header block
-        if not self.validate_sequence([0x55, 0x3C, 0x00]):
-            raise VirtualFileValidationError("Cassette header does not start with $55 $3C $00")
-
-        # Length byte
-        self.buffer = self.buffer[1:]
+        # Skip length byte (always $0F)
+        pointer += 4
 
         # Extract file name
-        coco_file_name = self.read_coco_file_name()
+        coco_file_name, pointer = self.read_coco_file_name(pointer)
 
         # Get the file type
-        file_type = NumericValue(self.buffer[0])
-        data_type = NumericValue(self.buffer[1])
-        gaps = NumericValue(self.buffer[2])
+        file_type = NumericValue(self.buffer[pointer])
+        pointer += 1
+        extension = "BAS"
+        if file_type.int == 0x02:
+            extension = "BIN"
 
-        load_addr_int = int(self.buffer[3])
-        load_addr_int = load_addr_int << 8
-        load_addr_int |= int(self.buffer[4])
-        load_addr = NumericValue(load_addr_int)
+        # Get the data type
+        data_type = NumericValue(self.buffer[pointer])
+        pointer += 1
 
-        exec_addr_int = int(self.buffer[5])
-        exec_addr_int = exec_addr_int << 8
-        exec_addr_int |= int(self.buffer[6])
-        exec_addr = NumericValue(exec_addr_int)
+        # Get the gap status
+        gaps = NumericValue(self.buffer[pointer])
+        pointer += 1
+
+        # Get load and exec addresses
+        load_addr = self.read_word(pointer)
+        pointer += 2
+        exec_addr = self.read_word(pointer)
+        pointer += 2
 
         # Advance two spaces to move past the header
-        self.buffer = self.buffer[9:]
+        pointer += 2
 
-        # Skip over 128 byte leader
-        self.read_leader()
-
-        data = self.read_blocks()
+        # Read any data blocks
+        data, pointer = self.read_blocks(pointer)
 
         if not data:
-            return None
+            return None, pointer
 
         return CoCoFile(
             name=coco_file_name,
+            extension=extension,
             type=file_type,
             data_type=data_type,
             gaps=gaps,
             load_addr=load_addr,
             exec_addr=exec_addr,
             data=data
-        )
+        ), pointer
 
-    def read_blocks(self):
+    def read_blocks(self, pointer):
         """
-        Read all of the blocks that make up a file until an EOF block is found, or
+        Read all the blocks that make up a file until an EOF block is found, or
         an error occurs.
 
-        :return: an array-like object with all of the file data bytes read in order
+        :return: an array-like object with all the file data bytes read in order
         """
         data = []
 
         while True:
-            if not self.validate_sequence([0x55, 0x3C]):
-                raise VirtualFileValidationError("Data or EOF block validation failed")
+            pointer = self.skip_to_sequence([0x55, 0x3C], start=pointer)
+            if pointer == -1:
+                raise VirtualFileValidationError("Data or EOF block not found")
+            pointer += 2
 
-            block_type = NumericValue(self.buffer[0])
-            self.buffer = self.buffer[1:]
+            # Read the block type
+            block_type = NumericValue(self.buffer[pointer])
+            pointer += 1
 
+            # Check for EOF block type, and if found skip over length, checksum and $55 byte and return
             if block_type.hex() == "FF":
-                # Skip over length byte, checksum, and final $55
-                self.buffer = self.buffer[3:]
-                return data
+                pointer += 3
+                return data, pointer
 
+            # Check for data block type and consume it
             elif block_type.hex() == "01":
-                data_length = NumericValue(self.buffer[0]).int
-                self.buffer = self.buffer[1:]
-                for ptr in range(data_length):
-                    data.append(self.buffer[ptr])
-                # Skip over block size, and checksum
-                self.buffer = self.buffer[data_length:]
-                self.buffer = self.buffer[2:]
+                data_length = NumericValue(self.buffer[pointer]).int
+                pointer += 1
+                for block_data_pointer in range(data_length):
+                    data.append(self.buffer[pointer + block_data_pointer])
+                pointer += data_length
+
+                # Skip over checksum
+                pointer += 2
             else:
                 raise VirtualFileValidationError("Unknown block type found: {}".format(block_type.hex()))
 
-    def append_header(self, coco_file, file_type, data_type):
+    def append_header(self, coco_file):
         """
         The header of a cassette file is 21 bytes long:
           byte 1 = $55 (fixed value)
@@ -234,8 +216,6 @@ class CassetteFile(VirtualFileContainer):
           byte 21 = $55 (fixed value)
 
         :param coco_file: the CoCoFile to append to cassette
-        :param file_type: the CassetteFileType to save as
-        :param data_type: the CassetteDataType to save as
         """
         # Standard header
         self.buffer.append(0x55)
@@ -246,10 +226,10 @@ class CassetteFile(VirtualFileContainer):
 
         # Filename and type
         checksum += self.append_name(coco_file.name)
-        self.buffer.append(file_type)
-        self.buffer.append(data_type)
-        checksum += file_type
-        checksum += data_type
+        self.buffer.append(coco_file.type.int)
+        self.buffer.append(coco_file.data_type.int)
+        checksum += coco_file.type.int
+        checksum += coco_file.data_type.int
 
         # No gaps in blocks
         self.buffer.append(0x00)
@@ -288,13 +268,14 @@ class CassetteFile(VirtualFileContainer):
                 checksum += 0x20
         return checksum
 
-    def append_data_blocks(self, raw_bytes):
+    def append_data_blocks(self, raw_bytes, gaps=False):
         """
         Appends one or more data blocks to the buffer. Will continue to add
         data blocks to the buffer until the raw_bytes buffer is empty. The
         buffer is modified in-place.
 
         :param raw_bytes: the raw bytes of data to add to the data block
+        :param gaps: if True, will append blanks and leaders between data blocks
         """
         if len(raw_bytes) == 0:
             return
@@ -326,6 +307,9 @@ class CassetteFile(VirtualFileContainer):
                 checksum += raw_bytes[index]
             self.buffer.append(checksum & 0xFF)
             self.buffer.append(0x55)
+            if gaps:
+                self.append_blank()
+                self.append_leader()
             self.append_data_blocks(raw_bytes[255:])
 
     def append_eof(self):
@@ -348,5 +332,20 @@ class CassetteFile(VirtualFileContainer):
         self.buffer.append(0xFF)
         self.buffer.append(0x55)
 
+    def append_leader(self):
+        """
+        Appends a cassette leader of character $55 to the buffer. The leader is
+        always 128 bytes long consisting of value $55.
+        """
+        for _ in range(128):
+            self.buffer.append(0x55)
+
+    def append_blank(self):
+        """
+        Appends a blank space of character $00 to the buffer. The blank space is
+        always 128 bytes long consisting of value $00.
+        """
+        for _ in range(128):
+            self.buffer.append(0x00)
 
 # E N D   O F   F I L E #######################################################

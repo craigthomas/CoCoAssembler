@@ -8,9 +8,12 @@ A Color Computer Assembler - see the README.md file for details.
 
 from typing import NamedTuple
 
+from abc import ABC, abstractmethod
+from enum import Enum
+
 from cocoasm.virtualfiles.coco_file import CoCoFile
 from cocoasm.virtualfiles.virtual_file_container import VirtualFileContainer
-from cocoasm.values import Value, NumericValue, NoneValue
+from cocoasm.values import NumericValue, NoneValue
 from cocoasm.virtualfiles.virtual_file_exceptions import VirtualFileValidationError
 
 # C L A S S E S ###############################################################
@@ -42,23 +45,179 @@ class DirectoryEntry(NamedTuple):
     first_granule: int = 0x00
 
 
-class Preamble(NamedTuple):
-    """
-    The Preamble class is used to store information relating to a binary file
-    on a disk image. The Preamble only contains the load address and the length
-    of data for the binary file.
-    """
-    load_addr: Value = NoneValue()
-    data_length: Value = NoneValue()
+class PreambleType(Enum):
+    ML = 0
+    OTHER = 1
 
 
-class Postamble(NamedTuple):
+class Preamble(ABC):
+    def __init__(self):
+        self.data_length = NoneValue()
+        self.load_addr = NoneValue()
+        self.length = 0
+
+    def get_data_length(self):
+        """
+        Returns the length of the actual data.
+
+        :return: the length of the data
+        """
+        return self.data_length.int
+
+    @abstractmethod
+    def read(self, buffer, pointer):
+        """
+        Given a buffer and a pointer, reads the preamble, and returns a pointer
+        past the point of the preamble.
+        """
+
+    @abstractmethod
+    def write(self, buffer, pointer):
+        """
+        Given a buffer and a pointer, writes the preamble, and returns a pointer
+        past the point of the preamble.
+
+        :param buffer: the buffer to write into
+        :param pointer: the pointer into the buffer to start the write
+        :return: a pointer to the byte past the preamble
+        """
+
+    def is_ml(self):
+        """
+        Returns whether this is an ML preamble or a basic preamble.
+
+        :return: True if it is an ML preamble
+        """
+        return False
+
+
+class MLPreamble(Preamble):
+    """
+    The machine language preamble data for the file. The preamble is a collection of 5
+    bytes at the start of a binary file:
+
+        byte 0 - always $00
+        byte 1,2 - the data length of the file
+        byte 3,4 - the load address for the file
+
+    """
+    def __init__(self):
+        super().__init__()
+        self.length = 5
+
+    def read(self, buffer, pointer):
+        if len(buffer[pointer:]) < self.length:
+            raise VirtualFileValidationError("Not enough bytes to read preamble")
+
+        if buffer[pointer] != 0x00:
+            raise VirtualFileValidationError("Invalid ML preamble flag")
+
+        self.data_length = NumericValue((buffer[pointer + 1] << 8) + buffer[pointer + 2])
+        self.load_addr = NumericValue((buffer[pointer + 3] << 8) + buffer[pointer + 4])
+
+        return pointer + self.length
+
+    def write(self, buffer, pointer):
+        if len(buffer[pointer:]) < self.length:
+            raise VirtualFileValidationError("Not enough bytes to write preamble")
+
+        buffer[pointer] = 0x00
+        buffer[pointer + 1] = self.data_length.high_byte()
+        buffer[pointer + 2] = self.data_length.low_byte()
+        buffer[pointer + 3] = self.load_addr.high_byte()
+        buffer[pointer + 4] = self.load_addr.low_byte()
+        return pointer + self.length
+
+    def is_ml(self):
+        return True
+
+
+class ASCIIPreamble(Preamble):
+    """
+    ASCII encoded files in TRS-DOS do not have a preamble or a postamble.
+    """
+    def __init__(self):
+        super().__init__()
+        self.length = 0
+
+    def read(self, buffer, pointer):
+        return pointer
+
+    def write(self, buffer, pointer):
+        return pointer
+
+
+class BasicPreamble(Preamble):
+    """
+    All BASIC files under TRS-DOS are considered to have just a preamble that
+    contains the data length. The preamble is a collection of 3 bytes at the
+    start of a file:
+
+        byte 0 - always $FF
+        byte 1,2 - the data length of the file
+
+    """
+    def __init__(self):
+        super().__init__()
+        self.length = 3
+
+    def read(self, buffer, pointer):
+        if len(buffer[pointer:]) < self.length:
+            raise VirtualFileValidationError("Not enough bytes to read preamble")
+
+        if buffer[pointer] != 0xFF:
+            raise VirtualFileValidationError("Invalid basic preamble flag")
+
+        self.data_length = NumericValue((buffer[pointer + 1] << 8) + buffer[pointer + 2])
+
+        return pointer + self.length
+
+    def write(self, buffer, pointer):
+        if len(buffer[pointer:]) < self.length:
+            raise VirtualFileValidationError("Not enough bytes to write preamble")
+
+        buffer[pointer] = 0xFF
+        buffer[pointer + 1] = self.data_length.high_byte()
+        buffer[pointer + 2] = self.data_length.low_byte()
+        return pointer + self.length
+
+
+class Postamble(object):
     """
     The Postamble class is used to store information relating t a binary file
     on a disk image. The Postamble is stored at the end of a binary file and
     contains the exec address for the binary.
     """
-    exec_addr: Value = NoneValue()
+    def __init__(self):
+        self.exec_addr = NoneValue()
+        self.length = 5
+
+    def read(self, buffer, pointer):
+        if len(buffer[pointer:]) < self.length:
+            raise VirtualFileValidationError("Not enough bytes to read postamble")
+
+        if buffer[pointer] != 0xFF:
+            raise VirtualFileValidationError("Invalid postamble byte 0 not 0xFF, got {}".format(hex(buffer[pointer])))
+
+        if buffer[pointer + 1] != 0x00:
+            raise VirtualFileValidationError("Invalid postamble byte 1 not 0x00, got {}".format(hex(buffer[pointer+1])))
+
+        if buffer[pointer + 2] != 0x00:
+            raise VirtualFileValidationError("Invalid postamble byte 2 not 0x00, got {}".format(hex(buffer[pointer+2])))
+
+        self.exec_addr = NumericValue((buffer[pointer + 3] << 8) + buffer[pointer + 4])
+        return pointer + self.length
+
+    def write(self, buffer, pointer):
+        if len(buffer[pointer:]) < self.length:
+            raise VirtualFileValidationError("Not enough bytes to write postamble")
+
+        buffer[pointer] = 0xFF
+        buffer[pointer + 1] = 0
+        buffer[pointer + 2] = 0
+        buffer[pointer + 3] = self.exec_addr.high_byte()
+        buffer[pointer + 4] = self.exec_addr.low_byte()
+        return pointer + self.length
 
 
 class DiskFile(VirtualFileContainer):
@@ -66,7 +225,9 @@ class DiskFile(VirtualFileContainer):
         super().__init__(buffer=buffer)
         if buffer is None:
             self.buffer = [0xFF] * DiskConstants.IMAGE_SIZE
-        self.granule_fill_order = DiskConstants.GRANULE_FILL_ORDER if not granule_fill_order else granule_fill_order
+        self.granule_fill_order = DiskConstants.GRANULE_FILL_ORDER
+        if granule_fill_order:
+            self.granule_fill_order = granule_fill_order
 
     def read_sequence(self, pointer, length, decode=False):
         """
@@ -85,22 +246,6 @@ class DiskFile(VirtualFileContainer):
         for file_name_pointer in range(pointer, pointer + length):
             sequence.append(self.buffer[file_name_pointer])
         return bytearray(sequence).decode("utf-8") if decode else sequence
-
-    def read_word(self, pointer):
-        """
-        Reads a 16-bit value from the buffer starting at the specified
-        pointer offset.
-
-        :param pointer: the offset into the buffer to read from
-        :return: the NumericValue read
-        """
-        if len(self.buffer) < 2 or (len(self.buffer[pointer:]) < 2):
-            raise VirtualFileValidationError("Unable to read word - insufficient bytes in buffer")
-
-        word_int = int(self.buffer[pointer])
-        word_int = word_int << 8
-        word_int |= int(self.buffer[pointer + 1])
-        return NumericValue(word_int)
 
     def validate_sequence(self, pointer, sequence):
         """
@@ -121,6 +266,8 @@ class DiskFile(VirtualFileContainer):
         return True
 
     def list_files(self, filenames=None):
+        if len(self.buffer) < DiskConstants.IMAGE_SIZE:
+            raise VirtualFileValidationError("Disk image size is not {:,d} bytes long".format(DiskConstants.IMAGE_SIZE))
         files = []
 
         # Read the File Allocation Table
@@ -147,28 +294,32 @@ class DiskFile(VirtualFileContainer):
                 pointer += 18
 
                 # Set up data definitions
-                has_preamble = False
-                load_addr = NoneValue()
                 exec_addr = NoneValue()
 
                 # If the file is binary, read the preamble and postamble, otherwise don't
                 if file_type.int == 0x02:
-                    preamble = self.read_preamble(starting_granule.int)
-                    has_preamble = True
-                    data_length = preamble.data_length.int
-                    load_addr = preamble.load_addr
+                    preamble = MLPreamble()
+                elif data_type.int == 0xFF:
+                    preamble = ASCIIPreamble()
                 else:
+                    preamble = BasicPreamble()
+
+                preamble.read(self.buffer, self.seek_granule(starting_granule.int))
+
+                data_length = preamble.data_length.int
+                if data_length == 0:
                     data_length = self.calculate_file_length(starting_granule.int, fat, bytes_in_last_sector.int)
 
                 file_data, post_pointer = self.read_data(
                     starting_granule.int,
                     fat,
-                    has_preamble=has_preamble,
+                    preamble=preamble,
                     data_length=data_length,
                 )
 
-                if has_preamble:
-                    postamble = self.read_postamble(post_pointer)
+                if preamble.is_ml():
+                    postamble = Postamble()
+                    postamble.read(self.buffer, post_pointer)
                     exec_addr = postamble.exec_addr
 
                 coco_file = CoCoFile(
@@ -176,7 +327,7 @@ class DiskFile(VirtualFileContainer):
                     extension=extension,
                     type=file_type,
                     data_type=data_type,
-                    load_addr=load_addr,
+                    load_addr=preamble.load_addr,
                     exec_addr=exec_addr,
                     data=file_data,
                     ignore_gaps=True
@@ -263,21 +414,24 @@ class DiskFile(VirtualFileContainer):
         for granule_number in self.granule_fill_order:
             if not self.granule_in_use(granule_number):
                 return granule_number
-        return -1
+
+        raise VirtualFileValidationError("no free granules available for allocation")
 
     @staticmethod
-    def calculate_granules_needed(file_data):
+    def calculate_granules_needed(file_data, preamble, postamble):
         """
         Given an array that contains the actual file data to store, calculates how many
-        granules are needed on disk to store the file. The routine assumes that a 5-byte
-        preamble and 5-byte postamble will be appended to the file. A 0-byte file will
-        always take 1 granule on disk.
+        granules are needed on disk to store the file. A 0-byte file will always take
+        1 granule on disk.
 
         :param file_data: the array-like structure containing the file data
+        :param preamble: the preamble data
+        :param postamble: the postamble data if it exists, else None
         :return: a count of the number of granules needed for the file
         """
-        pre_post_amble_len = DiskConstants.PREAMBLE_LEN + DiskConstants.POSTAMBLE_LEN
-        return int((len(file_data) + pre_post_amble_len) / DiskConstants.HALF_TRACK_LEN) + 1
+        additional_len = preamble.length
+        additional_len += postamble.length if postamble else 0
+        return int((len(file_data) + additional_len) / DiskConstants.HALF_TRACK_LEN) + 1
 
     @staticmethod
     def calculate_sectors_needed(data_len):
@@ -292,18 +446,23 @@ class DiskFile(VirtualFileContainer):
         return int(data_len / DiskConstants.BYTES_PER_SECTOR) + 1
 
     @staticmethod
-    def calculate_last_sector_bytes_used(file_data):
+    def calculate_last_sector_bytes_used(file_data, preamble, postamble):
         """
         Given an array structure that contains the data to be saved to the virtual disk,
         calculates how many bytes will be used in the last sector of the last granule
         for the file.
 
         :param file_data: an array-like structure with file data in it
+        :param preamble: the preamble data
+        :param postamble: the postamble data if it exists, else None
         :return: the number of bytes stored in the last sector of the last granule
         """
-        granules_needed = DiskFile.calculate_granules_needed(file_data)
+        granules_needed = DiskFile.calculate_granules_needed(file_data, preamble, postamble)
 
-        file_data_len = len(file_data) + DiskConstants.PREAMBLE_LEN + DiskConstants.POSTAMBLE_LEN
+        additional_len = preamble.length
+        additional_len += postamble.length if postamble else 0
+
+        file_data_len = len(file_data) + additional_len
         full_granule_len = (granules_needed - 1) * DiskConstants.HALF_TRACK_LEN
         file_data_len -= full_granule_len
 
@@ -314,18 +473,22 @@ class DiskFile(VirtualFileContainer):
         return file_data_len
 
     @staticmethod
-    def calculate_last_granules_sectors_used(file_data):
+    def calculate_last_granules_sectors_used(file_data, preamble, postamble):
         """
         Given an array-like structure that contains data to be saved to the virtual disk,
         calculates how many sectors are used in the last granule. Note that this function
         adds the pre- and post-amble bytes to the number of bytes used to store the file.
 
         :param file_data: an array-like structure with file data in it
+        :param preamble: the preamble data
+        :param postamble: the postamble data if it exists, else None
         :return: the number of sectors used in the last granule of the file
         """
-        granules_needed = DiskFile.calculate_granules_needed(file_data)
+        granules_needed = DiskFile.calculate_granules_needed(file_data, preamble, postamble)
 
-        file_data_len = len(file_data) + DiskConstants.PREAMBLE_LEN + DiskConstants.POSTAMBLE_LEN
+        additional_len = preamble.length
+        additional_len += postamble.length if postamble else 0
+        file_data_len = len(file_data) + additional_len
         full_granule_len = (granules_needed - 1) * DiskConstants.HALF_TRACK_LEN
         file_data_len -= full_granule_len
 
@@ -345,52 +508,12 @@ class DiskFile(VirtualFileContainer):
             granule_offset += DiskConstants.HALF_TRACK_LEN * 2
         return granule_offset
 
-    def read_preamble(self, starting_granule):
-        """
-        Reads the preamble data for the file. The preamble is a collection of 5
-        bytes at the start of a binary file:
-
-            byte 0 - always $00
-            byte 1,2 - the data length of the file
-            byte 3,4 - the load address for the file
-
-        :param starting_granule: the granule number that contains the preamble
-        :return: a populated Preamble object
-        """
-        pointer = self.seek_granule(starting_granule)
-        if not self.validate_sequence(pointer, [0x00]):
-            raise VirtualFileValidationError("Invalid preamble flag")
-
-        return Preamble(
-            data_length=self.read_word(pointer + 1),
-            load_addr=self.read_word(pointer + 3),
-        )
-
-    def read_postamble(self, pointer):
-        """
-        Reads the postamble of a binary file. The postamble is a collection of
-        5 bytes as follows:
-
-            byte 0 - always $FF
-            byte 1,2 - always $00, $00
-            byte 3,4 - the exec address of the binary file
-
-        :param pointer: a pointer to the postamble data
-        :return: a populated Postamble object
-        """
-        if not self.validate_sequence(pointer, [0xFF, 0x00, 0x00]):
-            raise VirtualFileValidationError("Invalid postamble flags")
-
-        return Postamble(
-            exec_addr=self.read_word(pointer + 3),
-        )
-
-    def read_data(self, starting_granule, fat, has_preamble=False, data_length=0):
+    def read_data(self, starting_granule, fat, preamble, data_length=0):
         """
         Reads a collection of data from a disk image.
 
         :param starting_granule: the starting granule for the file
-        :param has_preamble: whether there is a preamble to be read
+        :param preamble: the preamble type to read
         :param data_length: the length of data to read
         :param fat: the File Allocation Table data for the disk
         :return: the raw data from the specified file and the pointer to the end of the file
@@ -403,9 +526,9 @@ class DiskFile(VirtualFileContainer):
             raise VirtualFileValidationError("Unable to read data - insufficient bytes in buffer")
 
         # Skip over preamble if it exists
-        if has_preamble:
-            pointer += DiskConstants.PREAMBLE_LEN
-            chunk_size -= DiskConstants.PREAMBLE_LEN
+        if preamble:
+            pointer += preamble.length
+            chunk_size -= preamble.length
 
         # Check to see if we are reading more than one granule
         if data_length > chunk_size:
@@ -414,7 +537,7 @@ class DiskFile(VirtualFileContainer):
                 data_length -= 1
                 pointer += 1
             next_granule = fat[starting_granule]
-            granule_data, pointer = self.read_data(next_granule, fat, data_length=data_length, has_preamble=False)
+            granule_data, pointer = self.read_data(next_granule, fat, None, data_length=data_length)
             file_data.extend(granule_data)
         else:
             for _ in range(data_length):
@@ -458,51 +581,6 @@ class DiskFile(VirtualFileContainer):
         for _ in range(0, 16):
             self.buffer[pointer] = 0x00
             pointer += 1
-
-    def write_preamble(self, preamble, granule):
-        """
-        Given preamble data, writes the preamble to the start of the specified granule.
-
-        :param preamble: the preamble data to write
-        :param granule: the granule number to write to
-        """
-        pointer = self.seek_granule(granule)
-
-        # First byte of preamble is $00
-        self.buffer[pointer] = 0x00
-        pointer += 1
-
-        self.buffer[pointer] = preamble.data_length.high_byte()
-        pointer += 1
-        self.buffer[pointer] = preamble.data_length.low_byte()
-        pointer += 1
-
-        self.buffer[pointer] = preamble.load_addr.high_byte()
-        pointer += 1
-        self.buffer[pointer] = preamble.load_addr.low_byte()
-
-    def write_postamble(self, postamble, pointer):
-        """
-        Given postamble data, writes the postamble format into the buffer at the
-        specified pointer location.
-
-        :param postamble: the postamble data to write
-        :param pointer: a pointer into the buffer where to write the postamble data
-        """
-        if not postamble:
-            return pointer
-
-        # First three bytes of postamble is always $FF $00 $00
-        self.buffer[pointer] = 0xFF
-        pointer += 1
-        self.buffer[pointer] = 0x00
-        pointer += 1
-        self.buffer[pointer] = 0x00
-        pointer += 1
-
-        self.buffer[pointer] = postamble.exec_addr.high_byte()
-        pointer += 1
-        self.buffer[pointer] = postamble.exec_addr.low_byte()
 
     def write_bytes_to_buffer(self, pointer, data_to_write):
         """
@@ -566,19 +644,19 @@ class DiskFile(VirtualFileContainer):
         skip_bytes = 0
 
         if first_granule and preamble:
-            self.write_preamble(preamble, granule)
-            pointer += DiskConstants.PREAMBLE_LEN
-            skip_bytes += DiskConstants.PREAMBLE_LEN
+            pointer = preamble.write(self.buffer, pointer)
+            skip_bytes += preamble.length
 
         if len(file_data) < (DiskConstants.HALF_TRACK_LEN - skip_bytes):
             pointer = self.write_bytes_to_buffer(pointer, file_data)
-            self.write_postamble(postamble, pointer)
+            if postamble:
+                postamble.write(self.buffer, pointer)
         else:
-            self.write_bytes_to_buffer(pointer, file_data[:DiskConstants.HALF_TRACK_LEN])
+            self.write_bytes_to_buffer(pointer, file_data[:DiskConstants.HALF_TRACK_LEN - skip_bytes])
             self.write_to_granules(
-                file_data[DiskConstants.HALF_TRACK_LEN:],
+                file_data[DiskConstants.HALF_TRACK_LEN - skip_bytes:],
                 allocated_granules,
-                preamble,
+                None,
                 postamble,
                 first_granule=False
             )
@@ -591,18 +669,28 @@ class DiskFile(VirtualFileContainer):
 
         :param coco_file: the CoCoFile object to write
         """
-        granules_needed = self.calculate_granules_needed(coco_file.data)
+        if coco_file.type.int == 0x02:
+            preamble = MLPreamble()
+            preamble.data_length = NumericValue(len(coco_file.data))
+            preamble.load_addr = coco_file.load_addr
+            postamble = Postamble()
+            postamble.exec_addr = coco_file.exec_addr
+        elif coco_file.data_type.int == 0xFF:
+            preamble = ASCIIPreamble()
+            postamble = None
+        else:
+            preamble = BasicPreamble()
+            preamble.data_length = NumericValue(len(coco_file.data))
+            postamble = None
+
+        granules_needed = self.calculate_granules_needed(coco_file.data, preamble, postamble)
 
         # Check to see if there are enough granules for allocation
         allocated_granules = []
-        for granule in range(DiskConstants.TOTAL_GRANULES):
-            if not self.granule_in_use(granule):
-                allocated_granules.append(granule)
-                if len(allocated_granules) == granules_needed:
-                    break
-
-        if len(allocated_granules) != granules_needed:
-            raise VirtualFileValidationError("Not enough free granules to save file")
+        while len(allocated_granules) < granules_needed:
+            granule = self.find_empty_granule()
+            allocated_granules.append(granule)
+            self.buffer[DiskConstants.FAT_OFFSET + granule] = 0x99
 
         # Check to see if there is a free directory entry to save the file
         directory_entry = self.find_empty_directory_entry()
@@ -610,20 +698,11 @@ class DiskFile(VirtualFileContainer):
             raise VirtualFileValidationError("No free directory entry to save file")
 
         # Calculate the number of bytes used in the last sector, and the number of sectors in the last granule
-        last_sector_bytes_used = self.calculate_last_sector_bytes_used(coco_file.data)
-        last_granule_sectors_used = self.calculate_last_granules_sectors_used(coco_file.data)
+        last_sector_bytes_used = self.calculate_last_sector_bytes_used(coco_file.data, preamble, postamble)
+        last_granule_sectors_used = self.calculate_last_granules_sectors_used(coco_file.data, preamble, postamble)
 
         # Write out the directory entry
         self.write_dir_entry(directory_entry, coco_file, allocated_granules[0], last_sector_bytes_used)
-
-        # Generate pre- and post-amble as required
-        preamble = Preamble(
-            load_addr=coco_file.load_addr,
-            data_length=NumericValue(len(coco_file.data))
-        )
-        postamble = Postamble(
-            exec_addr=coco_file.exec_addr
-        )
 
         # Write the granule data to disk
         self.write_to_granules(coco_file.data, allocated_granules, preamble, postamble)

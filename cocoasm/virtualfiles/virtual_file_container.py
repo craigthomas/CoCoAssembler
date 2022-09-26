@@ -8,7 +8,9 @@ A Color Computer Assembler - see the README.md file for details.
 
 import copy
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
+from cocoasm.virtualfiles.virtual_file_exceptions import VirtualFileValidationError
+from cocoasm.values import NumericValue
 
 # C L A S S E S ###############################################################
 
@@ -55,11 +57,26 @@ class VirtualFileContainer(object):
     @abstractmethod
     def list_files(self, filenames=None):
         """
-        Lists all of the CoCoFile objects within the container.
+        Lists all the CoCoFile objects within the container.
 
         :param filenames: the list of CoCoFiles to list (if they exist)
         :return: a list of all the CoCoFile objects in the container
         """
 
+    def read_word(self, pointer):
+        """
+        Reads a 16-bit value from the buffer starting at the specified
+        pointer offset.
+
+        :param pointer: the offset into the buffer to read from
+        :return: the NumericValue read
+        """
+        if len(self.buffer) < 2 or (len(self.buffer[pointer:]) < 2):
+            raise VirtualFileValidationError("Unable to read word - insufficient bytes in buffer")
+
+        word_int = int(self.buffer[pointer])
+        word_int = word_int << 8
+        word_int |= int(self.buffer[pointer + 1])
+        return NumericValue(word_int)
 
 # E N D   O F   F I L E #######################################################

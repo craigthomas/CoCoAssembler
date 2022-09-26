@@ -43,15 +43,15 @@ class VirtualFile(object):
 
     def get_coco_files(self):
         try:
-            cassette_file = CassetteFile(buffer=self.source_file.get_buffer())
-            return cassette_file.list_files(), VirtualFileType.CASSETTE
+            disk_file = DiskFile(buffer=self.source_file.get_buffer())
+            return disk_file.list_files(), VirtualFileType.DISK
         except VirtualFileValidationError:
             pass
 
         try:
-            disk_file = DiskFile(buffer=self.source_file.get_buffer())
-            return disk_file.list_files(), VirtualFileType.DISK
-        except VirtualFileValidationError:
+            cassette_file = CassetteFile(buffer=self.source_file.get_buffer())
+            return cassette_file.list_files(), VirtualFileType.CASSETTE
+        except VirtualFileValidationError as error:
             pass
 
         return [], VirtualFileType.BINARY

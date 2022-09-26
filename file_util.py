@@ -33,10 +33,13 @@ def parse_arguments():
         "--list", action="store_true", help="list all of the files on the specified host file"
     )
     parser.add_argument(
-        "--to_bin", action="store_true", help="extracts all the files from the host file, and saves them as BIN files"
+        "--to_bin", metavar="BIN_FILE", help="extracts all the files from the host file, and saves them as BIN files"
     )
     parser.add_argument(
-        "--to_cas", action="store_true", help="extracts all the files from the host file, and saves them as CAS files"
+        "--to_cas", metavar="CAS_FILE", help="extracts all the files from the host file, and saves it to a CAS file"
+    )
+    parser.add_argument(
+        "--to_dsk", metavar="DSK_FILE", help="extracts all the files from the host file, and saves it to a DSK file"
     )
     parser.add_argument(
         "--files", nargs="+", type=str, help="list of file names to extract"
@@ -65,37 +68,55 @@ def main(args):
             sys.exit(0)
 
         if args.to_cas:
+            target_virtual_file = VirtualFile(
+                SourceFile(args.to_cas, file_type=SourceFileType.BINARY),
+                virtual_file_type=VirtualFileType.CASSETTE
+            )
+            target_virtual_file.open_virtual_file()
             for number, file in enumerate(virtual_file.list_files()):
                 filename = file.name.strip().replace("\0", "")
                 if files_to_include is None or filename in files_to_include:
-                    cas_file_name = "{}.cas".format(filename)
                     print("-- File #{} [{}] --".format(number + 1, filename))
-                    target_virtual_file = VirtualFile(
-                        SourceFile(cas_file_name, file_type=SourceFileType.BINARY),
-                        virtual_file_type=VirtualFileType.CASSETTE
-                    )
-                    target_virtual_file.open_virtual_file()
                     target_virtual_file.add_coco_file(file)
-                    target_virtual_file.save_virtual_file(append_mode=args.append)
-                    print("Saved as {}".format(cas_file_name))
+            target_virtual_file.save_virtual_file(append_mode=args.append)
+            print("Saved to {}".format(args.to_cas))
+
+        if args.to_dsk:
+            target_virtual_file = VirtualFile(
+                SourceFile(args.to_dsk, file_type=SourceFileType.BINARY),
+                virtual_file_type=VirtualFileType.DISK
+            )
+            target_virtual_file.open_virtual_file()
+            for number, file in enumerate(virtual_file.list_files()):
+                filename = file.name.strip().replace("\0", "")
+                if files_to_include is None or filename in files_to_include:
+                    print("-- File #{} [{}] --".format(number + 1, filename))
+                    target_virtual_file.add_coco_file(file)
+            target_virtual_file.save_virtual_file(append_mode=args.append)
+            print("Saved to {}".format(args.to_dsk))
 
         if args.to_bin:
-            for number, file in enumerate(virtual_file.list_files()):
-                filename = file.name.strip().replace("\0", "")
-                if files_to_include is None or filename in files_to_include:
-                    bin_file_name = "{}.bin".format(filename)
-                    print("-- File #{} [{}] --".format(number + 1, filename))
-                    target_virtual_file = VirtualFile(
-                        SourceFile(bin_file_name, file_type=SourceFileType.BINARY),
-                        virtual_file_type=VirtualFileType.BINARY
-                    )
-                    target_virtual_file.open_virtual_file()
-                    target_virtual_file.add_coco_file(file)
-                    target_virtual_file.save_virtual_file(append_mode=args.append)
-                    print("Saved as {}".format(bin_file_name))
+            target_virtual_file = VirtualFile(
+                SourceFile(args.to_bin, file_type=SourceFileType.BINARY),
+                virtual_file_type=VirtualFileType.BINARY
+            )
+            target_virtual_file.open_virtual_file()
+            files = virtual_file.list_files()
+            if len(files) > 1:
+                print("More than one file exists in virtual container, not saving")
+                sys.exit(1)
+
+            file = files[0]
+            filename = file.name.strip().replace("\0", "")
+            if files_to_include is None or filename in files_to_include:
+                print("-- File #1 [{}] --".format(filename))
+                target_virtual_file.add_coco_file(file)
+            target_virtual_file.save_virtual_file(append_mode=args.append)
+            print("Saved to {}".format(args.to_bin))
 
     except Exception as error:
-        raise Exception(error)
+        print(error)
+        sys.exit(1)
 
 
 # M A I N #####################################################################
