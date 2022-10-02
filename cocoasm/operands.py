@@ -1,5 +1,5 @@
 """
-Copyright (C) 2013-2020 Craig Thomas
+Copyright (C) 2013-2022 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -10,7 +10,7 @@ import re
 
 from abc import ABC, abstractmethod
 
-from cocoasm.values import NoneValue, Value, NumericValue, DirectNumericValue, ExtendedNumericValue
+from cocoasm.values import NoneValue, Value, NumericValue, DirectNumericValue, ExtendedNumericValue, MultiByteValue
 from cocoasm.instruction import CodePackage
 from cocoasm.operand_type import OperandType
 from cocoasm.exceptions import OperandTypeError, ValueTypeError
@@ -188,7 +188,11 @@ class PseudoOperand(Operand):
         self.type = OperandType.PSEUDO
         if not instruction.is_pseudo:
             raise OperandTypeError("[{}] is not a pseudo instruction".format(instruction.mnemonic))
-        self.value = NoneValue() if instruction.is_include else Value.create_from_str(operand_string, instruction)
+        if instruction.is_multi_byte:
+            self.value = MultiByteValue(operand_string) if "," in operand_string else Value.create_from_str(operand_string, instruction)
+        else:
+            self.value = NoneValue() if instruction.is_include else Value.create_from_str(operand_string, instruction)
+
         if instruction.is_pseudo_define:
             if self.operand_string.startswith("$") and len(self.operand_string) > 3:
                 self.value = ExtendedNumericValue(self.value.int)
@@ -200,7 +204,15 @@ class PseudoOperand(Operand):
 
     def translate(self):
         if self.instruction.mnemonic == "FCB":
-            return CodePackage(additional=NumericValue(self.value.int, size_hint=2), size=1, max_size=1)
+            return CodePackage(
+                additional=self.value,
+                size=self.value.byte_len(),
+                max_size=self.value.byte_len()
+            ) if self.value.is_multi_byte() else CodePackage(
+                additional=NumericValue(self.value.int, size_hint=2),
+                size=1,
+                max_size=1
+            )
 
         if self.instruction.mnemonic == "FDB":
             return CodePackage(additional=NumericValue(self.value.int, size_hint=4), size=2, max_size=2)

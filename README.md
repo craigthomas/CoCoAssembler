@@ -472,7 +472,7 @@ as well as the number of cycles used to execute each operation.
 
 | Mnemonic  | Description                                                                | Example               |
 |-----------|----------------------------------------------------------------------------|-----------------------|
-| `FCB`     | Defines a single byte constant value.                                      | `FCB $1C`             |
+| `FCB`     | Defines a byte constant value. Separate multiple bytes with `,`.           | `FCB $1C,$AA`         |
 | `FCC`     | Defines a string constant value enclosed in a matching pair of delimiters. | `FCC "hello"`         |
 | `FDB`     | Defines a two byte constant value.                                         | `FDB $2000`           |
 | `END`     | Defines the end of the program.                                            | `END`                 |
