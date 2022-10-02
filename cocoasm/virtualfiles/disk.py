@@ -26,6 +26,12 @@ class DiskConstants(object):
     PREAMBLE_LEN = 5
     POSTAMBLE_LEN = 5
     IMAGE_SIZE = 161280
+    GRANULE_FILL_ORDER = [
+        32, 33, 34, 35, 30, 31, 36, 37, 28, 29, 38, 39, 26, 25, 40, 41, 24, 25, 42, 43,
+        22, 23, 40, 41, 20, 21, 42, 43, 18, 19, 44, 45, 16, 17, 46, 47, 14, 15, 48, 49,
+        12, 13, 50, 51, 10, 11, 52, 53, 8, 9, 54, 55, 6, 7, 56, 57, 4, 5, 58, 59, 2, 3,
+        60, 61, 0, 1, 62, 63, 64, 65, 66, 67
+    ]
 
 
 class DirectoryEntry(NamedTuple):
@@ -56,10 +62,11 @@ class Postamble(NamedTuple):
 
 
 class DiskFile(VirtualFileContainer):
-    def __init__(self, buffer=None):
+    def __init__(self, buffer=None, granule_fill_order=None):
         super().__init__(buffer=buffer)
         if buffer is None:
             self.buffer = [0xFF] * DiskConstants.IMAGE_SIZE
+        self.granule_fill_order = DiskConstants.GRANULE_FILL_ORDER if not granule_fill_order else granule_fill_order
 
     def read_sequence(self, pointer, length, decode=False):
         """
@@ -137,6 +144,7 @@ class DiskFile(VirtualFileContainer):
                 starting_granule = NumericValue(self.buffer[pointer])
                 pointer += 19
 
+                # TODO: if the type is not binary, then don't look for preamble or postamble
                 preamble = self.read_preamble(starting_granule.int)
 
                 file_data, post_pointer = self.read_data(
@@ -205,7 +213,10 @@ class DiskFile(VirtualFileContainer):
 
         :return: the first granule number not in use, otherwise -1 if all used
         """
-        for granule_number in range(0, 67):
+        if len(self.granule_fill_order) < DiskConstants.TOTAL_GRANULES:
+            raise VirtualFileValidationError("granule_fill_order does not contain 68 granules")
+
+        for granule_number in self.granule_fill_order:
             if not self.granule_in_use(granule_number):
                 return granule_number
         return -1
