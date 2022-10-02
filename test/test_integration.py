@@ -844,6 +844,16 @@ class TestIntegration(unittest.TestCase):
         program.translate_statements()
         self.assertEqual([0x8C, 0xFE, 0xFE], program.get_binary_array())
 
+    def test_multi_byte_declaration(self):
+        statements = [
+            Statement("         FCB $55,$44,17"),
+            Statement("         FCB $AA"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0x55, 0x44, 0x11, 0xAA], program.get_binary_array())
+
 # M A I N #####################################################################
 
 

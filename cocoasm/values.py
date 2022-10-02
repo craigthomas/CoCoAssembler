@@ -22,27 +22,27 @@ BINARY_REGEX = re.compile(
 
 # Pattern to recognize a character value
 CHAR_REGEX = re.compile(
-    r"^\'(?P<value>[a-zA-Z0-9><'\";:,.#?$%^&*()=!+-/])$"
+    r"^\'(?P<value>[a-zA-Z\d><'\";:,.#?$%^&*()=!+-/])$"
 )
 
 # Pattern to recognize a hex value
 HEX_REGEX = re.compile(
-    r"^\$(?P<value>[0-9a-fA-F]+)$"
+    r"^\$(?P<value>[\da-fA-F]+)$"
 )
 
 # Pattern to recognize an integer value
 INT_REGEX = re.compile(
-    r"^(?P<value>[\d]+)$"
+    r"^(?P<value>\d+)$"
 )
 
 # Pattern to recognize a negative integer value
 NEG_INT_REGEX = re.compile(
-    r"^-(?P<value>[\d]+)$"
+    r"^-(?P<value>\d+)$"
 )
 
 # Pattern to recognize a symbol value
 SYMBOL_REGEX = re.compile(
-    r"^(?P<value>[a-zA-Z0-9@]+)$"
+    r"^(?P<value>[a-zA-Z\d@]+)$"
 )
 
 # Patten to recognize an expression
@@ -78,6 +78,7 @@ class ValueType(Enum):
     EXPRESSION = 6
     LEFT_RIGHT = 7
     ADDRESS_EXPRESSION = 8
+    MULTI_BYTE = 9
 
 
 class Value(ABC):
@@ -170,10 +171,14 @@ class Value(ABC):
     def is_negative(self):
         return self.negative
 
+    def is_multi_byte(self):
+        return self.type == ValueType.MULTI_BYTE
+
     def resolve(self, symbol_table):
         """
         Attempts to resolve the proper value of the object given the supplied symbol table
 
+        :param symbol_table: a dict of symbols mapped to their addresses or values
         :return: a new Value type object with the resolved information
         """
         return self
@@ -298,6 +303,29 @@ class NoneValue(Value):
 
     def hex_len(self):
         return 0
+
+    def is_8_bit(self):
+        return False
+
+    def is_16_bit(self):
+        return False
+
+
+class MultiByteValue(Value):
+    def __init__(self, value):
+        super().__init__(value)
+        self.hex_array = []
+        self.type = ValueType.MULTI_BYTE
+        if "," not in value:
+            raise ValueTypeError("multi-byte declarations must have a comma in them")
+        values = value.split(",")
+        self.hex_array = [NumericValue(x).hex(size=2) for x in values if x != ""]
+
+    def hex(self, size=0):
+        return "".join(self.hex_array)
+
+    def hex_len(self):
+        return len(self.hex())
 
     def is_8_bit(self):
         return False

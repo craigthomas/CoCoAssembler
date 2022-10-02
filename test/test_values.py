@@ -9,7 +9,8 @@ A Color Computer Assembler - see the README.md file for details.
 import unittest
 
 from cocoasm.values import NumericValue, StringValue, NoneValue, SymbolValue, \
-    AddressValue, Value, ExpressionValue, ExplicitAddressingMode, LeftRightValue
+    AddressValue, Value, ExpressionValue, ExplicitAddressingMode, LeftRightValue, \
+    MultiByteValue
 from cocoasm.instruction import Instruction, Mode
 from cocoasm.exceptions import ValueTypeError
 
@@ -275,6 +276,45 @@ class TestNumericValue(unittest.TestCase):
     def test_numeric_negative_int_value_get_negative_correct_16_bit(self):
         result = NumericValue(-258)
         self.assertEqual(0xFEFE, result.get_negative())
+
+
+class TestMultiByteValue(unittest.TestCase):
+    """
+    A test class for the StringValue class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        pass
+
+    def test_multi_byte_raises_on_no_delimiter(self):
+        with self.assertRaises(ValueTypeError) as context:
+            MultiByteValue('$DE')
+        self.assertEqual("multi-byte declarations must have a comma in them", str(context.exception))
+
+    def test_multi_byte_no_values_correct(self):
+        result = MultiByteValue(",")
+        self.assertEqual("", result.hex())
+        self.assertEqual(0, result.hex_len())
+
+    def test_multi_byte_single_value_correct(self):
+        result = MultiByteValue("$DE,")
+        self.assertEqual("DE", result.hex())
+        self.assertEqual(2, result.hex_len())
+
+    def test_multi_byte_many_values_correct(self):
+        result = MultiByteValue("$DE,$AD,$BE,$EF")
+        self.assertEqual("DEADBEEF", result.hex())
+        self.assertEqual(8, result.hex_len())
+
+    def test_multi_byte_8_bit_correct(self):
+        result = MultiByteValue("$DE,$AD,$BE,$EF")
+        self.assertFalse(result.is_8_bit())
+
+    def test_multi_byte_16_bit_correct(self):
+        result = MultiByteValue("$DE,$AD,$BE,$EF")
+        self.assertFalse(result.is_16_bit())
 
 
 class TestStringValue(unittest.TestCase):
