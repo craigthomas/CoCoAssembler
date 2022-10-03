@@ -142,33 +142,77 @@ class DiskFile(VirtualFileContainer):
                 data_type = NumericValue(self.buffer[pointer])
                 pointer += 1
                 starting_granule = NumericValue(self.buffer[pointer])
-                pointer += 19
+                pointer += 1
+                bytes_in_last_sector = self.read_word(pointer)
+                pointer += 18
 
-                # TODO: if the type is not binary, then don't look for preamble or postamble
-                preamble = self.read_preamble(starting_granule.int)
+                # Set up data definitions
+                has_preamble = False
+                load_addr = NoneValue()
+                exec_addr = NoneValue()
+
+                # If the file is binary, read the preamble and postamble, otherwise don't
+                if file_type.int == 0x02:
+                    preamble = self.read_preamble(starting_granule.int)
+                    has_preamble = True
+                    data_length = preamble.data_length.int
+                    load_addr = preamble.load_addr
+                else:
+                    data_length = self.calculate_file_length(starting_granule.int, fat, bytes_in_last_sector.int)
 
                 file_data, post_pointer = self.read_data(
                     starting_granule.int,
                     fat,
-                    has_preamble=True,
-                    data_length=preamble.data_length.int,
+                    has_preamble=has_preamble,
+                    data_length=data_length,
                 )
 
-                postamble = self.read_postamble(post_pointer)
+                if has_preamble:
+                    postamble = self.read_postamble(post_pointer)
+                    exec_addr = postamble.exec_addr
 
                 coco_file = CoCoFile(
                     name=name,
                     extension=extension,
                     type=file_type,
                     data_type=data_type,
-                    load_addr=preamble.load_addr,
-                    exec_addr=postamble.exec_addr,
+                    load_addr=load_addr,
+                    exec_addr=exec_addr,
                     data=file_data,
                     ignore_gaps=True
                 )
                 files.append(coco_file)
 
         return files
+
+    @staticmethod
+    def calculate_file_length(granule, fat, bytes_in_last_sector):
+        """
+        Calculates the length of the file without using preamble data. It does so by
+        calculating how many granules are used as described in the FAT, and then
+        calculating how many sectors are used in the final granule of the file,
+        and adding the final number of bytes used in the last sector of the last
+        granule.
+
+        :param granule: the granule where the file starts at
+        :param fat: the file allocation table data
+        :param bytes_in_last_sector: the number of bytes stored in the last sector
+        :return: the total bytes used by the file
+        """
+        is_last_granule = False
+        total_bytes = 0
+
+        while not is_last_granule:
+            fat_entry = fat[granule]
+            if (fat_entry & 0xC0) == 0xC0:
+                is_last_granule = True
+                total_bytes += ((fat_entry & 0x1F) - 1) * DiskConstants.BYTES_PER_SECTOR
+                total_bytes += bytes_in_last_sector
+            else:
+                total_bytes += DiskConstants.HALF_TRACK_LEN
+                granule = fat_entry
+
+        return total_bytes
 
     def directory_entry_in_use(self, entry_number):
         """

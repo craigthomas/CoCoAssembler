@@ -54,8 +54,10 @@ class CoCoFile(NamedTuple):
                 gaps = "Gaps"
             result += "Gap Status: {}\n".format(gaps)
 
-        result += "Load Addr:  ${}\n".format(self.load_addr.hex(size=4))
-        result += "Exec Addr:  ${}\n".format(self.exec_addr.hex(size=4))
+        if self.type.hex() == "02":
+            result += "Load Addr:  ${}\n".format(self.load_addr.hex(size=4))
+            result += "Exec Addr:  ${}\n".format(self.exec_addr.hex(size=4))
+
         result += "Data Len:   {} bytes".format(len(self.data))
         return result
 
