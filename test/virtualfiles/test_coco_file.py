@@ -30,6 +30,14 @@ class TestCoCoFile(unittest.TestCase):
             'Filename:   {}\nExtension:  {}\nFile Type:  {}\nData Type:  {}\n'
             'Load Addr:  ${}\nExec Addr:  ${}\nData Len:   {} bytes'
         )
+        self.str_format_no_exec = (
+            'Filename:   {}\nExtension:  {}\nFile Type:  {}\nData Type:  {}\nGap Status: {}\n'
+            'Data Len:   {} bytes'
+        )
+        self.str_format_no_gaps_no_exec = (
+            'Filename:   {}\nExtension:  {}\nFile Type:  {}\nData Type:  {}\n'
+            'Data Len:   {} bytes'
+        )
         self.name = "testfile"
         self.extension = "bas"
         self.file_type = NumericValue(0)
@@ -53,24 +61,34 @@ class TestCoCoFile(unittest.TestCase):
             gaps=self.gaps,
         )
 
-    def compose_expected_string(self):
-        return self.str_format.format(
-            self.name, self.extension, self.file_type, self.data_type, self.ignore_gaps,
-            self.load_addr, self.exec_addr, len(self.data)
-        )
-
-    def compose_expected_string_ignore_gaps(self):
-        return self.str_format_no_gaps.format(
-            self.name, self.extension, self.file_type, self.data_type,
-            self.load_addr, self.exec_addr, len(self.data)
-        )
+    def compose_expected_string(self, ignore_gaps=False, is_basic_file=False):
+        if not ignore_gaps and not is_basic_file:
+            return self.str_format.format(
+                self.name, self.extension, self.file_type, self.data_type, self.ignore_gaps,
+                self.load_addr, self.exec_addr, len(self.data)
+            )
+        if ignore_gaps and not is_basic_file:
+            return self.str_format_no_gaps.format(
+                self.name, self.extension, self.file_type, self.data_type,
+                self.load_addr, self.exec_addr, len(self.data)
+            )
+        if not ignore_gaps and is_basic_file:
+            return self.str_format_no_exec.format(
+                self.name, self.extension, self.file_type, self.data_type, self.ignore_gaps,
+                len(self.data)
+            )
+        if ignore_gaps and is_basic_file:
+            return self.str_format_no_gaps_no_exec.format(
+                self.name, self.extension, self.file_type, self.data_type,
+                len(self.data)
+            )
 
     def test_str_is_correct_default_branches(self):
         result = self.compose_coco_file()
         self.ignore_gaps = "No Gaps"
         self.file_type = "BASIC"
         self.data_type = "Binary"
-        self.assertEqual(self.compose_expected_string(), str(result))
+        self.assertEqual(self.compose_expected_string(is_basic_file=True), str(result))
 
     def test_str_is_correct_data_filetype(self):
         self.file_type = NumericValue(1)
@@ -78,7 +96,7 @@ class TestCoCoFile(unittest.TestCase):
         self.ignore_gaps = "No Gaps"
         self.file_type = "Data"
         self.data_type = "Binary"
-        self.assertEqual(self.compose_expected_string(), str(result))
+        self.assertEqual(self.compose_expected_string(is_basic_file=True), str(result))
 
     def test_str_is_correct_object_filetype(self):
         self.file_type = NumericValue(2)
@@ -94,7 +112,7 @@ class TestCoCoFile(unittest.TestCase):
         self.ignore_gaps = "No Gaps"
         self.file_type = "Text"
         self.data_type = "Binary"
-        self.assertEqual(self.compose_expected_string(), str(result))
+        self.assertEqual(self.compose_expected_string(is_basic_file=True), str(result))
 
     def test_str_is_correct_ascii_datatype(self):
         self.data_type = NumericValue(0xFF)
@@ -102,7 +120,7 @@ class TestCoCoFile(unittest.TestCase):
         self.ignore_gaps = "No Gaps"
         self.file_type = "BASIC"
         self.data_type = "ASCII"
-        self.assertEqual(self.compose_expected_string(), str(result))
+        self.assertEqual(self.compose_expected_string(is_basic_file=True), str(result))
 
     def test_str_is_correct_gaps(self):
         self.gaps = NumericValue(0xFF)
@@ -110,14 +128,14 @@ class TestCoCoFile(unittest.TestCase):
         self.ignore_gaps = "Gaps"
         self.file_type = "BASIC"
         self.data_type = "Binary"
-        self.assertEqual(self.compose_expected_string(), str(result))
+        self.assertEqual(self.compose_expected_string(is_basic_file=True), str(result))
 
     def test_str_is_correct_ignore_gaps(self):
         self.ignore_gaps = True
         result = self.compose_coco_file()
         self.file_type = "BASIC"
         self.data_type = "Binary"
-        self.assertEqual(self.compose_expected_string_ignore_gaps(), str(result))
+        self.assertEqual(self.compose_expected_string(ignore_gaps=True, is_basic_file=True), str(result))
 
 
 # M A I N #####################################################################

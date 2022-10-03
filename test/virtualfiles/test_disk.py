@@ -377,7 +377,7 @@ class TestDiskFile(unittest.TestCase):
             DiskConstants.DIR_OFFSET,
             [0x54, 0x45, 0x53, 0x54, 0x20, 0x20, 0x20, 0x20, 0x42, 0x49, 0x4E, 0x02, 0x00, 0x00, 0x00, 0x00,
              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-             0x53, 0x45, 0x43, 0x4F, 0x4E, 0x44, 0x20, 0x20, 0x42, 0x41, 0x53, 0x00, 0xFF, 0x01, 0x00, 0x00,
+             0x53, 0x45, 0x43, 0x4F, 0x4E, 0x44, 0x20, 0x20, 0x42, 0x41, 0x53, 0x00, 0xFF, 0x01, 0x00, 0x0C,
              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
         )
         disk_file.write_bytes_to_buffer(
@@ -387,6 +387,10 @@ class TestDiskFile(unittest.TestCase):
         disk_file.write_bytes_to_buffer(
             DiskFile.seek_granule(1),
             [0x00, 0x00, 0x02, 0xCA, 0xFE, 0xBB, 0xBB, 0xFF, 0x00, 0x00, 0xBA, 0xBE]
+        )
+        disk_file.write_bytes_to_buffer(
+            DiskConstants.FAT_OFFSET,
+            [0x00, 0xC1]
         )
         coco_files = disk_file.list_files()
         self.assertEqual(2, len(coco_files))
@@ -404,9 +408,9 @@ class TestDiskFile(unittest.TestCase):
         self.assertEqual("BAS", coco_file.extension)
         self.assertEqual(0x00, coco_file.type.int)
         self.assertEqual(0xFF, coco_file.data_type.int)
-        self.assertEqual("CAFE", coco_file.load_addr.hex())
-        self.assertEqual("BABE", coco_file.exec_addr.hex())
-        self.assertEqual([0xBB, 0xBB], coco_file.data)
+        self.assertEqual("", coco_file.load_addr.hex())
+        self.assertEqual("", coco_file.exec_addr.hex())
+        self.assertEqual([0x00, 0x00, 0x02, 0xCA, 0xFE, 0xBB, 0xBB, 0xFF, 0x00, 0x00, 0xBA, 0xBE], coco_file.data)
 
     def test_write_to_granules_does_nothing_on_empty_allocated_granules(self):
         disk_file = DiskFile(buffer=[0xFF] * 161280)
@@ -483,6 +487,18 @@ class TestDiskFile(unittest.TestCase):
                     data=[0x00] * 5000,
                 )
             )
+
+    def test_calculate_file_length_single_granule_single_sector_correct(self):
+        result = DiskFile.calculate_file_length(0, [0xC1], 256)
+        self.assertEqual(256, result)
+
+    def test_calculate_file_length_single_granule_multiple_sectors_correct(self):
+        result = DiskFile.calculate_file_length(0, [0xC2], 256)
+        self.assertEqual(512, result)
+
+    def test_calculate_file_length_mutiple_granules_multiple_sectors_correct(self):
+        result = DiskFile.calculate_file_length(0, [0x01, 0x02, 0xC2], 256)
+        self.assertEqual(4608 + 512, result)
 
 # M A I N #####################################################################
 
