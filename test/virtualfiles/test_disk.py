@@ -193,13 +193,22 @@ class TestDiskFile(unittest.TestCase):
         for granule in range(0, 67):
             self.assertTrue(disk_file.granule_in_use(granule))
 
-    def test_granule_in_use_returns_negative_when_no_granules_free(self):
+    def test_find_empty_granule_returns_negative_when_no_granules_free(self):
         disk_file = DiskFile(buffer=[0xDE] * 161280)
         self.assertEqual(-1, disk_file.find_empty_granule())
 
-    def test_granule_in_use_returns_correct_when_granules_free(self):
+    def test_find_empty_granule_returns_correct_when_granules_free(self):
         disk_file = DiskFile(buffer=[0xFF] * 161280)
+        self.assertEqual(32, disk_file.find_empty_granule())
+
+    def test_find_empty_granule_returns_correct_when_granules_free_with_different_preferred_granules(self):
+        disk_file = DiskFile(buffer=[0xFF] * 161280, granule_fill_order=[x for x in range(68)])
         self.assertEqual(0, disk_file.find_empty_granule())
+
+    def test_find_empty_granule_raises_when_fill_order_too_small(self):
+        disk_file = DiskFile(buffer=[0xFF] * 161280, granule_fill_order=[0])
+        with self.assertRaises(VirtualFileValidationError):
+            disk_file.find_empty_granule()
 
     def test_granules_needed_empty_file(self):
         self.assertEqual(1, DiskFile.calculate_granules_needed([]))
