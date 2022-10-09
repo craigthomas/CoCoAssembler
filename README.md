@@ -474,7 +474,7 @@ as well as the number of cycles used to execute each operation.
 |-----------|----------------------------------------------------------------------------|-----------------------|
 | `FCB`     | Defines a byte constant value. Separate multiple bytes with `,`.           | `FCB $1C,$AA`         |
 | `FCC`     | Defines a string constant value enclosed in a matching pair of delimiters. | `FCC "hello"`         |
-| `FDB`     | Defines a two byte constant value.                                         | `FDB $2000`           |
+| `FDB`     | Defines a word constant value. Separate multiple word with `,`.            | `FDB $2000,$CAFE`     |
 | `END`     | Defines the end of the program.                                            | `END`                 |
 | `EQU`     | Defines a symbol with a set value.                                         | `SCRMEM EQU $1000`    |
 | `INCLUDE` | Includes another assembly source file at this location.                    | `INCLUDE globals.asm` |

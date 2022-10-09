@@ -10,7 +10,8 @@ import re
 
 from abc import ABC, abstractmethod
 
-from cocoasm.values import NoneValue, Value, NumericValue, DirectNumericValue, ExtendedNumericValue, MultiByteValue
+from cocoasm.values import NoneValue, Value, NumericValue, DirectNumericValue, ExtendedNumericValue, MultiByteValue, \
+    MultiWordValue
 from cocoasm.instruction import CodePackage
 from cocoasm.operand_type import OperandType
 from cocoasm.exceptions import OperandTypeError, ValueTypeError
@@ -190,6 +191,8 @@ class PseudoOperand(Operand):
             raise OperandTypeError("[{}] is not a pseudo instruction".format(instruction.mnemonic))
         if instruction.is_multi_byte:
             self.value = MultiByteValue(operand_string) if "," in operand_string else Value.create_from_str(operand_string, instruction)
+        elif instruction.is_multi_word:
+            self.value = MultiWordValue(operand_string) if "," in operand_string else Value.create_from_str(operand_string, instruction)
         else:
             self.value = NoneValue() if instruction.is_include else Value.create_from_str(operand_string, instruction)
 
@@ -215,7 +218,15 @@ class PseudoOperand(Operand):
             )
 
         if self.instruction.mnemonic == "FDB":
-            return CodePackage(additional=NumericValue(self.value.int, size_hint=4), size=2, max_size=2)
+            return CodePackage(
+                additional=self.value,
+                size=self.value.byte_len(),
+                max_size=self.value.byte_len()
+            ) if self.value.is_multi_word() else CodePackage(
+                additional=NumericValue(self.value.int, size_hint=4),
+                size=2,
+                max_size=2
+            )
 
         if self.instruction.mnemonic == "RMB":
             return CodePackage(

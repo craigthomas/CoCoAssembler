@@ -79,6 +79,7 @@ class ValueType(Enum):
     LEFT_RIGHT = 7
     ADDRESS_EXPRESSION = 8
     MULTI_BYTE = 9
+    MULTI_WORD = 10
 
 
 class Value(ABC):
@@ -173,6 +174,9 @@ class Value(ABC):
 
     def is_multi_byte(self):
         return self.type == ValueType.MULTI_BYTE
+
+    def is_multi_word(self):
+        return self.type == ValueType.MULTI_WORD
 
     def resolve(self, symbol_table):
         """
@@ -320,6 +324,29 @@ class MultiByteValue(Value):
             raise ValueTypeError("multi-byte declarations must have a comma in them")
         values = value.split(",")
         self.hex_array = [NumericValue(x).hex(size=2) for x in values if x != ""]
+
+    def hex(self, size=0):
+        return "".join(self.hex_array)
+
+    def hex_len(self):
+        return len(self.hex())
+
+    def is_8_bit(self):
+        return False
+
+    def is_16_bit(self):
+        return False
+
+
+class MultiWordValue(Value):
+    def __init__(self, value):
+        super().__init__(value)
+        self.hex_array = []
+        self.type = ValueType.MULTI_WORD
+        if "," not in value:
+            raise ValueTypeError("multi-word declarations must have a comma in them")
+        values = value.split(",")
+        self.hex_array = [NumericValue(x).hex(size=4) for x in values if x != ""]
 
     def hex(self, size=0):
         return "".join(self.hex_array)

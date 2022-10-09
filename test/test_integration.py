@@ -854,6 +854,16 @@ class TestIntegration(unittest.TestCase):
         program.translate_statements()
         self.assertEqual([0x55, 0x44, 0x11, 0xAA], program.get_binary_array())
 
+    def test_multi_word_declaration(self):
+        statements = [
+            Statement("         FDB $DEAD,$BEEF"),
+            Statement("         FDB $CAFE"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEqual([0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE], program.get_binary_array())
+
 # M A I N #####################################################################
 
 
