@@ -38,13 +38,13 @@ def parse_arguments():
         help="print out the assembled statements when finished"
     )
     parser.add_argument(
-        "--bin_file", metavar="BIN_FILE", help="stores the assembled program in a binary BIN_FILE"
+        "--to_bin", metavar="BIN_FILE", help="stores the assembled program in a binary BIN_FILE"
     )
     parser.add_argument(
-        "--cas_file", metavar="CAS_FILE", help="stores the assembled program in a cassette image CAS_FILE"
+        "--to_cas", metavar="CAS_FILE", help="stores the assembled program in a cassette image CAS_FILE"
     )
     parser.add_argument(
-        "--dsk_file", metavar="DSK_FILE", help="stores the assembled program in a disk image DSK_FILE"
+        "--to_dsk", metavar="DSK_FILE", help="stores the assembled program in a disk image DSK_FILE"
     )
     parser.add_argument(
         "--name", help="the name of the file to be created on the cassette or disk image"
@@ -107,10 +107,10 @@ def main(args):
         for statement in program.get_statements():
             print(statement)
 
-    if args.bin_file:
+    if args.to_bin:
         try:
             virtual_file = VirtualFile(
-                SourceFile(args.bin_file, file_type=SourceFileType.BINARY),
+                SourceFile(args.to_bin, file_type=SourceFileType.BINARY),
                 VirtualFileType.BINARY
             )
             virtual_file.open_virtual_file()
@@ -120,13 +120,13 @@ def main(args):
             print("Unable to save binary file:")
             print(error)
 
-    if args.cas_file:
+    if args.to_cas:
         if not coco_file.name:
             print("No name for the program specified, not creating cassette file")
             return
         try:
             virtual_file = VirtualFile(
-                SourceFile(args.cas_file, file_type=SourceFileType.BINARY),
+                SourceFile(args.to_cas, file_type=SourceFileType.BINARY),
                 VirtualFileType.CASSETTE
             )
             virtual_file.open_virtual_file()
@@ -136,13 +136,13 @@ def main(args):
             print("Unable to save cassette file:")
             print(error)
 
-    if args.dsk_file:
+    if args.to_dsk:
         if not coco_file.name:
             print("No name for the program specified, not creating disk file")
             return
         try:
             virtual_file = VirtualFile(
-                SourceFile(args.dsk_file, file_type=SourceFileType.BINARY),
+                SourceFile(args.to_dsk, file_type=SourceFileType.BINARY),
                 VirtualFileType.DISK
             )
             virtual_file.open_virtual_file()

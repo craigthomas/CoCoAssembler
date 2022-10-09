@@ -127,9 +127,9 @@ that are available:
 
 * `--print` - prints out the assembled statements
 * `--symbols` - prints out the symbol table
-* `--bin_file` - save assembled contents to a binary file
-* `--cas_file` - save assembled contents to a cassette file
-* `--dsk_file` - save assembled contents to a virtual disk file
+* `--to_bin` - save assembled contents to a binary file
+* `--to_cas` - save assembled contents to a cassette file
+* `--to_dsk` - save assembled contents to a virtual disk file
 * `--name` - saves the program with the specified name on a cassette or virtual disk file
 
 ---
@@ -240,9 +240,9 @@ The columns are as follows:
 
 ### Save to Binary File
 
-To save the assembled contents to a binary file, use the `--bin_file` switch:
+To save the assembled contents to a binary file, use the `--to_bin` switch:
 
-    python3 assembler.py test.asm --bin_file test.bin
+    python3 assembler.py test.asm --to_bin test.bin
     
 The assembled program will be saved to the file `test.bin`. Note that this file
 may not be useful on its own, as it does not have any meta information about
@@ -255,9 +255,9 @@ will not have any effect on the assembled file).
 
 ### Save to Cassette File
 
-To save the assembled contents to a cassette file, use the `--cas_file` switch:
+To save the assembled contents to a cassette file, use the `--to_cas` switch:
 
-    python3 assembler.py test.asm --cas_file test.cas
+    python3 assembler.py test.asm --to_cas test.cas
     
 This will assemble the program and save it to a cassette file called `test.cas`.
 The source code must include the `NAM` mnemonic to name the program (e.g. 
@@ -268,7 +268,7 @@ The source code must include the `NAM` mnemonic to name the program (e.g.
 not be overwritten. If you wish to add the program to `test.cas`, you must 
 specify the `--append` flag during assembly:
 
-    python3 assembler.py test.asm --cas_file test.cas --append
+    python3 assembler.py test.asm --to_cas test.cas --append
     
 To load from the cassette file, you must use BASIC's `CLOADM` command as follows:
 
@@ -278,9 +278,9 @@ To load from the cassette file, you must use BASIC's `CLOADM` command as follows
 
 ### Save to Disk File
 
-To save the assembled contents to a disk file, use the `--dsk_file` switch:
+To save the assembled contents to a disk file, use the `--to_dsk` switch:
 
-    python3 assembler.py test.asm --dsk_file test.dsk
+    python3 assembler.py test.asm --to_dsk test.dsk
 
 This will assemble the program and save it to a disk file called `test.dsk`. 
 The source code must include the `NAM` mnemonic to name the program on disk (e.g.
@@ -291,7 +291,7 @@ The source code must include the `NAM` mnemonic to name the program on disk (e.g
 not be updated. If you wish to add the program to `test.dsk`, you must specify the 
 `--append` flag during assembly:
 
-    python3 assembler.py test.asm --dsk_file test.dsk --append
+    python3 assembler.py test.asm --to_dsk test.dsk --append
 
 To load from the disk file, you must use Disk Basic's `LOADM` command as follows:
 
