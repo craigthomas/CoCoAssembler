@@ -80,6 +80,7 @@ class Instruction(NamedTuple):
     is_16_bit: bool = False
     is_lea: bool = False
     is_multi_byte: bool = False
+    is_multi_word: bool = False
 
 
 INSTRUCTIONS = [
@@ -236,7 +237,7 @@ INSTRUCTIONS = [
     Instruction(mnemonic="SET", is_pseudo=True),
     Instruction(mnemonic="RMB", is_pseudo=True),
     Instruction(mnemonic="FCB", is_pseudo=True, is_multi_byte=True),
-    Instruction(mnemonic="FDB", is_pseudo=True),
+    Instruction(mnemonic="FDB", is_pseudo=True, is_multi_word=True),
     Instruction(mnemonic="FCC", is_pseudo=True, is_string_define=True),
     Instruction(mnemonic="SETDP", is_pseudo=True),
     Instruction(mnemonic="INCLUDE", is_pseudo=True, is_include=True),

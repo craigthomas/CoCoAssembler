@@ -10,7 +10,7 @@ import unittest
 
 from cocoasm.values import NumericValue, StringValue, NoneValue, SymbolValue, \
     AddressValue, Value, ExpressionValue, ExplicitAddressingMode, LeftRightValue, \
-    MultiByteValue
+    MultiByteValue, MultiWordValue
 from cocoasm.instruction import Instruction, Mode
 from cocoasm.exceptions import ValueTypeError
 
@@ -280,7 +280,7 @@ class TestNumericValue(unittest.TestCase):
 
 class TestMultiByteValue(unittest.TestCase):
     """
-    A test class for the StringValue class.
+    A test class for the MultiByteValue class.
     """
     def setUp(self):
         """
@@ -314,6 +314,45 @@ class TestMultiByteValue(unittest.TestCase):
 
     def test_multi_byte_16_bit_correct(self):
         result = MultiByteValue("$DE,$AD,$BE,$EF")
+        self.assertFalse(result.is_16_bit())
+
+
+class TestMultiWordValue(unittest.TestCase):
+    """
+    A test class for the StringValue class.
+    """
+    def setUp(self):
+        """
+        Common setup routines needed for all unit tests.
+        """
+        pass
+
+    def test_multi_word_raises_on_no_delimiter(self):
+        with self.assertRaises(ValueTypeError) as context:
+            MultiWordValue('$DEAD')
+        self.assertEqual("multi-word declarations must have a comma in them", str(context.exception))
+
+    def test_multi_word_no_values_correct(self):
+        result = MultiWordValue(",")
+        self.assertEqual("", result.hex())
+        self.assertEqual(0, result.hex_len())
+
+    def test_multi_word_single_value_correct(self):
+        result = MultiWordValue("$DEAD,")
+        self.assertEqual("DEAD", result.hex())
+        self.assertEqual(4, result.hex_len())
+
+    def test_multi_word_many_values_correct(self):
+        result = MultiWordValue("$DEAD,$BEEF")
+        self.assertEqual("DEADBEEF", result.hex())
+        self.assertEqual(8, result.hex_len())
+
+    def test_multi_byte_8_bit_correct(self):
+        result = MultiWordValue("$DEAD,$BEEF")
+        self.assertFalse(result.is_8_bit())
+
+    def test_multi_byte_16_bit_correct(self):
+        result = MultiWordValue("$DEAD,$BEEF")
         self.assertFalse(result.is_16_bit())
 
 
