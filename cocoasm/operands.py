@@ -258,7 +258,7 @@ class SpecialOperand(Operand):
     def translate(self):
         post_byte = 0x00
 
-        if self.instruction.mnemonic == "PSHS" or self.instruction.mnemonic == "PULS":
+        if self.instruction.mnemonic in ["PSHS", "PSHU", "PULS", "PULU"]:
             if not self.operand_string:
                 raise OperandTypeError("one or more registers must be specified")
 

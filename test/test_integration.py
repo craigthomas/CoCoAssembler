@@ -864,6 +864,42 @@ class TestIntegration(unittest.TestCase):
         program.translate_statements()
         self.assertEqual([0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE], program.get_binary_array())
 
+    def test_pshu_regression(self):
+        statements = [
+            Statement("         PSHU A"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEquals([0x36, 0x02], program.get_binary_array())
+
+    def test_pshu_multi_regression(self):
+        statements = [
+            Statement("         PSHU A,B"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEquals([0x36, 0x06], program.get_binary_array())
+
+    def test_pulu_regression(self):
+        statements = [
+            Statement("         PULU A"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEquals([0x37, 0x02], program.get_binary_array())
+
+    def test_pulu_multi_regression(self):
+        statements = [
+            Statement("         PULU A,B"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        self.assertEquals([0x37, 0x06], program.get_binary_array())
+
 # M A I N #####################################################################
 
 
