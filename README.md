@@ -1,6 +1,6 @@
 # CoCo Assembler and File Utility
 
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/craigthomas/CoCoAssembler/Build%20Test%20Coverage?style=flat-square)](https://github.com/craigthomas/CoCoAssembler/actions)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/craigthomas/CoCoAssembler/python-app.yml?style=flat-square&branch=main)](https://github.com/craigthomas/CoCoAssembler/actions)
 [![Codecov](https://img.shields.io/codecov/c/gh/craigthomas/CoCoAssembler?style=flat-square)](https://codecov.io/gh/craigthomas/CoCoAssembler) 
 [![Dependencies](https://img.shields.io/librariesio/github/craigthomas/CoCoAssembler?style=flat-square)](https://libraries.io/github/craigthomas/CoCoAssembler)
 [![Releases](https://img.shields.io/github/release/craigthomas/CoCoAssembler?style=flat-square)](https://github.com/craigthomas/CoCoAssembler/releases)
