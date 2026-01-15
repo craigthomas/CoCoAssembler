@@ -1,5 +1,5 @@
 """
-Copyright (C) 2013-2022 Craig Thomas
+Copyright (C) 2026 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 This file contains the main Program class for the CoCo Assembler.
@@ -10,7 +10,7 @@ import unittest
 
 from cocoasm.program import Program
 from cocoasm.statement import Statement
-from cocoasm.exceptions import TranslationError
+from cocoasm.exceptions import TranslationError, MacroError
 from cocoasm.values import NumericValue
 
 from mock import MagicMock, patch, mock_open
@@ -102,6 +102,154 @@ class TestProgram(unittest.TestCase):
             "$                 LABEL   JMP $FFFF                          ; comment                                 ",
         ]
         self.assertEqual(expected, statements)
+
+    def test_macro_no_args_replacement_correct(self):
+        statements = [
+            Statement("        ORG $0600"),
+            Statement("MYMACRO MACRO    "),
+            Statement("        LDA #$FF "),
+            Statement("        ENDM     "),
+            Statement("        LDA #$00 "),
+            Statement("        MYMACRO  "),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        statements = program.get_statements()
+        expected = [
+          "$0600                         ORG $0600                          ;                                         ",
+          "$0600 8600                    LDA #$00                           ;                                         ",
+          "$0602 86FF                    LDA #$FF                           ;                                         ",
+        ]
+        self.assertEqual(expected, statements)
+
+    def test_macro_no_args_multi_line_replacement_correct(self):
+        statements = [
+            Statement("        ORG $0600"),
+            Statement("MYMACRO MACRO    "),
+            Statement("        LDA #$FF "),
+            Statement("        LDA #$FE "),
+            Statement("        ENDM     "),
+            Statement("        LDA #$00 "),
+            Statement("        MYMACRO  "),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        statements = program.get_statements()
+        expected = [
+          "$0600                         ORG $0600                          ;                                         ",
+          "$0600 8600                    LDA #$00                           ;                                         ",
+          "$0602 86FF                    LDA #$FF                           ;                                         ",
+          "$0604 86FE                    LDA #$FE                           ;                                         ",
+        ]
+        self.assertEqual(expected, statements)
+
+    def test_macro_embedded_symbol_expanded_correct(self):
+        statements = [
+            Statement("        ORG $0600"),
+            Statement("MYMACRO MACRO    "),
+            Statement(r"\.A    LDA #$FF "),
+            Statement(r"       JMP \.A  "),
+            Statement("        ENDM     "),
+            Statement("        MYMACRO  "),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        statements = program.get_statements()
+        expected = [
+          "$0600                         ORG $0600                          ;                                         ",
+          "$0600 86FF           A00000   LDA #$FF                           ;                                         ",
+          "$0602 7E0600                  JMP A00000                         ;                                         ",
+        ]
+        self.assertEqual(expected, statements)
+
+    def test_macro_embedded_symbol_expanded_multiple_times_correct(self):
+        statements = [
+            Statement("        ORG $0600"),
+            Statement("MYMACRO MACRO    "),
+            Statement(r"\.A    LDA #$FF "),
+            Statement(r"       JMP \.A  "),
+            Statement("        ENDM     "),
+            Statement("        MYMACRO  "),
+            Statement("        MYMACRO  "),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        statements = program.get_statements()
+        expected = [
+          "$0600                         ORG $0600                          ;                                         ",
+          "$0600 86FF           A00000   LDA #$FF                           ;                                         ",
+          "$0602 7E0600                  JMP A00000                         ;                                         ",
+          "$0605 86FF           A00001   LDA #$FF                           ;                                         ",
+          "$0607 7E0605                  JMP A00001                         ;                                         ",
+        ]
+        self.assertEqual(expected, statements)
+
+    def test_macro_embedded_symbol_regression_condition_1_correct(self):
+        statements = [
+            Statement(r"        NAM HELLO"),
+            Statement(r"LOADER  MACRO    "),
+            Statement(r"        LDA \0   "),
+            Statement(r"        LDB \1   "),
+            Statement(r"        CMPA #$02"),
+            Statement(r"        BEQ \.B  "),
+            Statement(r"        LDX \2   "),
+            Statement(r"\.B     LDY \3   "),
+            Statement(r"        ENDM     "),
+            Statement(r"        LOADER #$00,#$03,#$0000,#$FFFF"),
+            Statement(r"        END      "),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        statements = program.get_statements()
+        expected = [
+          "$0000                         NAM HELLO                          ;                                         ",
+          "$0000 8600                    LDA #$00                           ;                                         ",
+          "$0002 C603                    LDB #$03                           ;                                         ",
+          "$0004 8102                   CMPA #$02                           ;                                         ",
+          "$0006 2703                    BEQ B00000                         ;                                         ",
+          "$0008 8E0000                  LDX #$0000                         ;                                         ",
+          "$000B 108EFFFF       B00000   LDY #$FFFF                         ;                                         ",
+          "$000F                         END                                ;                                         ",
+        ]
+        self.assertEqual(expected, statements)
+
+    def test_macro_no_end_raises(self):
+        statements = [
+            Statement("MYMACRO MACRO"),
+        ]
+        program = Program()
+        program.statements = statements
+        with self.assertRaises(MacroError):
+            program.translate_statements()
+
+    def test_macro_redefinition_raises(self):
+        statements = [
+            Statement("MYMACRO MACRO"),
+            Statement("        ENDM"),
+            Statement("MYMACRO MACRO"),
+            Statement("        ENDM"),
+        ]
+        program = Program()
+        program.statements = statements
+        with self.assertRaises(MacroError):
+            program.translate_statements()
+
+    def test_embedded_macro_raises(self):
+        statements = [
+            Statement("MYMACRO1 MACRO"),
+            Statement("NEWMACRO MACRO"),
+            Statement("         ENDM"),
+            Statement("         ENDM")
+        ]
+        program = Program()
+        program.statements = statements
+        with self.assertRaises(MacroError):
+            program.translate_statements()
 
     def test_character_literal_regression(self):
         statements = [

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2013-2020 Craig Thomas
+Copyright (C) 2026 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -11,7 +11,7 @@ import re
 from copy import copy
 
 from cocoasm.exceptions import ParseError, TranslationError, OperandTypeError
-from cocoasm.instruction import INSTRUCTIONS, CodePackage
+from cocoasm.instruction import INSTRUCTIONS, CodePackage, MACRO_CALL_INSTRUCTION
 from cocoasm.operands import Operand, BadInstructionOperand
 from cocoasm.values import NumericValue
 
@@ -25,7 +25,17 @@ COMMENT_LINE_REGEX = re.compile(r"^\s*;\s*(?P<comment>.*)$")
 
 # Pattern to parse a single line
 ASM_LINE_REGEX = re.compile(
-    r"^(?P<label>[\w@]*)\s+(?P<mnemonic>\w*)\s+(?P<operands>[\w\[\]><'\"@:,.#?$%^&*()=!+\-/]*)\s*;*(?P<comment>.*)$"
+    r"^(?P<label>[\w@\\.]*)\s+(?P<mnemonic>\w*)\s+(?P<operands>[\w\[\]><'\"@:,.#?$%^&*()=!+\-/\\]*)\s*;*(?P<comment>.*)$"
+)
+
+# Pattern to recognize a macro definition
+MACRO_DEF_LINE_REGEX = re.compile(
+    r"^(?P<label>[\w]+)\s+MACRO\s*;*(?P<comment>.*)$"
+)
+
+# Pattern to recognize an end macro definition
+MACRO_END_DEF_LINE_REGEX = re.compile(
+    r"\s+ENDM\s*;*(?P<comment>.*)$"
 )
 
 # Pattern to recognize a direct value
@@ -49,6 +59,9 @@ class Statement(object):
     def __init__(self, line):
         self.is_empty = True
         self.is_comment_only = False
+        self.macro_name = ""
+        self.macro_call_regex = None
+        self.macro_operands = None
         self.instruction = None
         self.label = ""
         self.operand = None
@@ -59,6 +72,8 @@ class Statement(object):
         self.fixed_size = True
         self.pcr_size_hint = 2
         self.code_pkg = CodePackage()
+        self.original_line = line
+        self.compile_macro_call_regex()
         self.parse_line(line)
 
     def __str__(self):
@@ -88,6 +103,20 @@ class Statement(object):
             self.fixed_size == other.fixed_size and \
             self.pcr_size_hint == other.pcr_size_hint
 
+
+    def compile_macro_call_regex(self):
+        """
+        Programmatically construct and then compile the macro call
+        regular expression. We do this using a loop since there can be
+        up to 36 operands allowed per macro call.
+        """
+        macro_call_str = r"^(?P<label>\w*)\s+(?P<macro_name>\w+)(\s+)?"
+        for x in range(36):
+            macro_call_str += rf"(?P<op{x}>[\w\[\]><'\"@:.#?$%^&*()=!+\-/]+)?(,)?"
+        macro_call_str += r"$"
+        self.macro_call_regex = re.compile(macro_call_str)
+
+
     def get_include_filename(self):
         """
         Returns the name of the file to include in the current stream of
@@ -114,6 +143,23 @@ class Statement(object):
             self.comment = data.group("comment").strip()
             return
 
+        data = MACRO_DEF_LINE_REGEX.match(line)
+        if data:
+            self.is_empty = False
+            self.label = data.group("label") or ""
+            self.instruction = next((op for op in INSTRUCTIONS if op.mnemonic == "MACRO"), None)
+            self.comment = data.group("comment").strip()
+            if self.instruction.is_start_macro and not self.label:
+                raise ParseError("Macro definition must have a label", line)
+            return
+
+        data = MACRO_END_DEF_LINE_REGEX.match(line)
+        if data:
+            self.is_empty = False
+            self.instruction = next((op for op in INSTRUCTIONS if op.mnemonic == "ENDM"), None)
+            self.comment = data.group("comment").strip()
+            return
+
         data = ASM_LINE_REGEX.match(line)
         if data:
             self.label = data.group("label") or ""
@@ -121,13 +167,23 @@ class Statement(object):
             self.instruction = next((op for op in INSTRUCTIONS if op.mnemonic == self.mnemonic), None)
             self.original_operand = copy(self.operand)
             if not self.instruction:
-                self.original_operand = BadInstructionOperand(data.group("operands"), self.instruction)
-                self.comment = data.group("comment")
-                raise ParseError("[{}] invalid mnemonic".format(self.mnemonic), line)
+                # Attempt to parse as a macro call
+                macro_data = self.macro_call_regex.match(line)
+                if macro_data:
+                    self.label = macro_data.group("label") or ""
+                    self.macro_name = macro_data.group("macro_name") or ""
+                    self.macro_operands = [macro_data.group(f"op{x}") if macro_data.group(f"op{x}") else "" for x in range(36)]
+                    self.is_empty = False
+                    self.instruction = MACRO_CALL_INSTRUCTION
+                    return
+                else:
+                    self.original_operand = BadInstructionOperand(data.group("operands"), self.instruction)
+                    self.comment = data.group("comment")
+                    raise ParseError(f"[{self.mnemonic}] invalid mnemonic", line)
             if self.instruction.is_string_define:
                 original_operand = data.group("operands")
                 if data.group("comment"):
-                    original_operand = "{} {}".format(data.group("operands"), data.group("comment").strip())
+                    original_operand = f'{data.group("operands")} {data.group("comment").strip()}'
                 starting_symbol = original_operand[0]
                 ending_location = original_operand.find(starting_symbol, 1)
                 self.operand = Operand.create_from_str(
@@ -249,7 +305,7 @@ class Statement(object):
 
     def fix_addresses(self, statements, this_index):
         """
-        Once all of the statements have been translated, all of the addresses
+        Once all the statements have been translated, all the addresses
         must be 'fixed'. In particular, branch operations need to know how
         many statements they need to skip ahead or behind, and the address
         at the target statement. This function calculates what the target

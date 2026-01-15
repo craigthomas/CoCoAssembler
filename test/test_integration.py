@@ -871,7 +871,7 @@ class TestIntegration(unittest.TestCase):
         program = Program()
         program.statements = statements
         program.translate_statements()
-        self.assertEquals([0x36, 0x02], program.get_binary_array())
+        self.assertEqual([0x36, 0x02], program.get_binary_array())
 
     def test_pshu_multi_regression(self):
         statements = [
@@ -880,7 +880,7 @@ class TestIntegration(unittest.TestCase):
         program = Program()
         program.statements = statements
         program.translate_statements()
-        self.assertEquals([0x36, 0x06], program.get_binary_array())
+        self.assertEqual([0x36, 0x06], program.get_binary_array())
 
     def test_pulu_regression(self):
         statements = [
@@ -889,7 +889,7 @@ class TestIntegration(unittest.TestCase):
         program = Program()
         program.statements = statements
         program.translate_statements()
-        self.assertEquals([0x37, 0x02], program.get_binary_array())
+        self.assertEqual([0x37, 0x02], program.get_binary_array())
 
     def test_pulu_multi_regression(self):
         statements = [
@@ -898,7 +898,7 @@ class TestIntegration(unittest.TestCase):
         program = Program()
         program.statements = statements
         program.translate_statements()
-        self.assertEquals([0x37, 0x06], program.get_binary_array())
+        self.assertEqual([0x37, 0x06], program.get_binary_array())
 
 # M A I N #####################################################################
 

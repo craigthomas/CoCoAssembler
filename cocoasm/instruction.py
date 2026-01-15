@@ -1,5 +1,5 @@
 """
-Copyright (C) 2013-2022 Craig Thomas
+Copyright (C) 2026 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -81,6 +81,10 @@ class Instruction(NamedTuple):
     is_lea: bool = False
     is_multi_byte: bool = False
     is_multi_word: bool = False
+    is_start_macro: bool = False
+    is_end_macro: bool = False
+    is_macro_call: bool = False
+    is_end: bool = False
 
 
 INSTRUCTIONS = [
@@ -231,7 +235,7 @@ INSTRUCTIONS = [
     Instruction(mnemonic="LBVS", mode=Mode(rel=0x1029, rel_sz=4), is_long_branch=True),
 
     # Pseudo operations
-    Instruction(mnemonic="END", is_pseudo=True),
+    Instruction(mnemonic="END", is_pseudo=True, is_end=True),
     Instruction(mnemonic="ORG", is_pseudo=True, is_origin=True),
     Instruction(mnemonic="EQU", is_pseudo=True, is_pseudo_define=True),
     Instruction(mnemonic="SET", is_pseudo=True),
@@ -241,7 +245,11 @@ INSTRUCTIONS = [
     Instruction(mnemonic="FCC", is_pseudo=True, is_string_define=True),
     Instruction(mnemonic="SETDP", is_pseudo=True),
     Instruction(mnemonic="INCLUDE", is_pseudo=True, is_include=True),
-    Instruction(mnemonic="NAM", is_pseudo=True, is_name=True)
+    Instruction(mnemonic="NAM", is_pseudo=True, is_name=True),
+    Instruction(mnemonic="MACRO", is_pseudo=True, is_start_macro=True),
+    Instruction(mnemonic="ENDM", is_pseudo=True, is_end_macro=True),
 ]
+
+MACRO_CALL_INSTRUCTION = Instruction(mnemonic="", is_pseudo=True, is_macro_call=True)
 
 # E N D   O F   F I L E #######################################################

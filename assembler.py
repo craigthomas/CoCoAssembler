@@ -9,7 +9,7 @@ A Color Computer Assembler - see the README.md file for details.
 import argparse
 import sys
 
-from cocoasm.exceptions import TranslationError, ParseError
+from cocoasm.exceptions import TranslationError, ParseError, MacroError
 from cocoasm.program import Program
 from cocoasm.virtualfiles.virtual_file import VirtualFileType, VirtualFile
 from cocoasm.virtualfiles.source_file import SourceFile, SourceFileType
@@ -70,6 +70,16 @@ def throw_error(error):
     sys.exit(1)
 
 
+def throw_macro_error(error):
+    """
+    Prints out a macro related error.
+
+    :param error: the error to print
+    """
+    print(error.value)
+    sys.exit(1)
+
+
 def main(args):
     """
     Runs the assembler with the specified arguments.
@@ -86,6 +96,8 @@ def main(args):
         throw_error(error)
     except ParseError as error:
         throw_error(error)
+    except MacroError as error:
+        throw_macro_error(error)
 
     coco_file = CoCoFile(
         name=program.name or args.name,

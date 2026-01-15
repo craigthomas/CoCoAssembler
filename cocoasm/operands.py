@@ -1,5 +1,5 @@
 """
-Copyright (C) 2013-2022 Craig Thomas
+Copyright (C) 2026 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -15,6 +15,7 @@ from cocoasm.values import NoneValue, Value, NumericValue, DirectNumericValue, E
 from cocoasm.instruction import CodePackage
 from cocoasm.operand_type import OperandType
 from cocoasm.exceptions import OperandTypeError, ValueTypeError
+from cocoasm.macro_types import MACRO_LABEL_STRINGS, MACRO_VALUE_STRINGS
 
 # C O N S T A N T S ###########################################################
 
@@ -58,6 +59,11 @@ class Operand(ABC):
     @classmethod
     def create_from_str(cls, operand_string, instruction):
         try:
+            return MacroSymbolOperand(operand_string, instruction)
+        except OperandTypeError:
+            pass
+
+        try:
             return PseudoOperand(operand_string, instruction)
         except OperandTypeError:
             pass
@@ -97,7 +103,7 @@ class Operand(ABC):
         except OperandTypeError:
             pass
 
-        raise OperandTypeError("[{}] unknown operand type".format(operand_string))
+        raise OperandTypeError(f"[{operand_string}] unknown operand type")
 
     def is_unknown(self):
         return self.type == OperandType.UNKNOWN
@@ -125,6 +131,9 @@ class Operand(ABC):
 
     def is_indexed(self):
         return self.type == OperandType.INDEXED or self.type == OperandType.EXTENDED_INDIRECT
+
+    def is_macro_symbol(self):
+        return self.type == OperandType.MACRO_SYMBOL
 
     def resolve_symbols(self, symbol_table):
         """
@@ -166,6 +175,23 @@ class BadInstructionOperand(Operand):
         return CodePackage()
 
 
+class MacroSymbolOperand(Operand):
+    def __init__(self, operand_string, instruction):
+        super().__init__(operand_string, instruction)
+        for value in MACRO_VALUE_STRINGS:
+            if value in operand_string:
+                self.type = OperandType.MACRO_SYMBOL
+        for value in MACRO_LABEL_STRINGS:
+            if value in operand_string:
+                self.type = OperandType.MACRO_SYMBOL
+
+        if self.type != OperandType.MACRO_SYMBOL:
+            raise OperandTypeError("Operand does not contain any macro symbols")
+
+    def translate(self):
+        return CodePackage()
+
+
 class UnknownOperand(Operand):
     def __init__(self, operand_string, instruction, value=None):
         super().__init__(instruction)
@@ -176,7 +202,7 @@ class UnknownOperand(Operand):
         try:
             self.value = Value.create_from_str(operand_string, instruction)
         except ValueTypeError:
-            raise OperandTypeError("[{}] unknown operand type".format(operand_string))
+            raise OperandTypeError(f"[{operand_string}] unknown operand type")
 
     def translate(self):
         return CodePackage(additional=self.value)
@@ -188,7 +214,11 @@ class PseudoOperand(Operand):
         self.operand_string = operand_string
         self.type = OperandType.PSEUDO
         if not instruction.is_pseudo:
-            raise OperandTypeError("[{}] is not a pseudo instruction".format(instruction.mnemonic))
+            raise OperandTypeError(f"[{instruction.mnemonic}] is not a pseudo instruction")
+
+        if instruction.is_end:
+            return
+
         if instruction.is_multi_byte:
             self.value = MultiByteValue(operand_string) if "," in operand_string else Value.create_from_str(operand_string, instruction)
         elif instruction.is_multi_word:
@@ -250,7 +280,7 @@ class SpecialOperand(Operand):
         self.operand_string = operand_string
         self.type = OperandType.SPECIAL
         if not instruction.is_special:
-            raise OperandTypeError("[{}] is not a special instruction".format(instruction.mnemonic))
+            raise OperandTypeError(f"[{instruction.mnemonic}] is not a special instruction")
 
     def resolve_symbols(self, symbol_table):
         return self
@@ -280,13 +310,13 @@ class SpecialOperand(Operand):
         if self.instruction.mnemonic == "EXG" or self.instruction.mnemonic == "TFR":
             registers = self.operand_string.split(",")
             if len(registers) != 2:
-                raise OperandTypeError("[{}] requires exactly 2 registers".format(self.instruction.mnemonic))
+                raise OperandTypeError(f"[{self.instruction.mnemonic}] requires exactly 2 registers")
 
             if registers[0] not in REGISTERS:
-                raise OperandTypeError("[{}] unknown register".format(registers[0]))
+                raise OperandTypeError(f"[{registers[0]}] unknown register")
 
             if registers[1] not in REGISTERS:
-                raise OperandTypeError("[{}] unknown register".format(registers[1]))
+                raise OperandTypeError(f"[{registers[1]}] unknown register")
 
             # Implicit is that a value of 0x00 means register D
 
@@ -328,7 +358,7 @@ class SpecialOperand(Operand):
                         0x88, 0x99, 0xAA, 0xBB
                     ]:
                 raise OperandTypeError(
-                    "[{}] of [{}] to [{}] not allowed".format(self.instruction.mnemonic, registers[0], registers[1]))
+                    f"[{self.instruction.mnemonic}] of [{registers[0]}] to [{registers[1]}] not allowed")
 
         return CodePackage(
             op_code=NumericValue(self.instruction.mode.imm),
@@ -343,7 +373,7 @@ class RelativeOperand(Operand):
         super().__init__(instruction)
         self.type = OperandType.RELATIVE
         if not instruction.is_short_branch and not instruction.is_long_branch:
-            raise OperandTypeError("[{}] is not a branch instruction".format(instruction.mnemonic))
+            raise OperandTypeError(f"[{instruction.mnemonic}] is not a branch instruction")
         self.operand_string = operand_string
         self.value = value if value else Value.create_from_str(operand_string, instruction)
 
@@ -361,7 +391,7 @@ class InherentOperand(Operand):
         super().__init__(instruction)
         self.type = OperandType.INHERENT
         if value:
-            raise OperandTypeError("[{}] is not an inherent value".format(value.ascii()))
+            raise OperandTypeError(f"[{value.ascii()}] is not an inherent value")
         if operand_string:
             raise OperandTypeError("[{}] is not an inherent value".format(operand_string))
 
