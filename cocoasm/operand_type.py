@@ -1,5 +1,5 @@
 """
-Copyright (C) 2013-2022 Craig Thomas
+Copyright (C) 2026 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 A Color Computer Assembler - see the README.md file for details.
@@ -28,5 +28,6 @@ class OperandType(Enum):
     SYMBOL = 10
     PSEUDO = 11
     SPECIAL = 12
+    MACRO_SYMBOL = 13
 
 # E N D   O F   F I L E #######################################################

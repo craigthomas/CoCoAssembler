@@ -23,6 +23,7 @@
    2. [Mnemonic Table](#mnemonic-table)
       1. [Mnemonics](#mnemonics)
       2. [Pseudo Operations](#pseudo-operations)
+      3. [Macros](#macros)
    3. [Addressing Modes](#addressing-modes)
       1. [Inherent](#inherent)
       2. [Immediate](#immediate)
@@ -482,6 +483,8 @@ as well as the number of cycles used to execute each operation.
 | `ORG`     | Defines where in memory the program should originate at.                   | `ORG $0E00`           |
 | `RMB`     | Defines a block of _n_ bytes initialized to a zero value.                  | `RMB $8`              |
 | `SETDP`   | Sets the direct page value for the assembler (see notes below).            | `SETDP $0E00`         |
+| `MACRO`   | Starts the definition of a macro.                                          | `MYROUTINE MACRO`     |
+| `ENDM`    | Ends the definition of a macro.                                            | `ENDM`                |
 
 **Notes**
 
@@ -490,6 +493,62 @@ if `SETDP $0E00` is set, any machine instructions that use `$0EXX` as a memory l
 using direct page addressing. Instructions such as `JMP $0E8F` will become `JMP <$8F`. The programmer is 
 responsible for loading the direct page register manually - this mnemonic does not output opcodes that
 change the direct page register. 
+
+
+---
+
+### Macros
+
+Macros are code fragments that are inserted into the assembly language listing when they are called by
+name from other source lines. A macro must have a label and be defined between a `MACRO` definition block
+and an `ENDM` block. Between the definition and the end block are assembly language statements. These 
+statements are identical to any other statements, but may contain special macro labels, and special 
+value placeholders. Consider the following example that defines a macro called `LOADER`:
+
+    ; A macro example
+                NAM     HELLO           ; Name of the program
+                ORG     $0E00           ; Set the origin
+    LOADER      MACRO                   ; Definition of the LOADER macro
+                LDA     \0              ; Load the first macro value into A
+                LDB     \1              ; Load the second macro value into B
+                CMPA    #$02            ; Compare A for a specific value
+                BEQ     \.B             ; Jump to end of macro if equal
+                LDX     \2              ; Load the third macro value into X if A == $02
+    \.B         LDY     \3              ; Load the fourd macro value into Y
+                ENDM                    ; Finish macro definition
+
+                LOADER  #$00,#$03,#$0000,#$FFFF ; Call the macro
+                END
+
+There are several special symbols that exist in the listing above that are unique to macros:
+
+* `\0`, `\1`, `\2`, and `\3` - these are macro value _placeholders_. When the macro is called,
+these placeholders are replaced with the actual values passed in to the macro call itself. In the
+example above, the value `\0` would be replaced with `#$00`, the value `\01` would be replaced
+with `#$03`, the value `\2` would be replaced with `#$0000`, and the value `\3` would be
+replaced with `#$FFFF` when the macro is expanded. There can be up to 36 value placeholders
+used within a macro, starting from values `\0` to `\9`, and then counting from `\A` to `\Z`.
+This means when invoked, a macro can have up to 36 values passed to it.
+* The `\.B` is an example of a _label_ used within a macro. These special labels from `\.A` to
+`\.Z` can only be used within the context of a macro. The assembler keeps a count of how many
+times these special labels are expanded, and replaces them labels with the letter name and a 
+five digit decimal number of the current count. For example, the first time the label `\.B` is
+expanded, it will be replaced with `B00000`, the second time with `B00001`, and so on. Normal 
+labels can be used as operands, but defining a normal label within the context of a macro will
+result in a symbol redefinition error if the macro is expanded multiple times.
+
+Overall, the above example would assemble to the following:
+
+    -- Assembled Statements --
+    $0000                         NAM HELLO                          ; Name of the program                     
+    $0E00                         ORG $0E00                          ; Set the origin                          
+    $0E00 8600                    LDA #$00                           ; Load the first macro value into A       
+    $0E02 C603                    LDB #$03                           ; Load the second macro value into B      
+    $0E04 8102                   CMPA #$02                           ; Compare A for a specific value          
+    $0E06 2703                    BEQ B00000                         ; Jump to end of macro if equal           
+    $0E08 8E0000                  LDX #$0000                         ; Load the third macro value into X if A == $02
+    $0E0B 108EFFFF       B00000   LDY #$FFFF                         ; Load the fourd macro value into Y       
+    $0E0F                         END                                ;
 
 ---
 

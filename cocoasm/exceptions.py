@@ -1,5 +1,5 @@
 """
-Copyright (C) 2013-2022 Craig Thomas
+Copyright (C) 2026 Craig Thomas
 
 This project uses an MIT style license - see LICENSE for details.
 This file contains Exceptions for the CoCo Assembler.
@@ -32,6 +32,18 @@ class ParseError(Exception):
         super().__init__()
         self.value = value
         self.statement = statement
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class MacroError(Exception):
+    """
+    Macro errors occur when processing macro definitions.
+    """
+    def __init__(self, value):
+        super().__init__()
+        self.value = value
 
     def __str__(self):
         return repr(self.value)
