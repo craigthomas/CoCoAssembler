@@ -154,6 +154,7 @@ class Program(object):
         """
         processed_statements, self.macros = self.process_mnemonics(self.statements)
         self.statements = []
+        direct_page = 0x00
 
         # Expand macros
         macro_symbol_counts = {key: 0 for key in MACRO_LABEL_STRINGS}
@@ -165,10 +166,14 @@ class Program(object):
                     observed_macros = set()
                     for macro_statement in self.macros[statement.macro_name]:
                         new_statement, observed_macros = self.replace_macro_arguments(macro_statement, statement, macro_symbol_counts)
+                        new_statement.set_direct_page(direct_page)
                         self.statements.append(new_statement)
                     for macro_symbol in observed_macros:
                         macro_symbol_counts[macro_symbol] += 1
+            elif statement.instruction.is_set_dp:
+                direct_page = statement.operand.value.int
             else:
+                statement.set_direct_page(direct_page)
                 self.statements.append(statement)
 
         # Construct symbol table

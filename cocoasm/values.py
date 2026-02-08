@@ -123,6 +123,11 @@ class Value(ABC):
             return 0x00
         return int(self.hex()[0:2], 16)
 
+    def high_byte_hex(self):
+        if self.hex_len() <= 2:
+            return "00"
+        return self.hex()[0:2]
+
     def low_byte(self):
         if self.hex_len() == 0:
             return 0x00

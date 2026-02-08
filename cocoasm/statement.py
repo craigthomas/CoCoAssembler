@@ -73,6 +73,7 @@ class Statement(object):
         self.pcr_size_hint = 2
         self.code_pkg = CodePackage()
         self.original_line = line
+        self.direct_page = 0x00
         self.compile_macro_call_regex()
         self.parse_line(line)
 
@@ -103,6 +104,17 @@ class Statement(object):
             self.fixed_size == other.fixed_size and \
             self.pcr_size_hint == other.pcr_size_hint
 
+    def set_direct_page(self, direct_page):
+        """
+        Sets the current value of the direct page register according to
+        any encountered SETDP calls, or based on the initial DP value
+        (assumed to be $00). This value is used in translate functions
+        to see whether direct page addressing can be used instead of
+        extended addressing wherever possible.
+
+        :param direct_page: the new direct page register value
+        """
+        self.direct_page = direct_page
 
     def compile_macro_call_regex(self):
         """
@@ -236,7 +248,7 @@ class Statement(object):
         Translate the mnemonic into an actual operation.
         """
         try:
-            self.code_pkg = self.operand.translate()
+            self.code_pkg = self.operand.translate(direct_page=self.direct_page)
             self.fixed_size = not (self.code_pkg.additional_needs_resolution or self.code_pkg.post_byte_choices)
         except Exception as error:
             raise TranslationError(str(error), self)

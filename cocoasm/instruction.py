@@ -85,6 +85,7 @@ class Instruction(NamedTuple):
     is_end_macro: bool = False
     is_macro_call: bool = False
     is_end: bool = False
+    is_set_dp: bool = False
 
 
 INSTRUCTIONS = [
@@ -243,7 +244,7 @@ INSTRUCTIONS = [
     Instruction(mnemonic="FCB", is_pseudo=True, is_multi_byte=True),
     Instruction(mnemonic="FDB", is_pseudo=True, is_multi_word=True),
     Instruction(mnemonic="FCC", is_pseudo=True, is_string_define=True),
-    Instruction(mnemonic="SETDP", is_pseudo=True),
+    Instruction(mnemonic="SETDP", is_pseudo=True, is_set_dp=True),
     Instruction(mnemonic="INCLUDE", is_pseudo=True, is_include=True),
     Instruction(mnemonic="NAM", is_pseudo=True, is_name=True),
     Instruction(mnemonic="MACRO", is_pseudo=True, is_start_macro=True),

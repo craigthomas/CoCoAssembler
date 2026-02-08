@@ -156,7 +156,7 @@ class Operand(ABC):
         return ExtendedOperand(self.operand_string, self.instruction, value=self.value)
 
     @abstractmethod
-    def translate(self):
+    def translate(self, direct_page=None):
         """
         Using information contained within the instruction, translate the operand,
         and return a code package containing the equivalent machine code information.
@@ -171,7 +171,7 @@ class BadInstructionOperand(Operand):
         self.operand_string = operand_string
         self.original_operand = operand_string
 
-    def translate(self):
+    def translate(self, direct_page=None):
         return CodePackage()
 
 
@@ -204,7 +204,7 @@ class UnknownOperand(Operand):
         except ValueTypeError:
             raise OperandTypeError(f"[{operand_string}] unknown operand type")
 
-    def translate(self):
+    def translate(self, direct_page=None):
         return CodePackage(additional=self.value)
 
 
@@ -215,6 +215,10 @@ class PseudoOperand(Operand):
         self.type = OperandType.PSEUDO
         if not instruction.is_pseudo:
             raise OperandTypeError(f"[{instruction.mnemonic}] is not a pseudo instruction")
+
+        if instruction.is_set_dp:
+            self.value = NumericValue(operand_string)
+            return
 
         if instruction.is_end:
             return
@@ -235,7 +239,7 @@ class PseudoOperand(Operand):
     def resolve_symbols(self, symbol_table):
         return self
 
-    def translate(self):
+    def translate(self, direct_page=None):
         if self.instruction.mnemonic == "FCB":
             return CodePackage(
                 additional=self.value,
@@ -285,7 +289,7 @@ class SpecialOperand(Operand):
     def resolve_symbols(self, symbol_table):
         return self
 
-    def translate(self):
+    def translate(self, direct_page=None):
         post_byte = 0x00
 
         if self.instruction.mnemonic in ["PSHS", "PSHU", "PULS", "PULU"]:
@@ -377,7 +381,7 @@ class RelativeOperand(Operand):
         self.operand_string = operand_string
         self.value = value if value else Value.create_from_str(operand_string, instruction)
 
-    def translate(self):
+    def translate(self, direct_page=None):
         return CodePackage(
             op_code=NumericValue(self.instruction.mode.rel),
             additional=self.value if self.value.is_address() else NoneValue(),
@@ -395,7 +399,7 @@ class InherentOperand(Operand):
         if operand_string:
             raise OperandTypeError("[{}] is not an inherent value".format(operand_string))
 
-    def translate(self):
+    def translate(self, direct_page=None):
         if not self.instruction.mode.inh:
             raise OperandTypeError("Instruction [{}] requires an operand".format(self.instruction.mnemonic))
         return CodePackage(
@@ -420,7 +424,7 @@ class ImmediateOperand(Operand):
         if not self.value.is_immediate():
             raise OperandTypeError("[{}] is not an immediate value".format(operand_string))
 
-    def translate(self):
+    def translate(self, direct_page=None):
         if not self.instruction.mode.imm:
             raise OperandTypeError(
                 "Instruction [{}] does not support immediate addressing".format(self.instruction.mnemonic)
@@ -446,7 +450,7 @@ class DirectOperand(Operand):
         if not self.value.is_direct() and not self.value.is_explicit_direct():
             raise OperandTypeError("[{}] is not a direct value".format(self.operand_string))
 
-    def translate(self):
+    def translate(self, direct_page=None):
         if not self.instruction.mode.dir:
             raise OperandTypeError(
                 "Instruction [{}] does not support direct addressing".format(self.instruction.mnemonic)
@@ -473,11 +477,23 @@ class ExtendedOperand(Operand):
         else:
             self.value = Value.create_from_str(operand_string, instruction)
 
-    def translate(self):
+    def translate(self, direct_page=0x00):
         if not self.instruction.mode.ext:
             raise OperandTypeError(
-                "Instruction [{}] does not support extended addressing".format(self.instruction.mnemonic)
+                f"Instruction [{self.instruction.mnemonic}] does not support extended addressing"
             )
+
+        # Check for direct page optimization
+        if self.instruction.mode.dir and direct_page is not None:
+            direct_value = NumericValue(direct_page)
+            if self.value.high_byte_hex() == direct_value.hex():
+                return CodePackage(
+                    op_code = NumericValue(self.instruction.mode.dir),
+                    additional = NumericValue(self.value.int & 0xFF),
+                    size = self.instruction.mode.dir_sz,
+                    max_size = self.instruction.mode.dir_sz,
+                )
+
         return CodePackage(
             op_code=NumericValue(self.instruction.mode.ext),
             additional=self.value,
@@ -516,7 +532,7 @@ class ExtendedIndexedOperand(Operand):
                     self.left = self.left.resolve(symbol_table)
         return self
 
-    def translate(self):
+    def translate(self, direct_page=None):
         if not self.instruction.mode.ind:
             raise OperandTypeError(
                 "Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic)
@@ -663,7 +679,7 @@ class IndexedOperand(Operand):
                 self.left = self.left.resolve(symbol_table)
         return self
 
-    def translate(self):
+    def translate(self, direct_page=None):
         if not self.instruction.mode.ind:
             raise OperandTypeError(
                 "Instruction [{}] does not support indexed addressing".format(self.instruction.mnemonic)
