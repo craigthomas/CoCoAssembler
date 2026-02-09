@@ -26,6 +26,7 @@ class Program(object):
         self.statements = []
         self.address = 0x0
         self.origin = NoneValue()
+        self.exec_address = None
         self.name = None
         self.macros = dict()
 
@@ -204,12 +205,20 @@ class Program(object):
             if value.is_address():
                 self.symbol_table[symbol] = self.statements[value.int].code_pkg.address
 
-        # Find the origin and name of the project
+        # Find the origin, exec_address and name of the project
         for statement in self.statements:
             if statement.instruction.is_origin:
                 self.origin = statement.code_pkg.address
+                if self.exec_address is None:
+                    self.exec_address = statement.code_pkg.address
             if statement.instruction.is_name:
                 self.name = statement.operand.operand_string
+            if statement.instruction.is_end:
+                if statement.operand.operand_string:
+                    for symbol, value in self.symbol_table.items():
+                        if statement.operand.operand_string == symbol:
+                            if value.is_numeric():
+                                self.exec_address = value
 
     def get_binary_array(self):
         """
