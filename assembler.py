@@ -102,7 +102,7 @@ def main(args):
     coco_file = CoCoFile(
         name=program.name or args.name,
         load_addr=program.origin,
-        exec_addr=program.origin,
+        exec_addr=program.exec_address,
         data=program.get_binary_array(),
         extension="bin",
         type=NumericValue(0x02),

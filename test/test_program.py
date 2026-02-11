@@ -289,6 +289,50 @@ class TestProgram(unittest.TestCase):
         ]
         self.assertEqual(expected, statements)
 
+    def test_end_sets_exec_address(self):
+        statements = [
+            Statement("  NAM EXECADDR"),
+            Statement("  ORG $0600"),
+            Statement("  FCB $01"),
+            Statement("START LDA #$00"),
+            Statement("  END START"),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        statements = program.get_statements()
+        expected = [
+          "$0000                         NAM EXECADDR                       ;                                         ",
+          "$0600                         ORG $0600                          ;                                         ",
+          "$0600 01                      FCB $01                            ;                                         ",
+          "$0601 8600            START   LDA #$00                           ;                                         ",
+          "$0603                         END START                          ;                                         ",
+        ]
+        self.assertEqual(expected, statements)
+        self.assertEqual(0x0601, program.exec_address.int)
+
+    def test_end_no_label_sets_exec_address_to_origin(self):
+        statements = [
+            Statement("  NAM EXECADDR"),
+            Statement("  ORG $0600"),
+            Statement("  FCB $01"),
+            Statement("START LDA #$00"),
+            Statement("  END "),
+        ]
+        program = Program()
+        program.statements = statements
+        program.translate_statements()
+        statements = program.get_statements()
+        expected = [
+          "$0000                         NAM EXECADDR                       ;                                         ",
+          "$0600                         ORG $0600                          ;                                         ",
+          "$0600 01                      FCB $01                            ;                                         ",
+          "$0601 8600            START   LDA #$00                           ;                                         ",
+          "$0603                         END                                ;                                         ",
+        ]
+        self.assertEqual(expected, statements)
+        self.assertEqual(0x0600, program.exec_address.int)
+
     def test_translation_error_raised_on_bad_label(self):
         statement = Statement("LABEL JMP EXIT ; comment")
         program = Program()
