@@ -476,7 +476,7 @@ as well as the number of cycles used to execute each operation.
 | `FCB`     | Defines a byte constant value. Separate multiple bytes with `,`.           | `FCB $1C,$AA`         |
 | `FCC`     | Defines a string constant value enclosed in a matching pair of delimiters. | `FCC "hello"`         |
 | `FDB`     | Defines a word constant value. Separate multiple word with `,`.            | `FDB $2000,$CAFE`     |
-| `END`     | Defines the end of the program.                                            | `END`                 |
+| `END`     | Defines the end of the program; option label sets exec address.            | `END STARTLABEL`      |
 | `EQU`     | Defines a symbol with a set value.                                         | `SCRMEM EQU $1000`    |
 | `INCLUDE` | Includes another assembly source file at this location.                    | `INCLUDE globals.asm` |
 | `NAM`     | Sets the name for the program when assembled to disk or cassette.          | `NAM myprog`          |
@@ -488,6 +488,9 @@ as well as the number of cycles used to execute each operation.
 
 **Notes**
 
+* `END` - this mnemonic marks the end of the assembly language listing. An optional label can also be 
+supplied that instructs the assembler to use the label's address as the exec point for the assembled
+program. The label's address may differ from the `ORG` point of the assembly listing.
 * `SETDP` - this mnemonic is used for memory and instruction optimization by the assembler. For example, 
 if `SETDP $0E00` is set, any machine instructions that use `$0EXX` as a memory location will be assembled 
 using direct page addressing. Instructions such as `JMP $0E8F` will become `JMP <$8F`. The programmer is 
