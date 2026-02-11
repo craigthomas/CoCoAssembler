@@ -309,7 +309,7 @@ class TestProgram(unittest.TestCase):
           "$0603                         END START                          ;                                         ",
         ]
         self.assertEqual(expected, statements)
-        self.assertEqual(0x0601, program.exec_address)
+        self.assertEqual(0x0601, program.exec_address.int)
 
     def test_end_no_label_sets_exec_address_to_origin(self):
         statements = [
@@ -331,7 +331,7 @@ class TestProgram(unittest.TestCase):
           "$0603                         END                                ;                                         ",
         ]
         self.assertEqual(expected, statements)
-        self.assertEqual(0x0600, program.exec_address)
+        self.assertEqual(0x0600, program.exec_address.int)
 
     def test_translation_error_raised_on_bad_label(self):
         statement = Statement("LABEL JMP EXIT ; comment")
