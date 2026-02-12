@@ -361,6 +361,36 @@ class TestProgram(unittest.TestCase):
             program.statements = [statement]
             program.translate_statements()
 
+    def test_translation_error_raised_on_short_branch_too_large_backward_branch(self):
+        statements = [
+            "  ORG $0600",
+            "START LDA #$01",
+        ]
+        for x in range(400):
+            statements.append("    LDA #$01")
+        statements.append("  BRA START")
+        program = Program()
+        with self.assertRaises(TranslationError) as context:
+            program.process(statements)
+
+        the_exception = context.exception
+        self.assertEqual("short relative branch cannot be less than -128 bytes", the_exception.value)
+
+    def test_translation_error_raised_on_short_branch_too_large_forward_branch(self):
+        statements = [
+            "  ORG $0600",
+            "START BRA THEEND",
+        ]
+        for x in range(400):
+            statements.append("    LDA #$01")
+        statements.append("THEEND  LDA #$01")
+        program = Program()
+        with self.assertRaises(TranslationError) as context:
+            program.process(statements)
+
+        the_exception = context.exception
+        self.assertEqual("short relative branch cannot be more than 127 bytes", the_exception.value)
+
     def test_get_binary_array_empty_if_no_statements(self):
         program = Program()
         self.assertEqual([], program.get_binary_array())
