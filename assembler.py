@@ -38,6 +38,10 @@ def parse_arguments():
         help="print out the assembled statements when finished"
     )
     parser.add_argument(
+        "--print_length", metavar="LEN", help="truncates each assembly line printed to LEN characters",
+        default=0, type=int,
+    )
+    parser.add_argument(
         "--to_bin", metavar="BIN_FILE", help="stores the assembled program in a binary BIN_FILE"
     )
     parser.add_argument(
@@ -91,7 +95,7 @@ def main(args):
     program = Program()
 
     try:
-        program.process(source_file.get_buffer())
+        program.process(source_file.get_buffer(), line_length=args.print_length)
     except TranslationError as error:
         throw_error(error)
     except ParseError as error:

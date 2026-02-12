@@ -30,31 +30,33 @@ class Program(object):
         self.name = None
         self.macros = dict()
 
-    def process(self, source_file):
+    def process(self, source_file, line_length=0):
         """
         Processes a filename for assembly.
 
         :param source_file: the source file to process
+        :param line_length: the maximum length of a statement when printed
         """
-        self.statements = self.parse(source_file)
+        self.statements = self.parse(source_file, line_length=line_length)
         self.translate_statements()
 
     @classmethod
-    def parse(cls, contents):
+    def parse(cls, contents, line_length=0):
         """
         Parses a single file and saves the set of statements.
 
         :param contents: a list of strings, each string represents one line of assembly
+        :param line_length: sets the maximum length of a printed statement
         """
         statements = []
         for line in contents:
-            statement = Statement(line)
+            statement = Statement(line, line_length=line_length)
             if not statement.is_empty and not statement.is_comment_only:
                 statements.append(statement)
         return statements
 
     @classmethod
-    def process_mnemonics(cls, statements):
+    def process_mnemonics(cls, statements, line_length=0):
         """
         Given a list of statements, processes the mnemonics on each statement, and
         assigns each statement an Instruction object. If the statement is the
@@ -63,6 +65,7 @@ class Program(object):
         it will excise the macro code from the list of statements.
 
         :param statements: the list of statements to process
+        :param line_length: sets the maximum length of a printed statement
         :return: a list of processed statements, a list of processed macros
         """
         processed_statements = []
@@ -77,7 +80,12 @@ class Program(object):
             if include_filename:
                 include_source = SourceFile(include_filename)
                 include_source.read_file()
-                include, included_macros = cls.process_mnemonics(cls.parse(include_source.get_buffer()))
+                include, included_macros = cls.process_mnemonics(
+                    cls.parse(
+                        include_source.get_buffer(),
+                        line_length=line_length
+                    )
+                )
                 processed_statements.extend(include)
                 macros.update(included_macros)
             else:
@@ -267,9 +275,6 @@ class Program(object):
         """
         Returns a list of strings. Each string represents one assembled statement
         """
-        lines = []
-        for index, statement in enumerate(self.statements):
-            lines.append(f"{str(statement)}")
-        return lines
+        return [str(statement) for statement in self.statements]
 
 # E N D   O F   F I L E #######################################################

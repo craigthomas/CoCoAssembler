@@ -333,6 +333,27 @@ class TestProgram(unittest.TestCase):
         self.assertEqual(expected, statements)
         self.assertEqual(0x0600, program.exec_address.int)
 
+    def test_line_length_truncates_correctly(self):
+        statements = [
+            "  NAM EXECADDR",
+            "  ORG $0600",
+            "  FCB $01",
+            "START LDA #$00",
+            "  END START",
+        ]
+        program = Program()
+        program.process(statements, line_length=35)
+        statements = program.get_statements()
+        expected = [
+          "$0000                         NAM E",
+          "$0600                         ORG $",
+          "$0600 01                      FCB $",
+          "$0601 8600            START   LDA #",
+          "$0603                         END S",
+        ]
+        self.assertEqual(expected, statements)
+        self.assertEqual(0x0601, program.exec_address.int)
+
     def test_translation_error_raised_on_bad_label(self):
         statement = Statement("LABEL JMP EXIT ; comment")
         program = Program()

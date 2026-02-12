@@ -56,7 +56,7 @@ class Statement(object):
     The statement can be parsed and translated to its Chip8 machine code
     equivalent.
     """
-    def __init__(self, line):
+    def __init__(self, line, line_length=0):
         self.is_empty = True
         self.is_comment_only = False
         self.macro_name = ""
@@ -73,6 +73,7 @@ class Statement(object):
         self.pcr_size_hint = 2
         self.code_pkg = CodePackage()
         self.original_line = line
+        self.line_length = line_length
         self.compile_macro_call_regex()
         self.parse_line(line)
 
@@ -82,15 +83,16 @@ class Statement(object):
         op_code_string += self.code_pkg.post_byte.hex()
         op_code_string += self.code_pkg.additional.hex()
 
-        return "${} {:.10} {} {} {} ; {}".format(
-            self.code_pkg.address.hex(size=4),
-            op_code_string.ljust(10, ' '),
-            self.label.rjust(10, ' '),
-            self.mnemonic.rjust(5, ' '),
-            self.original_operand.operand_string.ljust(30, ' '),
-            self.comment.ljust(40, ' '),
-            # self.operand.type
-        )
+        address = self.code_pkg.address.hex(size=4)
+        op_string = op_code_string.ljust(10, ' ')
+        label = self.label.rjust(10, ' ')
+        mnemonic = self.mnemonic.rjust(5, ' ')
+        original = self.original_operand.operand_string.ljust(30, ' ')
+        comment = self.comment.ljust(40, ' ')
+
+        result = f"${address} {op_string:.10} {label} {mnemonic} {original} ; {comment}"
+
+        return result if self.line_length <= 0 else result[:self.line_length]
 
     def __eq__(self, other):
         return self.is_empty == other.is_empty and \
