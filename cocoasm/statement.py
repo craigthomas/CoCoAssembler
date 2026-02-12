@@ -326,10 +326,18 @@ class Statement(object):
                 length = 1
                 for statement in statements[branch_index:this_index+1]:
                     length += statement.code_pkg.size
+
+                # Check for overflow errors if this is a short relative operation
+                if self.instruction.is_short_branch and length > 128:
+                    raise TranslationError(f"short relative branch cannot be less than -128 bytes", self)
                 self.code_pkg.additional = NumericValue(base_value - length, size_hint=size_hint)
             else:
                 for statement in statements[this_index+1:branch_index]:
                     length += statement.code_pkg.size
+
+                # Check for overflow errors if this is a short relative operation
+                if self.instruction.is_short_branch and length > 127:
+                    raise TranslationError(f"short relative branch cannot be more than 127 bytes", self)
                 self.code_pkg.additional = NumericValue(length, size_hint=size_hint)
             return
 
