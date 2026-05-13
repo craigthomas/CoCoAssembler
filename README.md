@@ -45,8 +45,7 @@
 
 # What is it?
 
-This project is an assembler for the Tandy Color Computer 1, 2 and 3 written in Python 3.6+.
-More broadly speaking, it is an assembler that targets the Motorola 6809 processor, meaning it 
+This project is an assembler that targets the Motorola 6809 processor, meaning it 
 targets any computer that used the 6809 as it's main CPU (e.g. the 
 [Dragon 32 and 64](https://en.wikipedia.org/wiki/Dragon_32/64), 
 [Vectrex](https://en.wikipedia.org/wiki/Vectrex), [Thomson TO7](https://en.wikipedia.org/wiki/Thomson_TO7), 
